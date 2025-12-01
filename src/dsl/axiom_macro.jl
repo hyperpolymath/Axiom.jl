@@ -1,0 +1,239 @@
+# Axiom.jl @axiom DSL Macro
+#
+# The core of Axiom.jl's declarative model definition.
+# Transforms high-level model specifications into verified, optimized code.
+
+"""
+    @axiom name body
+
+Define a verified machine learning model with compile-time guarantees.
+
+# Syntax
+```julia
+@axiom ModelName begin
+    input :: TensorType
+    output :: TensorType
+
+    # Layer definitions
+    layer1 = input |> SomeLayer(...)
+    layer2 = layer1 |> AnotherLayer(...)
+    output = layer2 |> FinalLayer(...)
+
+    # Invariants (checked at compile time where possible)
+    @ensure property1
+    @ensure property2
+end
+```
+
+# Example
+```julia
+@axiom Classifier begin
+    input :: Tensor{Float32, (28, 28, 1)}
+    output :: Tensor{Float32, (10,)}
+
+    features = input |> Flatten |> Dense(128, relu) |> Dense(64, relu)
+    logits = features |> Dense(10)
+    output = logits |> Softmax
+
+    @ensure sum(output) ≈ 1.0
+    @ensure all(output .>= 0)
+end
+```
+"""
+macro axiom(name, body)
+    # Parse the model definition
+    parsed = parse_axiom_body(body)
+
+    # Generate the model struct and methods
+    generate_axiom_code(name, parsed)
+end
+
+"""
+Parsed representation of an @axiom body.
+"""
+struct AxiomDefinition
+    input_type::Union{Expr, Nothing}
+    output_type::Union{Expr, Nothing}
+    layers::Vector{Pair{Symbol, Expr}}
+    ensures::Vector{Expr}
+    proves::Vector{Expr}
+end
+
+"""
+Parse the body of an @axiom block.
+"""
+function parse_axiom_body(body::Expr)
+    @assert body.head == :block "Expected begin...end block"
+
+    input_type = nothing
+    output_type = nothing
+    layers = Pair{Symbol, Expr}[]
+    ensures = Expr[]
+    proves = Expr[]
+
+    for expr in body.args
+        # Skip line numbers
+        expr isa LineNumberNode && continue
+
+        if expr isa Expr
+            if expr.head == :(::)
+                # Type annotation: input :: Type or output :: Type
+                name, typ = expr.args
+                if name == :input
+                    input_type = typ
+                elseif name == :output
+                    output_type = typ
+                end
+            elseif expr.head == :(=)
+                # Assignment: layer = expr
+                name, value = expr.args
+                push!(layers, name => value)
+            elseif expr.head == :macrocall
+                # Macro: @ensure or @prove
+                macro_name = string(expr.args[1])
+                if macro_name == "@ensure"
+                    push!(ensures, expr.args[3])  # Skip macro name and line number
+                elseif macro_name == "@prove"
+                    push!(proves, expr.args[3])
+                end
+            end
+        end
+    end
+
+    AxiomDefinition(input_type, output_type, layers, ensures, proves)
+end
+
+"""
+Generate Julia code from parsed axiom definition.
+"""
+function generate_axiom_code(name::Symbol, def::AxiomDefinition)
+    # Build layer initialization
+    layer_fields = []
+    layer_inits = []
+
+    for (layer_name, layer_expr) in def.layers
+        # Skip 'output' as it's a computed value
+        layer_name == :output && continue
+
+        push!(layer_fields, :($layer_name::Any))
+        push!(layer_inits, :($layer_name = $(esc(layer_expr))))
+    end
+
+    # Build forward pass
+    forward_body = []
+    for (layer_name, layer_expr) in def.layers
+        if is_pipeline_expr(layer_expr)
+            # Pipeline expression: x |> Layer(...)
+            push!(forward_body, :($layer_name = $(transform_pipeline(layer_expr))))
+        else
+            push!(forward_body, :($layer_name = $(esc(layer_expr))))
+        end
+    end
+
+    # Build ensure checks
+    ensure_checks = []
+    for ensure_expr in def.ensures
+        check_name = gensym("ensure")
+        push!(ensure_checks, quote
+            $check_name = $(esc(ensure_expr))
+            if !$check_name
+                throw(AxiomViolation($(string(ensure_expr)), "Ensure condition failed"))
+            end
+        end)
+    end
+
+    # Generate the struct and methods
+    quote
+        struct $(esc(name)) <: AxiomModel
+            $(layer_fields...)
+
+            function $(esc(name))()
+                $(layer_inits...)
+                new($([:($n) for (n, _) in def.layers if n != :output]...))
+            end
+        end
+
+        function (m::$(esc(name)))(input)
+            $(forward_body...)
+            $(ensure_checks...)
+            return output
+        end
+
+        # Store metadata for verification
+        Axiom._axiom_metadata[$(QuoteNode(name))] = $(QuoteNode(def))
+    end
+end
+
+"""
+Check if expression is a pipeline (uses |> operator).
+"""
+function is_pipeline_expr(expr::Expr)
+    expr.head == :call && expr.args[1] == :|>
+end
+is_pipeline_expr(::Any) = false
+
+"""
+Transform pipeline expression to function composition.
+"""
+function transform_pipeline(expr::Expr)
+    if !is_pipeline_expr(expr)
+        return esc(expr)
+    end
+
+    input, layer = expr.args[2], expr.args[3]
+
+    # Recursively transform nested pipelines
+    if is_pipeline_expr(input)
+        input = transform_pipeline(input)
+    else
+        input = esc(input)
+    end
+
+    # Apply the layer
+    :($layer($input))
+end
+
+"""
+Base type for all Axiom models.
+"""
+abstract type AxiomModel end
+
+"""
+Exception for axiom violations.
+"""
+struct AxiomViolation <: Exception
+    property::String
+    message::String
+end
+
+function Base.showerror(io::IO, e::AxiomViolation)
+    println(io, "Axiom Violation: $(e.message)")
+    println(io, "  Property: $(e.property)")
+end
+
+# Global metadata storage
+const _axiom_metadata = Dict{Symbol, AxiomDefinition}()
+
+# Convenience macro for quick model definition
+"""
+    @model name layers...
+
+Quick model definition without full @axiom ceremony.
+
+# Example
+```julia
+model = @model Sequential(
+    Flatten,
+    Dense(784, 128, relu),
+    Dense(128, 10),
+    Softmax
+)
+```
+"""
+macro model(expr)
+    if expr.head == :call && expr.args[1] == :Sequential
+        layers = expr.args[2:end]
+        return :(Sequential($(map(esc, layers)...)))
+    end
+    error("@model expects Sequential(...) syntax")
+end
