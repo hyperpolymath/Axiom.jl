@@ -6,6 +6,7 @@
 
 [![Julia](https://img.shields.io/badge/Julia-1.9+-purple.svg)](https://julialang.org/)
 [![Rust](https://img.shields.io/badge/Rust-Backend-orange.svg)](https://www.rust-lang.org/)
+[![Zig](https://img.shields.io/badge/Zig-Backend-yellow.svg)](https://ziglang.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 **The ML framework where bugs are caught before runtime, not after deployment.**
@@ -138,27 +139,31 @@ result = verify(model, properties=[ValidProbabilities()])
 
 ### Getting Started
 - [Vision & Philosophy](Vision.md) - Why Axiom.jl exists
-- [Installation Guide](Installation.md) - Get up and running
-- [First Model Tutorial](../tutorials/first-model.md) - Build your first model
+- [Tutorials](Tutorials.md) - From beginner to expert
 - [PyTorch Migration](Migration-Guide.md) - Coming from PyTorch?
+- [FAQ](FAQ.md) - Common questions answered
 
 ### Core Concepts
 - [@axiom DSL](Axiom-DSL.md) - The declarative model definition
 - [Verification System](Verification.md) - @ensure and @prove
-- [Type System](Type-System.md) - Compile-time shape checking
+- [Architecture](Architecture.md) - Deep dive into design
 - [Rust Backend](Rust-Backend.md) - Performance architecture
 
 ### API Reference
-- [Layers](../api/layers.md) - Dense, Conv, Pool, etc.
-- [Activations](../api/activations.md) - ReLU, GELU, Softmax, etc.
-- [Optimizers](../api/optimizers.md) - Adam, SGD, etc.
-- [Loss Functions](../api/loss.md) - CrossEntropy, MSE, etc.
+- [Complete API Reference](API-Reference.md) - All functions, types, macros
+- Layers - Dense, Conv, Pool, etc.
+- Activations - ReLU, GELU, Softmax, etc.
+- Optimizers - Adam, SGD, etc.
+- Loss Functions - CrossEntropy, MSE, etc.
 
-### Advanced
-- [Custom Layers](Custom-Layers.md) - Build your own
-- [Formal Proofs](Formal-Proofs.md) - Mathematical guarantees
-- [GPU Acceleration](GPU.md) - CUDA and Metal
-- [Distributed Training](Distributed.md) - Scale across machines
+### Production
+- [Performance Tuning](Performance-Tuning.md) - Optimize for speed
+- [Safety-Critical Applications](Safety-Critical.md) - FDA, ISO 26262, DO-178C
+- [Deployment Guide](Deployment.md) - Server, edge, cloud
+- [Ecosystem & Integrations](Ecosystem.md) - Connect to Julia/Python world
+
+### Compare
+- [Framework Comparison](Framework-Comparison.md) - vs PyTorch, TensorFlow, JAX
 
 ---
 
