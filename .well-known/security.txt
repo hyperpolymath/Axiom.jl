@@ -1,0 +1,13 @@
+# Axiom.jl Security Information
+# https://securitytxt.org/
+# https://www.rfc-editor.org/rfc/rfc9116
+
+Contact: mailto:security@axiom-jl.org
+Contact: https://github.com/Hyperpolymath/Axiom.jl/security/advisories/new
+Expires: 2026-01-01T00:00:00.000Z
+Encryption: https://axiom-jl.org/.well-known/pgp-key.txt
+Preferred-Languages: en
+Canonical: https://axiom-jl.org/.well-known/security.txt
+Policy: https://github.com/Hyperpolymath/Axiom.jl/blob/main/SECURITY.md
+Hiring: https://axiom-jl.org/careers
+Acknowledgments: https://github.com/Hyperpolymath/Axiom.jl/blob/main/SECURITY.md#acknowledgments

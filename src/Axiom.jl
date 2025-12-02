@@ -1,9 +1,12 @@
+# SPDX-FileCopyrightText: 2025 Axiom.jl Contributors
+# SPDX-License-Identifier: MIT
+
 # Axiom.jl - Provably Correct Machine Learning
 #
 # A Julia ML framework with:
 # - Compile-time shape verification
 # - Formal property guarantees
-# - Rust performance backend
+# - Rust/Zig performance backends
 # - PyTorch model import
 
 module Axiom

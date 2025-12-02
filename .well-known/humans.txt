@@ -1,0 +1,25 @@
+/* TEAM */
+Project: Axiom.jl - Provably Correct Machine Learning
+Site: https://axiom-jl.org
+Repository: https://github.com/Hyperpolymath/Axiom.jl
+
+/* MAINTAINERS */
+See MAINTAINERS.md for the full list of maintainers.
+
+/* CONTRIBUTORS */
+See git log for the full list of contributors.
+
+/* THANKS */
+Julia Computing - For the Julia programming language
+Rust Foundation - For the Rust programming language
+Zig Software Foundation - For the Zig programming language
+PyTorch Team - For inspiration and compatibility
+IndieWeb Community - For web standards guidance
+RSR Community - For the Rhodium Standard
+
+/* SITE */
+Last update: 2025-01-01
+Language: English
+Standards: RSR (Rhodium Standard Repositories)
+Components: Julia, Rust, Zig
+License: MIT
