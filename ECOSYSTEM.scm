@@ -8,7 +8,7 @@
   (version "1.0.0")
   (name "axiom.jl")
   (type "project")
-  (purpose "<div align=\"center\">")
+  (purpose "Provably correct machine learning framework with compile-time verification")
 
   (position-in-ecosystem
     "Part of the hyperpolymath ecosystem of tools, libraries, and specifications.
@@ -53,7 +53,8 @@
          ECOSYSTEM.scm = Project relationship format")))
 
   (what-this-is
-    "<div align=\"center\">
+    "A next-generation ML framework combining compile-time verification,
+     formal guarantees, and high performance.
 
      Design principles:
      - RSR Gold compliance target

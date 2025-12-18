@@ -20,7 +20,7 @@
      (title . "Initial Architecture and RSR Compliance")
      (status . "accepted")
      (date . "2025-12-15")
-     (context . "<div align=\"center\">")
+     (context . "Need for a machine learning framework that catches bugs at compile time rather than runtime, with formal verification capabilities for safety-critical applications")
      (decision . "Establish foundational architecture following Rhodium Standard Repository guidelines with multi-platform CI/CD, SHA-pinned actions, and SPDX headers")
      (consequences . ("RSR Gold compliance target"
                       "SHA-pinned GitHub Actions for security"

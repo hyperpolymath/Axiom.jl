@@ -1,22 +1,42 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
 name: Rust
 
 on:
   push:
-    branches: [ "claude/ferrite-julia-rust-hybrid-01J4hpTCw5mmRbb73fmWrM5Q" ]
+    branches: [main, master, develop]
+    paths:
+      - 'rust/**'
   pull_request:
-    branches: [ "claude/ferrite-julia-rust-hybrid-01J4hpTCw5mmRbb73fmWrM5Q" ]
+    branches: [main, master]
+    paths:
+      - 'rust/**'
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+
+    - name: Check formatting
+      run: cargo fmt --check
+
+    - name: Clippy lints
+      run: cargo clippy -- -D warnings
+
     - name: Build
       run: cargo build --verbose
+
     - name: Run tests
       run: cargo test --verbose
