@@ -1,0 +1,36 @@
+= Axiom.jl - Citation Guide
+:toc:
+
+== BibTeX
+
+[source,bibtex]
+----
+@software{axiom.jl_2025,
+  author = {Polymath, Hyper},
+  title = {Axiom.jl},
+  year = {2025},
+  url = {https://github.com/hyperpolymath/Axiom.jl},
+  license = {AGPL-3.0-or-later}
+}
+----
+
+== Harvard Style
+
+Polymath, H. (2025) _Axiom.jl_ [Computer software]. Available at: https://github.com/hyperpolymath/Axiom.jl
+
+== OSCOLA
+
+Hyper Polymath, 'Axiom.jl' (2025) <https://github.com/hyperpolymath/Axiom.jl>
+
+== MLA
+
+Polymath, Hyper. "Axiom.jl." 2025, github.com/hyperpolymath/Axiom.jl.
+
+== APA 7
+
+Polymath, H. (2025). _Axiom.jl_ [Computer software]. GitHub. https://github.com/hyperpolymath/Axiom.jl
+
+== See Also
+
+* link:../CITATION.cff[CITATION.cff]
+* link:../codemeta.json[codemeta.json]

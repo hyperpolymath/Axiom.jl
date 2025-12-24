@@ -1,0 +1,264 @@
+# Axiom.jl Loss Functions
+#
+# Standard loss functions for neural network training.
+
+"""
+    mse_loss(pred, target; reduction=:mean)
+
+Mean Squared Error loss.
+
+# Arguments
+- `pred`: Predictions
+- `target`: Ground truth
+- `reduction`: :mean, :sum, or :none
+"""
+function mse_loss(pred, target; reduction::Symbol=:mean)
+    diff = (pred .- target) .^ 2
+
+    if reduction == :mean
+        mean(diff)
+    elseif reduction == :sum
+        sum(diff)
+    else
+        diff
+    end
+end
+
+"""
+    l1_loss(pred, target; reduction=:mean)
+
+L1 (Mean Absolute Error) loss.
+"""
+function l1_loss(pred, target; reduction::Symbol=:mean)
+    diff = abs.(pred .- target)
+
+    if reduction == :mean
+        mean(diff)
+    elseif reduction == :sum
+        sum(diff)
+    else
+        diff
+    end
+end
+
+"""
+    smooth_l1_loss(pred, target; beta=1.0, reduction=:mean)
+
+Smooth L1 loss (Huber loss).
+"""
+function smooth_l1_loss(pred, target; beta::Float32=1.0f0, reduction::Symbol=:mean)
+    diff = abs.(pred .- target)
+    loss = ifelse.(diff .< beta,
+                   0.5f0 .* diff .^ 2 ./ beta,
+                   diff .- 0.5f0 .* beta)
+
+    if reduction == :mean
+        mean(loss)
+    elseif reduction == :sum
+        sum(loss)
+    else
+        loss
+    end
+end
+
+"""
+    crossentropy(pred, target; reduction=:mean)
+
+Cross-entropy loss for classification.
+
+# Arguments
+- `pred`: Predicted probabilities (after softmax)
+- `target`: Ground truth labels (one-hot or indices)
+- `reduction`: :mean, :sum, or :none
+"""
+function crossentropy(pred, target; reduction::Symbol=:mean, eps::Float32=1e-7f0)
+    # Clamp predictions for numerical stability
+    pred_clamped = clamp.(pred, eps, 1.0f0 - eps)
+
+    if target isa AbstractVector{<:Integer}
+        # Index format - select correct class probability
+        batch_size = size(pred, 1)
+        loss = [-log(pred_clamped[i, target[i]]) for i in 1:batch_size]
+    else
+        # One-hot format
+        loss = -sum(target .* log.(pred_clamped), dims=2)
+    end
+
+    if reduction == :mean
+        mean(loss)
+    elseif reduction == :sum
+        sum(loss)
+    else
+        loss
+    end
+end
+
+"""
+    binary_crossentropy(pred, target; reduction=:mean)
+
+Binary cross-entropy loss.
+"""
+function binary_crossentropy(pred, target; reduction::Symbol=:mean, eps::Float32=1e-7f0)
+    pred_clamped = clamp.(pred, eps, 1.0f0 - eps)
+    loss = -(target .* log.(pred_clamped) .+ (1 .- target) .* log.(1 .- pred_clamped))
+
+    if reduction == :mean
+        mean(loss)
+    elseif reduction == :sum
+        sum(loss)
+    else
+        loss
+    end
+end
+
+"""
+    nll_loss(pred, target; reduction=:mean)
+
+Negative Log Likelihood loss (expects log probabilities).
+"""
+function nll_loss(pred, target; reduction::Symbol=:mean)
+    if target isa AbstractVector{<:Integer}
+        batch_size = size(pred, 1)
+        loss = [-pred[i, target[i]] for i in 1:batch_size]
+    else
+        loss = -sum(target .* pred, dims=2)
+    end
+
+    if reduction == :mean
+        mean(loss)
+    elseif reduction == :sum
+        sum(loss)
+    else
+        loss
+    end
+end
+
+"""
+    kl_divergence(p, q; reduction=:mean)
+
+KL Divergence: KL(p || q) = sum(p * log(p / q))
+"""
+function kl_divergence(p, q; reduction::Symbol=:mean, eps::Float32=1e-7f0)
+    p_clamped = clamp.(p, eps, 1.0f0)
+    q_clamped = clamp.(q, eps, 1.0f0)
+
+    loss = sum(p_clamped .* log.(p_clamped ./ q_clamped), dims=2)
+
+    if reduction == :mean
+        mean(loss)
+    elseif reduction == :sum
+        sum(loss)
+    else
+        loss
+    end
+end
+
+"""
+    hinge_loss(pred, target; reduction=:mean)
+
+Hinge loss for SVMs and margin-based classification.
+"""
+function hinge_loss(pred, target; reduction::Symbol=:mean)
+    # target should be -1 or 1
+    loss = max.(0, 1 .- target .* pred)
+
+    if reduction == :mean
+        mean(loss)
+    elseif reduction == :sum
+        sum(loss)
+    else
+        loss
+    end
+end
+
+"""
+    focal_loss(pred, target; alpha=0.25, gamma=2.0, reduction=:mean)
+
+Focal Loss for handling class imbalance.
+"""
+function focal_loss(pred, target; alpha::Float32=0.25f0, gamma::Float32=2.0f0,
+                    reduction::Symbol=:mean, eps::Float32=1e-7f0)
+    pred_clamped = clamp.(pred, eps, 1.0f0 - eps)
+
+    # Binary case
+    ce = -target .* log.(pred_clamped) .- (1 .- target) .* log.(1 .- pred_clamped)
+    p_t = target .* pred_clamped .+ (1 .- target) .* (1 .- pred_clamped)
+    alpha_t = target .* alpha .+ (1 .- target) .* (1 - alpha)
+
+    loss = alpha_t .* ((1 .- p_t) .^ gamma) .* ce
+
+    if reduction == :mean
+        mean(loss)
+    elseif reduction == :sum
+        sum(loss)
+    else
+        loss
+    end
+end
+
+"""
+    contrastive_loss(embeddings1, embeddings2, labels; margin=1.0, reduction=:mean)
+
+Contrastive loss for siamese networks.
+"""
+function contrastive_loss(emb1, emb2, labels; margin::Float32=1.0f0, reduction::Symbol=:mean)
+    # labels: 1 for similar, 0 for dissimilar
+    distances = sqrt.(sum((emb1 .- emb2) .^ 2, dims=2) .+ 1e-7f0)
+
+    # Similar pairs: minimize distance
+    # Dissimilar pairs: maximize distance up to margin
+    loss = labels .* distances .^ 2 .+ (1 .- labels) .* max.(0, margin .- distances) .^ 2
+
+    if reduction == :mean
+        mean(loss)
+    elseif reduction == :sum
+        sum(loss)
+    else
+        loss
+    end
+end
+
+"""
+    triplet_loss(anchor, positive, negative; margin=0.2, reduction=:mean)
+
+Triplet loss for metric learning.
+"""
+function triplet_loss(anchor, positive, negative; margin::Float32=0.2f0, reduction::Symbol=:mean)
+    pos_dist = sqrt.(sum((anchor .- positive) .^ 2, dims=2) .+ 1e-7f0)
+    neg_dist = sqrt.(sum((anchor .- negative) .^ 2, dims=2) .+ 1e-7f0)
+
+    loss = max.(0, pos_dist .- neg_dist .+ margin)
+
+    if reduction == :mean
+        mean(loss)
+    elseif reduction == :sum
+        sum(loss)
+    else
+        loss
+    end
+end
+
+# ============================================================================
+# Loss function wrappers for @axiom
+# ============================================================================
+
+"""
+    Loss
+
+Wrapper type that stores loss function with its parameters.
+"""
+struct Loss{F, P}
+    fn::F
+    params::P
+end
+
+Loss(fn::Function; kwargs...) = Loss(fn, kwargs)
+
+(loss::Loss)(pred, target) = loss.fn(pred, target; loss.params...)
+
+# Pre-configured losses
+const MSELoss = Loss(mse_loss)
+const L1Loss = Loss(l1_loss)
+const CrossEntropyLoss = Loss(crossentropy)
+const BCELoss = Loss(binary_crossentropy)
+const NLLLoss = Loss(nll_loss)
