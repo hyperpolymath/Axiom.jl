@@ -313,8 +313,84 @@ function ConvTranspose2d(
 end
 
 function forward(c::ConvTranspose2d, x::AbstractArray)
-    # Transposed convolution (simplified implementation)
-    error("ConvTranspose2d forward not implemented - use Rust backend")
+    # Transposed convolution (deconvolution) - pure Julia implementation
+    # x shape: (N, H, W, C_in) or (H, W, C_in)
+
+    has_batch = ndims(x) == 4
+    if !has_batch
+        x = reshape(x, 1, size(x)...)
+    end
+
+    N, H_in, W_in, C_in = size(x)
+    kH, kW = c.kernel_size
+    sH, sW = c.stride
+    pH, pW = c.padding
+    opH, opW = c.output_padding
+
+    # Output dimensions for transposed convolution
+    H_out = (H_in - 1) * sH - 2 * pH + kH + opH
+    W_out = (W_in - 1) * sW - 2 * pW + kW + opW
+
+    # Allocate output
+    y = zeros(eltype(x), N, H_out, W_out, c.out_channels)
+
+    # Transposed convolution: scatter input values weighted by kernel
+    for n in 1:N
+        for ic in 1:C_in
+            for oc in 1:c.out_channels
+                for i in 1:H_in
+                    for j in 1:W_in
+                        # Calculate output region this input affects
+                        h_start = (i - 1) * sH + 1 - pH
+                        w_start = (j - 1) * sW + 1 - pW
+
+                        input_val = x[n, i, j, ic]
+
+                        # Scatter to output with kernel weights
+                        for kh in 1:kH
+                            for kw in 1:kW
+                                h_out = h_start + kh - 1
+                                w_out = w_start + kw - 1
+
+                                # Check bounds
+                                if 1 <= h_out <= H_out && 1 <= w_out <= W_out
+                                    y[n, h_out, w_out, oc] += input_val * c.weight[kh, kw, oc, ic]
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    # Add bias
+    if c.bias !== nothing
+        for oc in 1:c.out_channels
+            y[:, :, :, oc] .+= c.bias[oc]
+        end
+    end
+
+    has_batch ? y : dropdims(y, dims=1)
+end
+
+function output_shape(c::ConvTranspose2d, input_shape)
+    H, W, C = input_shape[end-2:end]
+    N = length(input_shape) == 4 ? input_shape[1] : nothing
+
+    kH, kW = c.kernel_size
+    sH, sW = c.stride
+    pH, pW = c.padding
+    opH, opW = c.output_padding
+
+    H_out = (H - 1) * sH - 2 * pH + kH + opH
+    W_out = (W - 1) * sW - 2 * pW + kW + opW
+
+    if N !== nothing
+        (N, H_out, W_out, c.out_channels)
+    else
+        (H_out, W_out, c.out_channels)
+    end
 end
 
 function parameters(c::ConvTranspose2d)
