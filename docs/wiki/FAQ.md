@@ -369,6 +369,11 @@ Open an issue on [GitHub](https://github.com/Hyperpolymath/Axiom.jl/issues) with
 
 See [Roadmap-TODOs](Roadmap-TODOs.md) for planned work and open TODOs, plus [Vision](Vision.md) for long-term direction.
 
+### Is Axiom Julia-first?
+
+Yes. The core DSL, verification pipeline, and SMT integration are Julia-native.
+Rust backends are optional and only used when explicitly enabled.
+
 ---
 
 ## More Questions?
