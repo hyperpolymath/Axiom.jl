@@ -3,6 +3,8 @@
 # Formal verification system for proving properties about models.
 # Uses symbolic execution and SMT solver integration.
 
+import SMTLib
+
 """
     @prove property
 
@@ -180,168 +182,117 @@ end
 """
 SMT solver integration for formal verification.
 
-This integrates with external SMT solvers (Z3, CVC5) when available.
+This integrates with external SMT solvers (Z3, CVC5, Yices, MathSAT) via SMTLib.
 Falls back to heuristic methods otherwise.
 """
 function smt_proof(property::ParsedProperty)
-    # Check if SMT solver is available
-    solver = get_smt_solver()
+    ctx = get_smt_context()
 
-    if solver === nothing
+    if ctx === nothing
         return ProofResult(:unknown, nothing, 0.0)
     end
 
-    # Convert property to SMT-LIB format
-    smt_formula = property_to_smt(property)
+    vars = property.variables
+    expr = normalize_smt_expr(property.body)
 
-    # Query the solver
-    result = query_smt_solver(solver, smt_formula)
+    for v in vars
+        SMTLib.declare(ctx, v, Float64)
+    end
 
-    if result == :sat
-        # Found counterexample
-        counterexample = extract_counterexample(solver)
-        return ProofResult(:disproven, counterexample, 1.0)
-    elseif result == :unsat
-        # Property proven
-        return ProofResult(:proven, nothing, 1.0)
+    if property.quantifier == :exists
+        SMTLib.assert!(ctx, expr)
     else
-        # Solver timeout or unknown
-        return ProofResult(:unknown, nothing, 0.0)
+        SMTLib.assert!(ctx, Expr(:call, :!, expr))
     end
+
+    result = SMTLib.check_sat(ctx; get_model=true)
+
+    if result.status == :sat
+        if property.quantifier == :exists
+            return ProofResult(:proven, result.model, 1.0)
+        end
+        return ProofResult(:disproven, result.model, 1.0)
+    elseif result.status == :unsat
+        if property.quantifier == :exists
+            return ProofResult(:disproven, nothing, 1.0)
+        end
+        return ProofResult(:proven, nothing, 1.0)
+    end
+
+    ProofResult(:unknown, nothing, 0.0)
+end
+
+"""
+Normalize expressions for SMT-LIB conversion.
+"""
+function normalize_smt_expr(expr)
+    if expr isa Expr
+        if expr.head == :call && expr.args[1] == :≈ && length(expr.args) == 3
+            return Expr(:call, :(==), normalize_smt_expr(expr.args[2]), normalize_smt_expr(expr.args[3]))
+        end
+        return Expr(expr.head, map(normalize_smt_expr, expr.args)...)
+    end
+    expr
 end
 
 """
 Get available SMT solver.
 """
+const SMT_ALLOWLIST = Set([:z3, :cvc5, :yices, :mathsat])
+
+function smt_solver_preference()
+    preference = get(ENV, "AXIOM_SMT_SOLVER", nothing)
+    preference === nothing && return nothing
+    Symbol(lowercase(preference))
+end
+
+function smt_timeout_ms()
+    raw = get(ENV, "AXIOM_SMT_TIMEOUT_MS", nothing)
+    raw === nothing && return 30000
+    parsed = tryparse(Int, raw)
+    parsed === nothing ? 30000 : parsed
+end
+
+function smt_logic()
+    raw = get(ENV, "AXIOM_SMT_LOGIC", nothing)
+    raw === nothing && return :QF_NRA
+    Symbol(uppercase(raw))
+end
+
 function get_smt_solver()
-    # Check for Z3
-    z3_path = Sys.which("z3")
-    if z3_path !== nothing
-        return SMTSolver(:z3, z3_path)
-    end
-
-    # Check for CVC5
-    cvc5_path = Sys.which("cvc5")
-    if cvc5_path !== nothing
-        return SMTSolver(:cvc5, cvc5_path)
-    end
-
-    nothing
-end
-
-"""
-SMT solver wrapper.
-"""
-struct SMTSolver
-    kind::Symbol
-    path::String
-end
-
-"""
-Convert property to SMT-LIB format.
-"""
-function property_to_smt(property::ParsedProperty)
-    # Generate SMT-LIB2 formula
-    vars = property.variables
-    body = property.body
-
-    smt = "(set-logic QF_NRA)\n"  # Quantifier-free nonlinear real arithmetic
-
-    # Declare variables
-    for v in vars
-        smt *= "(declare-const $(v) Real)\n"
-    end
-
-    # Convert body to SMT
-    smt *= "(assert (not $(expr_to_smt(body))))\n"
-    smt *= "(check-sat)\n"
-    smt *= "(get-model)\n"
-
-    smt
-end
-
-"""
-Convert Julia expression to SMT-LIB format.
-"""
-function expr_to_smt(expr)
-    if expr isa Symbol
-        return string(expr)
-    elseif expr isa Number
-        return string(Float64(expr))
-    elseif expr isa Expr
-        if expr.head == :call
-            op = expr.args[1]
-            args = expr.args[2:end]
-
-            smt_op = julia_to_smt_op(op)
-            smt_args = join([expr_to_smt(a) for a in args], " ")
-
-            return "($smt_op $smt_args)"
-        end
-    end
-
-    # Default: stringify
-    string(expr)
-end
-
-"""
-Map Julia operators to SMT-LIB operators.
-"""
-function julia_to_smt_op(op)
-    op_map = Dict(
-        :+ => "+",
-        :- => "-",
-        :* => "*",
-        :/ => "/",
-        :>= => ">=",
-        :<= => "<=",
-        :> => ">",
-        :< => "<",
-        :(==) => "=",
-        :&& => "and",
-        :|| => "or",
-        :! => "not",
-        :≈ => "=",  # Approximate equality -> exact for SMT
-        :∧ => "and",
-        :∨ => "or",
-        :¬ => "not",
-    )
-    get(op_map, op, string(op))
-end
-
-"""
-Query SMT solver with formula.
-"""
-function query_smt_solver(solver::SMTSolver, formula::String)
-    # Write formula to temp file
-    temp_file = tempname() * ".smt2"
-    write(temp_file, formula)
-
-    try
-        # Run solver with timeout
-        result = read(`$(solver.path) $temp_file`, String)
-
-        if occursin("unsat", result)
-            return :unsat
-        elseif occursin("sat", result)
-            return :sat
+    path_override = get(ENV, "AXIOM_SMT_SOLVER_PATH", nothing)
+    if path_override !== nothing
+        kind_raw = get(ENV, "AXIOM_SMT_SOLVER_KIND", nothing)
+        if kind_raw === nothing
+            @warn "AXIOM_SMT_SOLVER_PATH set without AXIOM_SMT_SOLVER_KIND; ignoring override"
         else
-            return :unknown
+            kind = Symbol(lowercase(kind_raw))
+            if kind in SMT_ALLOWLIST
+                return SMTLib.SMTSolver(kind, path_override, "custom")
+            end
+            @warn "SMT solver kind not allowed" kind=kind
         end
-    catch e
-        @debug "SMT solver error: $e"
-        return :unknown
-    finally
-        rm(temp_file, force=true)
     end
+
+    solvers = SMTLib.available_solvers()
+    solvers = filter(s -> s.kind in SMT_ALLOWLIST, solvers)
+    preference = smt_solver_preference()
+    if preference !== nothing
+        for solver in solvers
+            if solver.kind == preference
+                return solver
+            end
+        end
+        @warn "Preferred SMT solver not available" preferred=preference available=[s.kind for s in solvers]
+    end
+
+    isempty(solvers) ? nothing : first(solvers)
 end
 
-"""
-Extract counterexample from SMT solver.
-"""
-function extract_counterexample(solver::SMTSolver)
-    # Would parse model from solver output
-    nothing
+function get_smt_context()
+    solver = get_smt_solver()
+    solver === nothing && return nothing
+    SMTLib.SMTContext(solver=solver, logic=smt_logic(), timeout_ms=smt_timeout_ms())
 end
 
 # Additional pattern matchers

@@ -137,6 +137,17 @@ end
 3. **SMT Solvers**: Use Z3/CVC5 for complex properties
 4. **Fallback**: If unprovable, becomes runtime assertion
 
+### SMT Solver Configuration
+
+Axiom uses the bundled `packages/SMTLib.jl` adapter to talk to external solvers
+(`z3`, `cvc5`, `yices`, `mathsat`) when available. You can tune behavior with
+environment variables:
+
+- `AXIOM_SMT_SOLVER` (e.g., `z3`, `cvc5`)
+- `AXIOM_SMT_SOLVER_PATH` + `AXIOM_SMT_SOLVER_KIND`
+- `AXIOM_SMT_TIMEOUT_MS` (default: 30000)
+- `AXIOM_SMT_LOGIC` (default: `QF_NRA`)
+
 ### Proof Status
 
 ```julia
