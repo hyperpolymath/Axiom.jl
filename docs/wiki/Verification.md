@@ -147,6 +147,7 @@ environment variables:
 - `AXIOM_SMT_SOLVER_PATH` + `AXIOM_SMT_SOLVER_KIND`
 - `AXIOM_SMT_TIMEOUT_MS` (default: 30000)
 - `AXIOM_SMT_LOGIC` (default: `QF_NRA`)
+- `AXIOM_SMT_RUNNER=rust` to execute the solver via the Rust backend runner
 
 ### Proof Status
 

@@ -5,7 +5,11 @@
 use crate::ops::{matmul, activations, conv, pool, norm};
 use crate::tensor::{tensor_from_ptr, tensor_to_ptr, Tensor};
 use ndarray::{ArrayD, Array2, Array4, IxDyn, ArrayView2, ArrayView4};
+use std::ffi::{CStr, CString};
+use std::process::{Command, Stdio};
 use std::slice;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::{env, thread};
 
 // ============================================================================
 // Matrix Operations
@@ -195,6 +199,119 @@ pub unsafe extern "C" fn axiom_maxpool2d(
 
     let output_slice = slice::from_raw_parts_mut(output_ptr, output_size);
     output_slice.copy_from_slice(output.as_slice().unwrap());
+}
+
+// ============================================================================
+// SMT Solver Runner
+// ============================================================================
+
+#[no_mangle]
+pub unsafe extern "C" fn axiom_smt_run(
+    solver_kind: *const libc::c_char,
+    solver_path: *const libc::c_char,
+    script: *const libc::c_char,
+    timeout_ms: libc::c_uint,
+) -> *mut libc::c_char {
+    if solver_path.is_null() || script.is_null() {
+        return CString::new("error: missing solver path or script")
+            .unwrap()
+            .into_raw();
+    }
+
+    let kind = if solver_kind.is_null() {
+        ""
+    } else {
+        CStr::from_ptr(solver_kind).to_str().unwrap_or("")
+    };
+    let path = CStr::from_ptr(solver_path).to_str().unwrap_or("");
+    let script_str = CStr::from_ptr(script).to_str().unwrap_or("");
+
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let filename = format!("axiom_smt_{}_{}.smt2", std::process::id(), nanos);
+    let script_path = env::temp_dir().join(filename);
+
+    if let Err(e) = std::fs::write(&script_path, script_str) {
+        return CString::new(format!("error: {}", e)).unwrap().into_raw();
+    }
+
+    let timeout = Duration::from_millis(timeout_ms as u64);
+    let timeout_sec = (timeout_ms / 1000) as u64;
+
+    let mut cmd = Command::new(path);
+    match kind {
+        "z3" => {
+            cmd.arg(format!("-T:{}", timeout_sec))
+                .arg(&script_path);
+        }
+        "cvc5" => {
+            cmd.arg(format!("--tlimit={}", timeout_ms))
+                .arg(&script_path);
+        }
+        "yices" => {
+            cmd.arg(format!("--timeout={}", timeout_sec))
+                .arg(&script_path);
+        }
+        _ => {
+            cmd.arg(&script_path);
+        }
+    }
+
+    let mut child = match cmd.stdout(Stdio::piped()).stderr(Stdio::piped()).spawn() {
+        Ok(child) => child,
+        Err(e) => {
+            let _ = std::fs::remove_file(&script_path);
+            return CString::new(format!("error: {}", e)).unwrap().into_raw();
+        }
+    };
+
+    let start = Instant::now();
+    let mut timed_out = false;
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) => {
+                if start.elapsed() >= timeout {
+                    timed_out = true;
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    break;
+                }
+                thread::sleep(Duration::from_millis(10));
+            }
+            Err(_) => break,
+        }
+    }
+
+    let output = if timed_out {
+        "timeout".to_string()
+    } else {
+        match child.wait_with_output() {
+            Ok(out) => {
+                let mut text = String::from_utf8_lossy(&out.stdout).to_string();
+                if !out.stderr.is_empty() {
+                    if !text.ends_with('\n') && !text.is_empty() {
+                        text.push('\n');
+                    }
+                    text.push_str(&String::from_utf8_lossy(&out.stderr));
+                }
+                text
+            }
+            Err(e) => format!("error: {}", e),
+        }
+    };
+
+    let _ = std::fs::remove_file(&script_path);
+    CString::new(output).unwrap_or_else(|_| CString::new("error").unwrap()).into_raw()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn axiom_smt_free(ptr: *mut libc::c_char) {
+    if !ptr.is_null() {
+        let _ = CString::from_raw(ptr);
+    }
 }
 
 /// Global Average Pooling

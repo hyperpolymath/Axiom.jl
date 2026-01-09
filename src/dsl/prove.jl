@@ -205,7 +205,13 @@ function smt_proof(property::ParsedProperty)
         SMTLib.assert!(ctx, Expr(:call, :!, expr))
     end
 
-    result = SMTLib.check_sat(ctx; get_model=true)
+    result = if use_rust_smt_runner() && rust_available()
+        script = SMTLib.build_script(ctx, true)
+        output = rust_smt_run(string(ctx.solver.kind), ctx.solver.path, script, ctx.timeout_ms)
+        SMTLib.parse_result(output)
+    else
+        SMTLib.check_sat(ctx; get_model=true)
+    end
 
     if result.status == :sat
         if property.quantifier == :exists
@@ -239,6 +245,10 @@ end
 Get available SMT solver.
 """
 const SMT_ALLOWLIST = Set([:z3, :cvc5, :yices, :mathsat])
+
+function use_rust_smt_runner()
+    get(ENV, "AXIOM_SMT_RUNNER", "") == "rust"
+end
 
 function smt_solver_preference()
     preference = get(ENV, "AXIOM_SMT_SOLVER", nothing)

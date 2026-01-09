@@ -49,6 +49,24 @@ macro rust_call(func_name, ret_type, arg_types, args...)
     end
 end
 
+"""
+Run an SMT solver via the Rust backend runner.
+"""
+function rust_smt_run(kind::AbstractString, path::AbstractString, script::AbstractString, timeout_ms::Integer)
+    if !rust_available()
+        error("Rust backend not available")
+    end
+
+    ptr = @rust_call axiom_smt_run Ptr{UInt8} (Cstring, Cstring, Cstring, Cuint) kind path script UInt32(timeout_ms)
+    if ptr == C_NULL
+        return ""
+    end
+
+    output = unsafe_string(ptr)
+    @rust_call axiom_smt_free Cvoid (Ptr{UInt8},) ptr
+    output
+end
+
 # ============================================================================
 # Rust Backend Operations
 # ============================================================================
