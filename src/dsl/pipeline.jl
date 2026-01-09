@@ -196,12 +196,155 @@ end
 Optimize a pipeline by fusing compatible operations.
 """
 function optimize_pipeline(p::Pipeline)
-    # TODO: Implement fusion optimizations:
-    # - Fuse element-wise operations
-    # - Eliminate redundant reshapes
-    # - Combine batch norms with linear layers
-    p
+    layers = collect(p.layers)
+    optimized = AbstractLayer[]
+    i = 1
+
+    while i <= length(layers)
+        layer = layers[i]
+
+        # Optimization 1: Fuse consecutive element-wise activations
+        if i < length(layers) && is_elementwise(layer) && is_elementwise(layers[i + 1])
+            fused = FusedActivation(layer, layers[i + 1])
+            push!(optimized, fused)
+            i += 2
+            continue
+        end
+
+        # Optimization 2: Fuse BatchNorm with preceding Dense/Conv layer
+        if i < length(layers) && is_linear_layer(layer) && is_batchnorm(layers[i + 1])
+            fused = fuse_linear_batchnorm(layer, layers[i + 1])
+            push!(optimized, fused)
+            i += 2
+            continue
+        end
+
+        # Optimization 3: Eliminate identity/redundant operations
+        if is_identity_op(layer)
+            i += 1
+            continue
+        end
+
+        push!(optimized, layer)
+        i += 1
+    end
+
+    Pipeline(Tuple(optimized))
 end
+
+"""
+Check if a layer is element-wise (can be fused).
+"""
+is_elementwise(::StatelessLayer) = true
+is_elementwise(::AbstractLayer) = false
+
+"""
+Check if a layer is a linear transformation (Dense, Conv).
+"""
+is_linear_layer(::Dense) = true
+is_linear_layer(::Conv2d) = true
+is_linear_layer(::Conv1d) = true
+is_linear_layer(::AbstractLayer) = false
+
+"""
+Check if a layer is BatchNorm.
+"""
+is_batchnorm(::BatchNorm) = true
+is_batchnorm(::AbstractLayer) = false
+
+"""
+Check if a layer is an identity operation that can be removed.
+"""
+is_identity_op(::AbstractLayer) = false
+
+"""
+    FusedActivation
+
+Fused consecutive element-wise activations.
+"""
+struct FusedActivation{A, B} <: StatelessLayer
+    first::A
+    second::B
+end
+
+function forward(f::FusedActivation, x)
+    forward(f.second, forward(f.first, x))
+end
+
+output_shape(f::FusedActivation, input_shape) = output_shape(f.second, output_shape(f.first, input_shape))
+
+"""
+    FusedLinearBatchNorm
+
+Fused Dense/Conv layer with BatchNorm for inference.
+The BatchNorm parameters are folded into the linear layer weights.
+"""
+struct FusedLinearBatchNorm{L<:AbstractLayer} <: AbstractLayer
+    layer::L
+end
+
+function fuse_linear_batchnorm(linear::Dense{T}, bn::BatchNorm{T}) where T
+    # Fold BatchNorm into Dense weights: W_fused = W * γ / sqrt(σ² + ε)
+    # b_fused = γ * (b - μ) / sqrt(σ² + ε) + β
+
+    γ = bn.affine ? bn.γ : ones(T, bn.num_features)
+    β = bn.affine ? bn.β : zeros(T, bn.num_features)
+    μ = bn.running_mean
+    σ = sqrt.(bn.running_var .+ bn.eps)
+
+    scale = γ ./ σ
+
+    # Fused weight: scale each output column
+    weight_fused = linear.weight .* scale'
+
+    # Fused bias
+    if linear.bias !== nothing
+        bias_fused = scale .* (linear.bias .- μ) .+ β
+    else
+        bias_fused = scale .* (-μ) .+ β
+    end
+
+    fused_dense = Dense{T, typeof(linear.activation)}(
+        weight_fused, bias_fused, linear.activation,
+        linear.in_features, linear.out_features
+    )
+
+    FusedLinearBatchNorm(fused_dense)
+end
+
+function fuse_linear_batchnorm(conv::Conv2d{T}, bn::BatchNorm{T}) where T
+    # Fold BatchNorm into Conv2d weights
+    γ = bn.affine ? bn.γ : ones(T, bn.num_features)
+    β = bn.affine ? bn.β : zeros(T, bn.num_features)
+    μ = bn.running_mean
+    σ = sqrt.(bn.running_var .+ bn.eps)
+
+    scale = γ ./ σ
+
+    # Scale each output channel
+    weight_fused = similar(conv.weight)
+    for oc in 1:conv.out_channels
+        weight_fused[:, :, :, oc] = conv.weight[:, :, :, oc] .* scale[oc]
+    end
+
+    # Fused bias
+    if conv.bias !== nothing
+        bias_fused = scale .* (conv.bias .- μ) .+ β
+    else
+        bias_fused = scale .* (-μ) .+ β
+    end
+
+    fused_conv = Conv2d{T}(
+        weight_fused, bias_fused, conv.stride, conv.padding,
+        conv.dilation, conv.groups, conv.in_channels, conv.out_channels, conv.kernel_size
+    )
+
+    FusedLinearBatchNorm(fused_conv)
+end
+
+forward(f::FusedLinearBatchNorm, x) = forward(f.layer, x)
+parameters(f::FusedLinearBatchNorm) = parameters(f.layer)
+output_shape(f::FusedLinearBatchNorm, input_shape) = output_shape(f.layer, input_shape)
 
 # Shape debugging
 """
