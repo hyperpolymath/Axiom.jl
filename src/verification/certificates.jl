@@ -169,9 +169,144 @@ end
 Load certificate from file.
 """
 function load_certificate(path::String)
+    lines = readlines(path)
+
     # Parse YAML-like format
-    # Simplified implementation
-    error("Certificate loading not yet implemented")
+    model_hash = ""
+    model_name = ""
+    axiom_version = ""
+    verification_mode = STANDARD
+    proof_type = :empirical
+    properties = Property[]
+    signature = ""
+    created_at = 0.0
+    test_data_hash = nothing
+    verifier_id = "axiom-default"
+
+    current_section = :none
+
+    for line in lines
+        line = strip(line)
+
+        # Skip comments and empty lines
+        startswith(line, "#") && continue
+        isempty(line) && continue
+
+        # Parse key-value pairs
+        if contains(line, ": ")
+            parts = split(line, ": ", limit=2)
+            key = strip(parts[1])
+            value = length(parts) > 1 ? strip(parts[2]) : ""
+
+            if key == "model_name"
+                model_name = value
+            elseif key == "model_hash"
+                model_hash = value
+            elseif key == "axiom_version"
+                axiom_version = value
+            elseif key == "verification_mode"
+                verification_mode = parse_verification_mode(value)
+            elseif key == "proof_type"
+                proof_type = Symbol(value)
+            elseif key == "signature"
+                signature = value
+            elseif key == "properties"
+                current_section = :properties
+            elseif startswith(key, "- ") && current_section == :properties
+                # Parse property name
+                prop_name = strip(key[3:end])
+                prop = parse_property_type(prop_name)
+                if prop !== nothing
+                    push!(properties, prop)
+                end
+            end
+        end
+    end
+
+    cert = Certificate(
+        model_hash,
+        model_name,
+        properties,
+        verification_mode,
+        test_data_hash,
+        proof_type,
+        created_at,
+        axiom_version,
+        verifier_id,
+        ""  # Will verify signature below
+    )
+
+    # Verify signature
+    if !isempty(signature) && !verify_loaded_signature(cert, signature)
+        @warn "Certificate signature verification failed - certificate may have been tampered with"
+    end
+
+    # Return certificate with original signature
+    Certificate(
+        cert.model_hash,
+        cert.model_name,
+        cert.properties,
+        cert.verification_mode,
+        cert.test_data_hash,
+        cert.proof_type,
+        cert.created_at,
+        cert.axiom_version,
+        cert.verifier_id,
+        signature
+    )
+end
+
+"""
+Parse verification mode from string.
+"""
+function parse_verification_mode(s::String)
+    s = uppercase(strip(s))
+    if s == "STRICT"
+        return STRICT
+    elseif s == "FAST"
+        return FAST
+    elseif s == "DEBUG"
+        return DEBUG
+    else
+        return STANDARD
+    end
+end
+
+"""
+Parse property type from name string.
+"""
+function parse_property_type(name::String)
+    name = strip(name)
+
+    # Map property names to types
+    if name == "ValidProbabilities" || name == "ValidProbability"
+        return ValidProbabilities()
+    elseif name == "FiniteOutput" || name == "FiniteOutputs"
+        return FiniteOutput()
+    elseif name == "NoNaN" || name == "NoNaNs"
+        return NoNaN()
+    elseif name == "BoundedActivation" || name == "BoundedActivations"
+        return BoundedActivation()
+    else
+        @debug "Unknown property type: $name"
+        return nothing
+    end
+end
+
+"""
+Verify signature of loaded certificate.
+"""
+function verify_loaded_signature(cert::Certificate, expected_signature::String)
+    content = string(
+        cert.model_hash,
+        cert.model_name,
+        cert.verification_mode,
+        cert.created_at,
+        cert.axiom_version
+    )
+
+    computed_signature = bytes2hex(SHA.sha256(content))
+    computed_signature == expected_signature
 end
 
 # ============================================================================
