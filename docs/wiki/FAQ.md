@@ -367,7 +367,7 @@ Open an issue on [GitHub](https://github.com/Hyperpolymath/Axiom.jl/issues) with
 
 ### Is there a roadmap?
 
-See the [Vision](Vision.md) document for our long-term plans.
+See [Roadmap-TODOs](Roadmap-TODOs.md) for planned work and open TODOs, plus [Vision](Vision.md) for long-term direction.
 
 ---
 

@@ -284,6 +284,6 @@ Axiom.jl builds on the shoulders of giants:
 
 *The future of ML is verified.*
 
-[Get Started](docs/wiki/Home.md) | [Join Discord](https://discord.gg/axiomjl) | [Star on GitHub](https://github.com/Hyperpolymath/Axiom.jl)
+[Get Started](docs/wiki/Home.md) | [Roadmap](docs/wiki/Roadmap-TODOs.md) | [Join Discord](https://discord.gg/axiomjl) | [Star on GitHub](https://github.com/Hyperpolymath/Axiom.jl)
 
 </div>
