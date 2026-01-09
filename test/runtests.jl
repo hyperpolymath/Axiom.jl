@@ -244,6 +244,26 @@ using LinearAlgebra
         @test_throws EnsureViolation @ensure sum(x) ≈ 2.0 "Wrong sum"
     end
 
+    @testset "SMT Rust Runner" begin
+        if get(ENV, "AXIOM_SMT_RUNNER", "") != "rust"
+            @test true
+        else
+            if !Axiom.rust_available() && haskey(ENV, "AXIOM_RUST_LIB")
+                Axiom.init_rust_backend(ENV["AXIOM_RUST_LIB"])
+            end
+
+            solver = Axiom.get_smt_solver()
+            if !Axiom.rust_available() || solver === nothing
+                @info "Skipping Rust SMT runner test; backend or solver not available"
+                @test true
+            else
+                prop = Axiom.ParsedProperty(:exists, [:x], :(x > 0))
+                result = Axiom.smt_proof(prop)
+                @test result.status == :proven
+            end
+        end
+    end
+
 end
 
 println("\nAll tests passed!")
