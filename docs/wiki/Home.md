@@ -122,6 +122,14 @@ result = verify(model, properties=[ValidProbabilities()])
 
 ---
 
+## Optional Backends
+
+Axiom is Julia-first. The Rust backend is optional and used only when you
+explicitly enable it (e.g., for high-performance kernels or SMT runner
+hardening). Most users can ignore it entirely.
+
+---
+
 ## Core Features
 
 | Feature | PyTorch | TensorFlow | Axiom.jl |

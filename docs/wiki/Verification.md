@@ -151,7 +151,17 @@ environment variables:
 - `AXIOM_SMT_CACHE=1` to enable SMT result caching
 - `AXIOM_SMT_CACHE_MAX` to cap cache entries (default: 128)
 
-### Rust Runner Example
+### Julia-First Default
+
+By default, Axiom uses the Julia SMT path (SMTLib) and does not require Rust.
+
+```julia
+@prove ∃x. x > 0
+```
+
+### Optional Rust Runner Example
+
+The Rust runner is optional and only used when explicitly enabled.
 
 ```bash
 export AXIOM_SMT_RUNNER=rust
