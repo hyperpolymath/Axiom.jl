@@ -163,6 +163,18 @@ export AXIOM_SMT_SOLVER=z3
 @prove ∃x. x > 0
 ```
 
+### Cache Example (Julia-only)
+
+```bash
+export AXIOM_SMT_CACHE=1
+export AXIOM_SMT_CACHE_MAX=64
+```
+
+```julia
+@prove ∀x. x > 0 ⟹ (x + 1) > 0
+@prove ∀x. x > 0 ⟹ (x + 1) > 0  # second call hits cache
+```
+
 ### Proof Status
 
 ```julia

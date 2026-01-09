@@ -264,6 +264,23 @@ using LinearAlgebra
         end
     end
 
+    @testset "SMT Cache" begin
+        if get(ENV, "AXIOM_SMT_CACHE", "") in ("1", "true", "yes")
+            solver = Axiom.get_smt_solver()
+            if solver === nothing
+                @info "Skipping SMT cache test; no solver available"
+                @test true
+            else
+                prop = Axiom.ParsedProperty(:forall, [:x], :(x > 0))
+                result1 = Axiom.smt_proof(prop)
+                result2 = Axiom.smt_proof(prop)
+                @test result1.status == result2.status
+            end
+        else
+            @test true
+        end
+    end
+
 end
 
 println("\nAll tests passed!")
