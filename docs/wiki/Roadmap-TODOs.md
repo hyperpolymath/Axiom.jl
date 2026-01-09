@@ -12,6 +12,38 @@ This page consolidates planned work and in-code TODOs for Axiom.jl. It is a livi
 
 Source: `README.adoc`.
 
+## Prioritized, Staged Plan
+
+### Stage 1: Verification Foundations (Now -> v0.2)
+
+- Finish SMT integration hardening (timeouts, caching, Rust runner optional).
+- Implement proof serialization for audit trails.
+- Expand property coverage in `@prove` with clearer error reporting.
+
+### Stage 2: Backend Parity and Performance (v0.2)
+
+- Rust backend feature parity for core ops (matmul, conv, norms, activations).
+- Establish GPU abstraction hooks (CUDA/ROCm planned).
+- Add benchmarking + regressions for Rust vs Julia.
+
+### Stage 3: Ecosystem and Model Zoo (v0.3)
+
+- Hugging Face import integration.
+- Curated model zoo with verification-ready templates.
+- Packaging for reuse (pretrained weights + metadata).
+
+### Stage 4: Advanced Proofs (v0.4)
+
+- Extend SMT properties (quantifiers, non-linear properties where feasible).
+- Proof certificates export and verification workflow.
+- Formal proof tooling integration (long-term research track).
+
+### Stage 5: Production Readiness (v1.0)
+
+- Security hardening, sandboxed solver execution.
+- Release engineering, CI/CD maturity, signed artifacts.
+- Compliance and industry certification readiness.
+
 ## Planned Architecture Enhancements
 
 - GPU backends (CUDA/ROCm).
