@@ -263,6 +263,30 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
+== Julia-First Verification
+
+Axiom’s proof system is **Julia-native by default**. SMT solving runs through
+`packages/SMTLib.jl` with no Rust dependency. The Rust SMT runner is an optional
+backend you can enable for hardened subprocess control.
+
+Julia-native example:
+
+```julia
+@prove ∃x. x > 0
+```
+
+Optional Rust runner:
+
+```bash
+export AXIOM_SMT_RUNNER=rust
+export AXIOM_RUST_LIB=/path/to/libaxiom_core.so
+export AXIOM_SMT_SOLVER=z3
+```
+
+```julia
+@prove ∃x. x > 0
+```
+
 == License
 
 MIT License - see [LICENSE](LICENSE) for details.
