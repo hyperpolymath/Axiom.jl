@@ -148,6 +148,20 @@ environment variables:
 - `AXIOM_SMT_TIMEOUT_MS` (default: 30000)
 - `AXIOM_SMT_LOGIC` (default: `QF_NRA`)
 - `AXIOM_SMT_RUNNER=rust` to execute the solver via the Rust backend runner
+- `AXIOM_SMT_CACHE=1` to enable SMT result caching
+- `AXIOM_SMT_CACHE_MAX` to cap cache entries (default: 128)
+
+### Rust Runner Example
+
+```bash
+export AXIOM_SMT_RUNNER=rust
+export AXIOM_RUST_LIB=/path/to/libaxiom_core.so
+export AXIOM_SMT_SOLVER=z3
+```
+
+```julia
+@prove ∃x. x > 0
+```
 
 ### Proof Status
 

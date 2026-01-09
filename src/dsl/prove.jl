@@ -205,13 +205,22 @@ function smt_proof(property::ParsedProperty)
         SMTLib.assert!(ctx, Expr(:call, :!, expr))
     end
 
+    script = SMTLib.build_script(ctx, true)
+    cache_key = smt_cache_key(ctx, script)
+    if smt_cache_enabled()
+        cached = smt_cache_get(cache_key)
+        cached !== nothing && return finalize_smt_result(property, cached)
+    end
+
     result = if use_rust_smt_runner() && rust_available()
-        script = SMTLib.build_script(ctx, true)
         output = rust_smt_run(string(ctx.solver.kind), ctx.solver.path, script, ctx.timeout_ms)
         SMTLib.parse_result(output)
     else
         SMTLib.check_sat(ctx; get_model=true)
     end
+
+    smt_cache_put(cache_key, result)
+    return finalize_smt_result(property, result)
 
     if result.status == :sat
         if property.quantifier == :exists
@@ -245,9 +254,60 @@ end
 Get available SMT solver.
 """
 const SMT_ALLOWLIST = Set([:z3, :cvc5, :yices, :mathsat])
+const SMT_CACHE = Dict{UInt64, SMTLib.SMTResult}()
+const SMT_CACHE_ORDER = UInt64[]
 
 function use_rust_smt_runner()
     get(ENV, "AXIOM_SMT_RUNNER", "") == "rust"
+end
+
+function smt_cache_enabled()
+    get(ENV, "AXIOM_SMT_CACHE", "") in ("1", "true", "yes")
+end
+
+function smt_cache_max()
+    raw = get(ENV, "AXIOM_SMT_CACHE_MAX", nothing)
+    raw === nothing && return 128
+    parsed = tryparse(Int, raw)
+    parsed === nothing ? 128 : parsed
+end
+
+function smt_cache_key(ctx::SMTLib.SMTContext, script::String)
+    hash((ctx.solver.kind, ctx.solver.path, ctx.logic, ctx.timeout_ms, script))
+end
+
+function smt_cache_get(key::UInt64)
+    get(SMT_CACHE, key, nothing)
+end
+
+function smt_cache_put(key::UInt64, result::SMTLib.SMTResult)
+    smt_cache_enabled() || return
+    max_entries = smt_cache_max()
+    max_entries <= 0 && return
+    if !haskey(SMT_CACHE, key)
+        push!(SMT_CACHE_ORDER, key)
+    end
+    SMT_CACHE[key] = result
+    while length(SMT_CACHE_ORDER) > max_entries
+        oldest = popfirst!(SMT_CACHE_ORDER)
+        delete!(SMT_CACHE, oldest)
+    end
+end
+
+function finalize_smt_result(property::ParsedProperty, result::SMTLib.SMTResult)
+    if result.status == :sat
+        if property.quantifier == :exists
+            return ProofResult(:proven, result.model, 1.0)
+        end
+        return ProofResult(:disproven, result.model, 1.0)
+    elseif result.status == :unsat
+        if property.quantifier == :exists
+            return ProofResult(:disproven, nothing, 1.0)
+        end
+        return ProofResult(:proven, nothing, 1.0)
+    end
+
+    ProofResult(:unknown, nothing, 0.0)
 end
 
 function smt_solver_preference()
