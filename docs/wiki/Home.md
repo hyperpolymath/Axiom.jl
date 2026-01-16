@@ -167,6 +167,7 @@ hardening). Most users can ignore it entirely.
 ### Production
 - [Performance Tuning](Performance-Tuning.md) - Optimize for speed
 - [Safety-Critical Applications](Safety-Critical.md) - FDA, ISO 26262, DO-178C
+- [Certification Readiness](Certification-Readiness.md) - Compliance checklists by domain
 - [Deployment Guide](Deployment.md) - Server, edge, cloud
 - [Ecosystem & Integrations](Ecosystem.md) - Connect to Julia/Python world
 
