@@ -14,30 +14,31 @@ Base type for all tensor types in Axiom.jl.
 abstract type AbstractTensor{T, N} end
 
 """
-    Tensor{T, Shape} <: AbstractTensor{T, length(Shape)}
+    Tensor{T, N, Shape} <: AbstractTensor{T, N}
 
 A tensor with compile-time verified shape.
 
 # Type Parameters
 - `T`: Element type
+- `N`: Number of dimensions
 - `Shape`: Tuple of dimension sizes (compile-time constant)
 
 # Examples
 ```julia
 # 2D tensor (matrix) of Float32, shape (28, 28)
-x :: Tensor{Float32, (28, 28)}
+x :: Tensor{Float32, 2, (28, 28)}
 
 # 4D tensor (batch of images), shape (batch, height, width, channels)
-images :: Tensor{Float32, (32, 224, 224, 3)}
+images :: Tensor{Float32, 4, (32, 224, 224, 3)}
 
 # Dynamic batch dimension
-batch :: Tensor{Float32, (:, 784)}  # : means dynamic
+batch :: Tensor{Float32, 2, (:, 784)}  # : means dynamic
 ```
 """
-struct Tensor{T, Shape} <: AbstractTensor{T, length(Shape)}
-    data::Array{T}
+struct Tensor{T, N, Shape} <: AbstractTensor{T, N}
+    data::Array{T, N}
 
-    function Tensor{T, Shape}(data::Array{T}) where {T, Shape}
+    function Tensor{T, N, Shape}(data::Array{T, N}) where {T, N, Shape}
         # Verify shape at construction time
         expected = collect(Shape)
         actual = size(data)
@@ -50,16 +51,16 @@ struct Tensor{T, Shape} <: AbstractTensor{T, length(Shape)}
             end
         end
 
-        new{T, Shape}(data)
+        new{T, N, Shape}(data)
     end
 end
 
 # Convenience constructors
-Tensor(data::Array{T}) where T = Tensor{T, Tuple(size(data))}(data)
+Tensor(data::Array{T, N}) where {T, N} = Tensor{T, N, Tuple(size(data))}(data)
 
-function Tensor{T, Shape}() where {T, Shape}
+function Tensor{T, N, Shape}() where {T, N, Shape}
     dims = [s === :dynamic ? 1 : s for s in Shape]
-    Tensor{T, Shape}(zeros(T, dims...))
+    Tensor{T, N, Shape}(zeros(T, dims...))
 end
 
 """
@@ -74,10 +75,10 @@ end
 DynamicTensor(data::Array{T, N}) where {T, N} = DynamicTensor{T, N}(data)
 
 # Shape query functions
-Base.size(t::Tensor{T, Shape}) where {T, Shape} = Shape
+Base.size(t::Tensor{T, N, Shape}) where {T, N, Shape} = Shape
 Base.size(t::DynamicTensor) = size(t.data)
 Base.length(t::AbstractTensor) = prod(size(t))
-Base.ndims(::Tensor{T, Shape}) where {T, Shape} = length(Shape)
+Base.ndims(::Tensor{T, N}) where {T, N} = N
 Base.ndims(::DynamicTensor{T, N}) where {T, N} = N
 Base.eltype(::AbstractTensor{T}) where T = T
 
@@ -96,7 +97,7 @@ Base.Array(t::DynamicTensor) = t.data
 
 Convert a statically-shaped tensor to dynamic shape.
 """
-to_dynamic(t::Tensor{T}) where T = DynamicTensor(t.data)
+to_dynamic(t::Tensor{T, N}) where {T, N} = DynamicTensor(t.data)
 
 """
     to_static(t::DynamicTensor, Shape) -> Tensor
@@ -104,13 +105,13 @@ to_dynamic(t::Tensor{T}) where T = DynamicTensor(t.data)
 Convert a dynamically-shaped tensor to static shape.
 Throws if shapes don't match.
 """
-function to_static(t::DynamicTensor{T}, ::Type{Tensor{T, Shape}}) where {T, Shape}
-    Tensor{T, Shape}(t.data)
+function to_static(t::DynamicTensor{T, N}, ::Type{Tensor{T, N, Shape}}) where {T, N, Shape}
+    Tensor{T, N, Shape}(t.data)
 end
 
 # Pretty printing
-function Base.show(io::IO, ::MIME"text/plain", t::Tensor{T, Shape}) where {T, Shape}
-    print(io, "Tensor{$T, $Shape}")
+function Base.show(io::IO, ::MIME"text/plain", t::Tensor{T, N, Shape}) where {T, N, Shape}
+    print(io, "Tensor{$T, $N, $Shape}")
     if length(t) <= 10
         print(io, ":\n")
         show(io, MIME"text/plain"(), t.data)
@@ -119,8 +120,8 @@ function Base.show(io::IO, ::MIME"text/plain", t::Tensor{T, Shape}) where {T, Sh
     end
 end
 
-function Base.show(io::IO, t::Tensor{T, Shape}) where {T, Shape}
-    print(io, "Tensor{$T, $Shape}(...)")
+function Base.show(io::IO, t::Tensor{T, N, Shape}) where {T, N, Shape}
+    print(io, "Tensor{$T, $N, $Shape}(...)")
 end
 
 # Tensor creation utilities
@@ -129,21 +130,21 @@ end
 
 Create a tensor of zeros with the same shape and type.
 """
-zeros_like(::Tensor{T, Shape}) where {T, Shape} = Tensor{T, Shape}(zeros(T, Shape...))
+zeros_like(::Tensor{T, N, Shape}) where {T, N, Shape} = Tensor{T, N, Shape}(zeros(T, Shape...))
 
 """
     ones_like(t::Tensor) -> Tensor
 
 Create a tensor of ones with the same shape and type.
 """
-ones_like(::Tensor{T, Shape}) where {T, Shape} = Tensor{T, Shape}(ones(T, Shape...))
+ones_like(::Tensor{T, N, Shape}) where {T, N, Shape} = Tensor{T, N, Shape}(ones(T, Shape...))
 
 """
     randn_like(t::Tensor) -> Tensor
 
 Create a tensor of random normal values with the same shape and type.
 """
-randn_like(::Tensor{T, Shape}) where {T, Shape} = Tensor{T, Shape}(randn(T, Shape...))
+randn_like(::Tensor{T, N, Shape}) where {T, N, Shape} = Tensor{T, N, Shape}(randn(T, Shape...))
 
 # Named tensor creation
 """
@@ -151,7 +152,7 @@ randn_like(::Tensor{T, Shape}) where {T, Shape} = Tensor{T, Shape}(randn(T, Shap
 
 Create a zero tensor with specified type and dimensions.
 """
-axiom_zeros(::Type{T}, dims::Int...) where T = Tensor{T, Tuple(dims)}(zeros(T, dims...))
+axiom_zeros(::Type{T}, dims::Int...) where T = Tensor(zeros(T, dims...))
 axiom_zeros(dims::Int...) = axiom_zeros(Float32, dims...)
 
 """
@@ -159,7 +160,7 @@ axiom_zeros(dims::Int...) = axiom_zeros(Float32, dims...)
 
 Create a ones tensor with specified type and dimensions.
 """
-axiom_ones(::Type{T}, dims::Int...) where T = Tensor{T, Tuple(dims)}(ones(T, dims...))
+axiom_ones(::Type{T}, dims::Int...) where T = Tensor(ones(T, dims...))
 axiom_ones(dims::Int...) = axiom_ones(Float32, dims...)
 
 """
@@ -167,5 +168,5 @@ axiom_ones(dims::Int...) = axiom_ones(Float32, dims...)
 
 Create a random normal tensor with specified type and dimensions.
 """
-axiom_randn(::Type{T}, dims::Int...) where T = Tensor{T, Tuple(dims)}(randn(T, dims...))
+axiom_randn(::Type{T}, dims::Int...) where T = Tensor(randn(T, dims...))
 axiom_randn(dims::Int...) = axiom_randn(Float32, dims...)
