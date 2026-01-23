@@ -108,7 +108,7 @@ end
 """
 Compute numerical gradient using finite differences.
 """
-function numerical_gradient(param, model, x, y, loss_fn; eps=1e-5f0)
+function numerical_gradient(param, model, x, y, loss_fn; eps=Float32(1e-5))
     grad = similar(param)
 
     original = copy(param)

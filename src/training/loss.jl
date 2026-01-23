@@ -71,7 +71,7 @@ Cross-entropy loss for classification.
 - `target`: Ground truth labels (one-hot or indices)
 - `reduction`: :mean, :sum, or :none
 """
-function crossentropy(pred, target; reduction::Symbol=:mean, eps::Float32=1e-7f0)
+function crossentropy(pred, target; reduction::Symbol=:mean, eps::Float32=Float32(1e-7))
     # Clamp predictions for numerical stability
     pred_clamped = clamp.(pred, eps, 1.0f0 - eps)
 
@@ -98,7 +98,7 @@ end
 
 Binary cross-entropy loss.
 """
-function binary_crossentropy(pred, target; reduction::Symbol=:mean, eps::Float32=1e-7f0)
+function binary_crossentropy(pred, target; reduction::Symbol=:mean, eps::Float32=Float32(1e-7))
     pred_clamped = clamp.(pred, eps, 1.0f0 - eps)
     loss = -(target .* log.(pred_clamped) .+ (1 .- target) .* log.(1 .- pred_clamped))
 
@@ -138,7 +138,7 @@ end
 
 KL Divergence: KL(p || q) = sum(p * log(p / q))
 """
-function kl_divergence(p, q; reduction::Symbol=:mean, eps::Float32=1e-7f0)
+function kl_divergence(p, q; reduction::Symbol=:mean, eps::Float32=Float32(1e-7))
     p_clamped = clamp.(p, eps, 1.0f0)
     q_clamped = clamp.(q, eps, 1.0f0)
 
@@ -177,7 +177,7 @@ end
 Focal Loss for handling class imbalance.
 """
 function focal_loss(pred, target; alpha::Float32=0.25f0, gamma::Float32=2.0f0,
-                    reduction::Symbol=:mean, eps::Float32=1e-7f0)
+                    reduction::Symbol=:mean, eps::Float32=Float32(1e-7))
     pred_clamped = clamp.(pred, eps, 1.0f0 - eps)
 
     # Binary case
@@ -203,7 +203,7 @@ Contrastive loss for siamese networks.
 """
 function contrastive_loss(emb1, emb2, labels; margin::Float32=1.0f0, reduction::Symbol=:mean)
     # labels: 1 for similar, 0 for dissimilar
-    distances = sqrt.(sum((emb1 .- emb2) .^ 2, dims=2) .+ 1e-7f0)
+    distances = sqrt.(sum((emb1 .- emb2) .^ 2, dims=2) .+ Float32(1e-7))
 
     # Similar pairs: minimize distance
     # Dissimilar pairs: maximize distance up to margin
@@ -224,8 +224,8 @@ end
 Triplet loss for metric learning.
 """
 function triplet_loss(anchor, positive, negative; margin::Float32=0.2f0, reduction::Symbol=:mean)
-    pos_dist = sqrt.(sum((anchor .- positive) .^ 2, dims=2) .+ 1e-7f0)
-    neg_dist = sqrt.(sum((anchor .- negative) .^ 2, dims=2) .+ 1e-7f0)
+    pos_dist = sqrt.(sum((anchor .- positive) .^ 2, dims=2) .+ Float32(1e-7))
+    neg_dist = sqrt.(sum((anchor .- negative) .^ 2, dims=2) .+ Float32(1e-7))
 
     loss = max.(0, pos_dist .- neg_dist .+ margin)
 

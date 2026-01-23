@@ -33,7 +33,7 @@ end
 function BatchNorm(
     num_features::Int;
     momentum = 0.1f0,
-    eps = 1e-5f0,
+    eps = Float32(1e-5),
     affine::Bool = true,
     track_running_stats::Bool = true,
     dtype::Type{T} = Float32
@@ -120,7 +120,7 @@ end
 
 function LayerNorm(
     normalized_shape;
-    eps::Float32 = 1e-5f0,
+    eps::Float32 = Float32(1e-5),
     elementwise_affine::Bool = true,
     dtype::Type{T} = Float32
 ) where T
@@ -143,7 +143,13 @@ function forward(ln::LayerNorm, x::AbstractArray)
     x_norm = (x .- μ) ./ sqrt.(σ² .+ ln.eps)
 
     if ln.elementwise_affine
-        x_norm = ln.γ .* x_norm .+ ln.β
+        # Reshape γ and β to match input dimensions for broadcasting
+        # Prepend singleton dimensions for batch/non-normalized dims
+        leading_ones = ntuple(_ -> 1, ndims(x) - n_dims)
+        reshape_size = (leading_ones..., ln.normalized_shape...)
+        γ_reshaped = reshape(ln.γ, reshape_size)
+        β_reshaped = reshape(ln.β, reshape_size)
+        x_norm = γ_reshaped .* x_norm .+ β_reshaped
     end
 
     x_norm
@@ -178,7 +184,7 @@ end
 
 function InstanceNorm(
     num_features::Int;
-    eps::Float32 = 1e-5f0,
+    eps::Float32 = Float32(1e-5),
     affine::Bool = false,
     dtype::Type{T} = Float32
 ) where T
@@ -238,7 +244,7 @@ end
 function GroupNorm(
     num_groups::Int,
     num_channels::Int;
-    eps::Float32 = 1e-5f0,
+    eps::Float32 = Float32(1e-5),
     affine::Bool = true,
     dtype::Type{T} = Float32
 ) where T
@@ -309,7 +315,7 @@ mutable struct RMSNorm{T} <: AbstractLayer
     eps::Float32
 end
 
-function RMSNorm(dim::Int; eps::Float32=1e-6f0, dtype::Type{T}=Float32) where T
+function RMSNorm(dim::Int; eps::Float32=Float32(1e-6), dtype::Type{T}=Float32) where T
     RMSNorm{T}(ones(T, dim), eps)
 end
 
