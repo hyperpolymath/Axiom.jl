@@ -352,9 +352,7 @@ const CLASSIFICATION_PROPERTIES = AllOf(
 """
 Standard properties for regression models.
 """
-const REGRESSION_PROPERTIES = AllOf(
-    FiniteOutput()
-)
+const REGRESSION_PROPERTIES = FiniteOutput()
 
 """
 Safety-critical properties.
