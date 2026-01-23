@@ -14,6 +14,9 @@ module Axiom
 using LinearAlgebra
 using Random
 using Statistics
+using Dates
+using SHA
+using JSON
 
 # Core type system
 include("types/tensor.jl")
@@ -47,6 +50,7 @@ include("training/train.jl")
 include("verification/properties.jl")
 include("verification/checker.jl")
 include("verification/certificates.jl")
+include("verification/serialization.jl")
 
 # Backend abstraction
 include("backends/abstract.jl")
@@ -96,6 +100,8 @@ export DataLoader, train_test_split, one_hot
 # Verification
 export ValidProbabilities, FiniteOutput, check
 export EnsureViolation
+export ProofCertificate, serialize_proof, deserialize_proof
+export export_proof_certificate, import_proof_certificate, verify_proof_certificate
 
 # Interop
 export from_pytorch, to_onnx
