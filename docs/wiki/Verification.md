@@ -185,6 +185,175 @@ export AXIOM_SMT_CACHE_MAX=64
 @prove ∀x. x > 0 ⟹ (x + 1) > 0  # second call hits cache
 ```
 
+---
+
+## SMT Runner Security Hardening
+
+### Security Checklist
+
+When using external SMT solvers for formal verification, follow these security best practices:
+
+#### 1. Solver Allow-List ✓
+
+**What**: Only use vetted, well-known SMT solvers.
+
+**Why**: Prevents execution of arbitrary binaries disguised as SMT solvers.
+
+**Implementation**: Axiom enforces an allow-list of trusted solvers:
+
+```julia
+# In prove.jl:
+const SMT_ALLOWLIST = Set([:z3, :cvc5, :yices, :mathsat])
+```
+
+**User Action**:
+- ✓ Only install SMT solvers from official sources
+- ✓ Verify checksums/signatures of downloaded binaries
+- ✗ Never use custom or unknown solvers without code review
+
+#### 2. Timeout Configuration ✓
+
+**What**: Always set a timeout to prevent infinite loops.
+
+**Why**: Malicious or malformed SMT queries can hang solvers indefinitely.
+
+**Implementation**:
+
+```bash
+# Set timeout (default: 30 seconds)
+export AXIOM_SMT_TIMEOUT_MS=30000
+
+# For quick proofs
+export AXIOM_SMT_TIMEOUT_MS=5000
+
+# For complex proofs (max recommended: 5 minutes)
+export AXIOM_SMT_TIMEOUT_MS=300000
+```
+
+**Best Practices**:
+- ✓ Start with 5-10 seconds for simple properties
+- ✓ Increase incrementally if needed
+- ✗ Never disable timeouts (set to 0)
+- ✗ Don't exceed 5 minutes without good reason
+
+#### 3. Path Validation ✓
+
+**What**: Validate solver binary paths before execution.
+
+**Why**: Prevents path traversal attacks and execution of unintended binaries.
+
+**Implementation**:
+
+```bash
+# Explicit solver path (use absolute paths)
+export AXIOM_SMT_SOLVER_PATH=/usr/local/bin/z3
+export AXIOM_SMT_SOLVER_KIND=z3
+
+# OR: Let Axiom auto-detect (safer)
+unset AXIOM_SMT_SOLVER_PATH
+```
+
+**User Action**:
+- ✓ Use absolute paths, not relative paths
+- ✓ Verify the binary is the expected solver: `z3 --version`
+- ✗ Never use paths from untrusted sources
+- ✗ Don't use paths containing `..`, `~`, or shell expansions
+
+#### 4. Result Caching ✓
+
+**What**: Cache SMT solver results to avoid redundant solver invocations.
+
+**Why**: Reduces solver execution frequency, minimizing attack surface.
+
+**Implementation**:
+
+```bash
+# Enable caching (disabled by default)
+export AXIOM_SMT_CACHE=1
+
+# Limit cache size (default: 128 entries)
+export AXIOM_SMT_CACHE_MAX=128
+```
+
+**Security Benefits**:
+- Fewer solver executions = smaller attack window
+- Cached results are deterministic and pre-validated
+- Cache key includes solver path and script, preventing poisoning
+
+**Trade-offs**:
+- ✓ Faster verification on repeated properties
+- ✓ Reduced solver invocations
+- ✗ Uses additional memory (bounded by CACHE_MAX)
+
+#### 5. Optional Rust Runner 🔒
+
+**What**: Execute SMT solvers through a Rust subprocess manager.
+
+**Why**: Provides additional sandboxing and resource limits.
+
+**Implementation**:
+
+```bash
+# Enable Rust runner (optional, requires Rust backend)
+export AXIOM_SMT_RUNNER=rust
+export AXIOM_RUST_LIB=/path/to/libaxiom_core.so
+
+# Configure Rust runner
+export AXIOM_RUST_SANDBOX=strict  # Future: seccomp, namespaces
+```
+
+**Security Benefits**:
+- Rust memory safety prevents buffer overflows in runner code
+- Future: Process isolation, resource limits, seccomp filters
+- Centralized auditing of solver invocations
+
+**When to Use**:
+- ✓ High-security environments
+- ✓ Untrusted input properties
+- ✓ Safety-critical applications (medical, automotive)
+- ✗ Development/testing (adds overhead)
+
+---
+
+### Security Verification Checklist
+
+Before deploying verification in production:
+
+```bash
+# 1. Verify solver is allow-listed
+julia -e 'using Axiom; @show Axiom.SMT_ALLOWLIST'
+
+# 2. Check timeout is set
+echo $AXIOM_SMT_TIMEOUT_MS  # Should be 5000-300000
+
+# 3. Verify solver binary
+which z3
+z3 --version
+
+# 4. Test timeout works
+export AXIOM_SMT_TIMEOUT_MS=1000
+julia -e '@prove ∀x. very_complex_property(x)'  # Should timeout
+
+# 5. Enable caching in production
+export AXIOM_SMT_CACHE=1
+```
+
+---
+
+### Threat Model & Mitigations
+
+| Threat | Mitigation | Status |
+|--------|------------|--------|
+| **Malicious solver binary** | Allow-list only trusted solvers | ✓ Enforced |
+| **Infinite loop in solver** | Mandatory timeouts | ✓ Enforced |
+| **Path traversal attack** | Absolute path validation | ✓ Enforced |
+| **Resource exhaustion** | Timeout + cache limits | ✓ Enforced |
+| **Cache poisoning** | Hash includes solver + script | ✓ Enforced |
+| **Sandbox escape** | Rust runner isolation | 🚧 Planned |
+| **Supply chain attack** | Checksum verification | ⚠ User responsibility |
+
+---
+
 ### Proof Status
 
 ```julia

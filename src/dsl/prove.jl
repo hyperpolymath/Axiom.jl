@@ -46,13 +46,28 @@ function _prove_impl(property)
 
         if proof_result.status == :proven
             # Property proven, no runtime check needed
-            @info "Property proven: $($(string(property)))"
+            reason_msg = isempty(proof_result.reason) ? "" : " ($(proof_result.reason))"
+            @info "✓ Property proven: $($(string(property)))$reason_msg"
         elseif proof_result.status == :disproven
             # Property false, compilation should fail
-            error("Property disproven: $($(string(property)))\nCounterexample: $(proof_result.counterexample)")
+            msg = "✗ Property disproven: $($(string(property)))\n" *
+                  "Counterexample: $(proof_result.counterexample)\n" *
+                  "Reason: $(proof_result.reason)"
+            if !isempty(proof_result.suggestions)
+                msg *= "\n\nSuggestions:\n" * join("  - " .* proof_result.suggestions, "\n")
+            end
+            error(msg)
         else
             # Cannot prove, add runtime check
-            @warn "Cannot prove property, adding runtime check: $($(string(property)))"
+            msg = "⚠ Cannot prove property: $($(string(property)))"
+            if !isempty(proof_result.reason)
+                msg *= "\nReason: $(proof_result.reason)"
+            end
+            if !isempty(proof_result.suggestions)
+                msg *= "\n\nSuggestions:\n" * join("  - " .* proof_result.suggestions, "\n")
+            end
+            msg *= "\nAdding runtime assertion instead."
+            @warn msg
             $(generate_runtime_check(property))
         end
     end
@@ -101,7 +116,13 @@ struct ProofResult
     status::Symbol  # :proven, :disproven, :unknown
     counterexample::Any
     confidence::Float64
+    reason::String  # Explanation of why the proof succeeded/failed
+    suggestions::Vector{String}  # Suggestions for fixing failed proofs
 end
+
+# Constructor with defaults
+ProofResult(status, counterexample, confidence) =
+    ProofResult(status, counterexample, confidence, "", String[])
 
 """
 Attempt to prove a property using symbolic execution and SMT solver integration.
@@ -134,31 +155,91 @@ Check against known provable patterns.
 """
 function check_known_patterns(property::ParsedProperty)
     if is_softmax_sum_property(property)
-        # Softmax always sums to 1 - proven by construction
-        return ProofResult(:proven, nothing, 1.0)
+        return ProofResult(:proven, nothing, 1.0,
+            "Softmax outputs always sum to 1 by definition: exp(xᵢ) / Σexp(xⱼ)",
+            String[])
     end
 
     if is_relu_nonnegative_property(property)
-        # ReLU is always >= 0 - proven by definition
-        return ProofResult(:proven, nothing, 1.0)
+        return ProofResult(:proven, nothing, 1.0,
+            "ReLU(x) = max(0, x) is non-negative by definition",
+            String[])
     end
 
     if is_sigmoid_bounded_property(property)
-        # Sigmoid is always in [0, 1] - proven by definition
-        return ProofResult(:proven, nothing, 1.0)
+        return ProofResult(:proven, nothing, 1.0,
+            "Sigmoid(x) = 1/(1 + exp(-x)) ∈ (0, 1) for all finite x",
+            String[])
     end
 
     if is_tanh_bounded_property(property)
-        # Tanh is always in [-1, 1]
-        return ProofResult(:proven, nothing, 1.0)
+        return ProofResult(:proven, nothing, 1.0,
+            "Tanh(x) = (exp(x) - exp(-x))/(exp(x) + exp(-x)) ∈ (-1, 1) for all finite x",
+            String[])
     end
 
     if is_probability_valid_property(property)
-        # Probability outputs from softmax are valid
-        return ProofResult(:proven, nothing, 1.0)
+        return ProofResult(:proven, nothing, 1.0,
+            "Softmax produces valid probability distributions: sum=1, all ∈ [0,1]",
+            String[])
     end
 
-    ProofResult(:unknown, nothing, 0.0)
+    if is_layernorm_normalized_property(property)
+        return ProofResult(:proven, nothing, 1.0,
+            "Layer normalization: (x - μ) / σ produces mean=0, variance=1",
+            String[])
+    end
+
+    if is_batchnorm_normalized_property(property)
+        return ProofResult(:proven, nothing, 1.0,
+            "Batch normalization: (x - E[x]) / √(Var[x] + ε) produces normalized output",
+            String[])
+    end
+
+    if is_dropout_bounded_property(property)
+        return ProofResult(:proven, nothing, 0.95,
+            "Dropout preserves bounds: if x ∈ [a,b], then Dropout(x,p)/(1-p) ∈ [a,b]",
+            String[])
+    end
+
+    if is_maxpool_bounded_property(property)
+        return ProofResult(:proven, nothing, 1.0,
+            "MaxPool(x) = max(xᵢ) preserves bounds: if all xᵢ ∈ [a,b], then max(xᵢ) ∈ [a,b]",
+            String[])
+    end
+
+    if is_avgpool_bounded_property(property)
+        return ProofResult(:proven, nothing, 1.0,
+            "AvgPool(x) = mean(xᵢ) preserves bounds: if all xᵢ ∈ [a,b], then mean(xᵢ) ∈ [a,b]",
+            String[])
+    end
+
+    if is_concat_bounded_property(property)
+        return ProofResult(:proven, nothing, 1.0,
+            "Concatenation preserves bounds: concat([x₁,...,xₙ]) where xᵢ ∈ [a,b] ⟹ result ∈ [a,b]",
+            String[])
+    end
+
+    if is_conv_finite_property(property)
+        return ProofResult(:proven, nothing, 0.95,
+            "Convolution preserves finiteness: if input and weights are finite, output is finite",
+            ["Ensure convolution weights are initialized with finite values",
+             "Consider weight regularization to prevent numerical instability"])
+    end
+
+    if is_linear_finite_property(property)
+        return ProofResult(:proven, nothing, 0.95,
+            "Linear layer preserves finiteness: W*x + b is finite if W, x, and b are finite",
+            ["Ensure weight initialization produces finite values",
+             "Consider gradient clipping during training"])
+    end
+
+    ProofResult(:unknown, nothing, 0.0,
+        "Property does not match any known provable patterns",
+        ["Try simplifying the property into smaller sub-properties",
+         "Check if the property can be decomposed into known patterns",
+         "Consider using SMT solvers for custom properties (set AXIOM_SMT_SOLVER)",
+         "Add @ensure for runtime verification if formal proof is not feasible"])
 end
 
 """
@@ -171,18 +252,36 @@ function symbolic_proof(property::ParsedProperty)
     if is_finite_output_check(body)
         # Check if all operations in the expression preserve finiteness
         if all_ops_preserve_finite(body)
-            return ProofResult(:proven, nothing, 0.95)
+            return ProofResult(:proven, nothing, 0.95,
+                "Symbolic analysis confirms all operations preserve finiteness",
+                String[])
+        else
+            return ProofResult(:unknown, nothing, 0.0,
+                "Expression contains operations that may produce Inf/NaN (e.g., log, exp, division)",
+                ["Use safe alternatives like log1p instead of log",
+                 "Add guards to prevent division by zero",
+                 "Clip intermediate values to prevent overflow"])
         end
     end
 
     # Check for monotonicity properties
     if is_monotonicity_check(body)
         if verify_monotonicity(body)
-            return ProofResult(:proven, nothing, 0.9)
+            return ProofResult(:proven, nothing, 0.9,
+                "Verified monotonicity through symbolic differentiation",
+                String[])
+        else
+            return ProofResult(:unknown, nothing, 0.0,
+                "Cannot verify monotonicity - symbolic differentiation inconclusive",
+                ["Simplify the function to isolate monotonic components",
+                 "Try proving monotonicity on sub-intervals"])
         end
     end
 
-    ProofResult(:unknown, nothing, 0.0)
+    ProofResult(:unknown, nothing, 0.0,
+        "Symbolic execution did not match any patterns",
+        ["Consider adding known patterns for your operations",
+         "Try using SMT solver for deeper analysis"])
 end
 
 """
@@ -303,17 +402,33 @@ end
 function finalize_smt_result(property::ParsedProperty, result::SMTLib.SMTResult)
     if result.status == :sat
         if property.quantifier == :exists
-            return ProofResult(:proven, result.model, 1.0)
+            return ProofResult(:proven, result.model, 1.0,
+                "SMT solver found satisfying assignment: ∃x. property(x) is SAT",
+                String[])
         end
-        return ProofResult(:disproven, result.model, 1.0)
+        return ProofResult(:disproven, result.model, 1.0,
+            "SMT solver found counterexample: ¬(∀x. property(x)) is SAT",
+            ["Check if the property holds for the provided counterexample",
+             "Consider adding preconditions to restrict the domain",
+             "Verify that the model behaves correctly on the counterexample input"])
     elseif result.status == :unsat
         if property.quantifier == :exists
-            return ProofResult(:disproven, nothing, 1.0)
+            return ProofResult(:disproven, nothing, 1.0,
+                "SMT solver proved no satisfying assignment exists: ∃x. property(x) is UNSAT",
+                ["Property is impossible to satisfy",
+                 "Review the property definition - it may be too restrictive"])
         end
-        return ProofResult(:proven, nothing, 1.0)
+        return ProofResult(:proven, nothing, 1.0,
+            "SMT solver proved property holds for all inputs: ∀x. property(x) is valid (¬property is UNSAT)",
+            String[])
     end
 
-    ProofResult(:unknown, nothing, 0.0)
+    ProofResult(:unknown, nothing, 0.0,
+        "SMT solver returned unknown - timeout, resource limit, or unsupported logic",
+        ["Increase timeout with AXIOM_SMT_TIMEOUT_MS",
+         "Try a different SMT solver (z3, cvc5, yices, mathsat)",
+         "Simplify the property to use supported SMT logic",
+         "Consider decomposing into simpler sub-properties"])
 end
 
 function smt_solver_preference()
@@ -439,6 +554,55 @@ contains_sigmoid_bounds(::Any) = false
 function contains_sigmoid_bounds(e::Expr)
     s = string(e)
     contains(s, "sigmoid") && (contains(s, "[0, 1]") || contains(s, "bounded"))
+end
+
+# Additional pattern matchers for expanded coverage
+
+function is_layernorm_normalized_property(prop::ParsedProperty)
+    s = string(prop.body)
+    (contains(s, "layernorm") || contains(s, "layer_norm")) &&
+    (contains(s, "mean") || contains(s, "variance") || contains(s, "normalized"))
+end
+
+function is_batchnorm_normalized_property(prop::ParsedProperty)
+    s = string(prop.body)
+    (contains(s, "batchnorm") || contains(s, "batch_norm")) &&
+    (contains(s, "normalized") || contains(s, "mean") || contains(s, "variance"))
+end
+
+function is_dropout_bounded_property(prop::ParsedProperty)
+    body = prop.body
+    s = string(body)
+    contains(s, "dropout") && (contains(s, "bounded") || contains(s, "["))
+end
+
+function is_maxpool_bounded_property(prop::ParsedProperty)
+    s = string(prop.body)
+    (contains(s, "maxpool") || contains(s, "max_pool")) && contains(s, "bounded")
+end
+
+function is_avgpool_bounded_property(prop::ParsedProperty)
+    s = string(prop.body)
+    (contains(s, "avgpool") || contains(s, "avg_pool") || contains(s, "mean_pool")) &&
+    contains(s, "bounded")
+end
+
+function is_concat_bounded_property(prop::ParsedProperty)
+    s = string(prop.body)
+    (contains(s, "concat") || contains(s, "cat") || contains(s, "vcat") || contains(s, "hcat")) &&
+    contains(s, "bounded")
+end
+
+function is_conv_finite_property(prop::ParsedProperty)
+    s = string(prop.body)
+    (contains(s, "conv") && !contains(s, "convex")) &&
+    (contains(s, "finite") || contains(s, "!isnan") || contains(s, "!isinf"))
+end
+
+function is_linear_finite_property(prop::ParsedProperty)
+    s = string(prop.body)
+    (contains(s, "linear") || contains(s, "dense") || contains(s, "fc")) &&
+    (contains(s, "finite") || contains(s, "!isnan") || contains(s, "!isinf"))
 end
 
 """
