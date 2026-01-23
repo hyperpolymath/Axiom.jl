@@ -30,7 +30,8 @@ include("layers/pooling.jl")
 # DSL macros
 include("dsl/axiom_macro.jl")
 include("dsl/ensure.jl")
-include("dsl/prove.jl")
+# TODO: prove.jl requires SMTLib (weak dependency) - move to extension
+# include("dsl/prove.jl")
 include("dsl/pipeline.jl")
 
 # Automatic differentiation
@@ -59,7 +60,7 @@ include("utils/initialization.jl")
 include("utils/data.jl")
 
 # Re-exports for user convenience
-export @axiom, @ensure, @prove
+export @axiom, @ensure  # TODO: @prove requires SMTLib extension
 export Tensor, Shape, DynamicShape
 export Dense, Conv, Conv2D, BatchNorm, LayerNorm, Dropout
 export ReLU, Sigmoid, Tanh, Softmax, GELU, LeakyReLU
