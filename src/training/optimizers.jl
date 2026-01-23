@@ -117,7 +117,7 @@ mutable struct Adam <: AbstractOptimizer
 end
 
 function Adam(; lr::Float32=0.001f0, betas::Tuple{Float32, Float32}=(0.9f0, 0.999f0),
-              eps::Float32=1e-8f0, weight_decay::Float32=0.0f0)
+              eps::Float32=Float32(1e-8), weight_decay::Float32=0.0f0)
     Adam(lr, betas[1], betas[2], eps, weight_decay, 0, Dict(), Dict())
 end
 
@@ -181,7 +181,7 @@ mutable struct AdamW <: AbstractOptimizer
 end
 
 function AdamW(; lr::Float32=0.001f0, betas::Tuple{Float32, Float32}=(0.9f0, 0.999f0),
-               eps::Float32=1e-8f0, weight_decay::Float32=0.01f0)
+               eps::Float32=Float32(1e-8), weight_decay::Float32=0.01f0)
     AdamW(lr, betas[1], betas[2], eps, weight_decay, 0, Dict(), Dict())
 end
 
@@ -238,7 +238,7 @@ mutable struct RMSprop <: AbstractOptimizer
 end
 
 function RMSprop(; lr::Float32=0.01f0, alpha::Float32=0.99f0,
-                 eps::Float32=1e-8f0, weight_decay::Float32=0.0f0,
+                 eps::Float32=Float32(1e-8), weight_decay::Float32=0.0f0,
                  momentum::Float32=0.0f0)
     RMSprop(lr, alpha, eps, weight_decay, momentum, Dict(), Dict())
 end

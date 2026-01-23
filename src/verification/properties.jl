@@ -238,7 +238,7 @@ Compute gradient of loss with respect to input.
 """
 function compute_input_gradient(model, x, y)
     # Simplified numerical gradient
-    eps = 1e-5f0
+    eps = Float32(1e-5)
     grad = similar(x)
 
     for i in eachindex(x)
