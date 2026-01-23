@@ -3,7 +3,13 @@
 # Formal verification system for proving properties about models.
 # Uses symbolic execution and SMT solver integration.
 
-import SMTLib
+# SMTLib is a weak dependency - only load if available
+const HAS_SMTLIB = Ref(false)
+function __init__()
+    if isdefined(@__MODULE__, :SMTLib)
+        HAS_SMTLIB[] = true
+    end
+end
 
 """
     @prove property
