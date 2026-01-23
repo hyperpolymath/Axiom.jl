@@ -32,8 +32,8 @@ end
 
 function BatchNorm(
     num_features::Int;
-    momentum::Float32 = 0.1f0,
-    eps::Float32 = 1e-5f0,
+    momentum = 0.1f0,
+    eps = 1e-5f0,
     affine::Bool = true,
     track_running_stats::Bool = true,
     dtype::Type{T} = Float32
