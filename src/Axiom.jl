@@ -61,14 +61,43 @@ include("utils/data.jl")
 
 # Re-exports for user convenience
 export @axiom, @ensure  # TODO: @prove requires SMTLib extension
-export Tensor, Shape, DynamicShape
-export Dense, Conv, Conv2D, BatchNorm, LayerNorm, Dropout
+
+# Tensor types and creation
+export Tensor, DynamicTensor, Shape, DynamicShape
+export axiom_zeros, axiom_ones, axiom_randn
+export zeros_like, ones_like, randn_like
+export to_dynamic, to_static
+
+# Layers
+export Dense, Conv, Conv2d, Conv2D, BatchNorm, LayerNorm, Dropout
+export MaxPool2d, AvgPool2d, GlobalAvgPool, Flatten
+
+# Activation functions (lowercase)
+export relu, sigmoid, tanh, softmax, gelu, leaky_relu
+
+# Activation layers (capitalized)
 export ReLU, Sigmoid, Tanh, Softmax, GELU, LeakyReLU
-export MaxPool, AvgPool, GlobalAvgPool, Flatten
+
+# Model containers
 export Sequential, Chain, Residual
+
+# Optimizers
 export Adam, SGD, RMSprop, AdamW
+
+# Loss functions
 export mse_loss, crossentropy, binary_crossentropy
+
+# Training
 export train!, compile, verify
+
+# Data utilities
+export DataLoader, train_test_split, one_hot
+
+# Verification
+export ValidProbabilities, FiniteOutput, check
+export EnsureViolation
+
+# Interop
 export from_pytorch, to_onnx
 
 # Version info

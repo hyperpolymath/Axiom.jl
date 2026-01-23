@@ -44,11 +44,6 @@ function Dense(
     Dense{T, F}(weight, b, activation, in_features, out_features)
 end
 
-# Convenience constructor with activation as second positional arg
-function Dense(in_features::Int, out_features::Int, activation; kwargs...)
-    Dense(in_features, out_features, activation; kwargs...)
-end
-
 function forward(d::Dense, x::AbstractArray)
     # x: (batch, in_features) or (in_features,)
     # output: (batch, out_features) or (out_features,)
