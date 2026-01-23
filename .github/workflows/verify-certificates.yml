@@ -1,0 +1,270 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+name: Verify Proof Certificates
+
+on:
+  pull_request:
+    paths:
+      - 'proofs/**/*.proof'
+      - 'proofs/**/*.json'
+      - 'test/verification/**'
+      - 'src/verification/**'
+  push:
+    branches: [main]
+    paths:
+      - 'proofs/**/*.proof'
+      - 'proofs/**/*.json'
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  verify-certificates:
+    name: Verify Proof Certificates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+
+      - name: Setup Julia
+        uses: julia-actions/setup-julia@9e6ca3eecabac0e486d6babab8f371b3f5b4b4e5 # v2.7.1
+        with:
+          version: '1.9'
+
+      - name: Install dependencies
+        run: |
+          julia --project=. -e 'using Pkg; Pkg.instantiate()'
+
+      - name: Verify all proof certificates
+        id: verify
+        run: |
+          julia --project=. -e '
+            using Axiom
+            using JSON
+
+            # Find all proof certificate files
+            cert_files = String[]
+            if isdir("proofs")
+              for (root, dirs, files) in walkdir("proofs")
+                for file in files
+                  if endswith(file, ".proof") || endswith(file, ".json")
+                    push!(cert_files, joinpath(root, file))
+                  end
+                end
+              end
+            end
+
+            if isempty(cert_files)
+              println("✅ No proof certificates found to verify")
+              exit(0)
+            end
+
+            println("Found $(length(cert_files)) certificate(s) to verify:")
+            for file in cert_files
+              println("  - $file")
+            end
+            println()
+
+            # Verify each certificate
+            failed = String[]
+            passed = String[]
+
+            for cert_file in cert_files
+              print("Verifying $cert_file... ")
+              try
+                cert = import_proof_certificate(cert_file)
+
+                if verify_proof_certificate(cert)
+                  println("✅ VALID")
+                  push!(passed, cert_file)
+                else
+                  println("❌ INVALID (hash mismatch)")
+                  push!(failed, cert_file)
+                end
+              catch e
+                println("❌ ERROR: $e")
+                push!(failed, cert_file)
+              end
+            end
+
+            println()
+            println("=" ^ 60)
+            println("Verification Summary:")
+            println("  ✅ Passed: $(length(passed))")
+            println("  ❌ Failed: $(length(failed))")
+            println("=" ^ 60)
+
+            if !isempty(failed)
+              println()
+              println("Failed certificates:")
+              for file in failed
+                println("  - $file")
+              end
+              exit(1)
+            end
+
+            println()
+            println("All certificates verified successfully!")
+          '
+
+      - name: Check certificate freshness
+        if: success()
+        run: |
+          julia --project=. -e '
+            using Axiom
+            using Dates
+
+            if !isdir("proofs")
+              println("✅ No proof certificates to check freshness")
+              exit(0)
+            end
+
+            # Check if any certificates are older than 90 days
+            stale_threshold = now(UTC) - Day(90)
+            stale_certs = String[]
+
+            for (root, dirs, files) in walkdir("proofs")
+              for file in files
+                if endswith(file, ".proof") || endswith(file, ".json")
+                  cert_file = joinpath(root, file)
+                  cert = import_proof_certificate(cert_file)
+                  cert_time = DateTime(cert.timestamp, dateformat"yyyy-mm-ddTHH:MM:SS.sssZ")
+
+                  if cert_time < stale_threshold
+                    push!(stale_certs, cert_file)
+                  end
+                end
+              end
+            end
+
+            if !isempty(stale_certs)
+              println("⚠️  Warning: $(length(stale_certs)) certificate(s) are >90 days old:")
+              for file in stale_certs
+                println("  - $file")
+              end
+              println()
+              println("Consider regenerating these certificates to ensure they reflect current code.")
+            else
+              println("✅ All certificates are fresh (<90 days old)")
+            end
+          '
+
+      - name: Generate verification report
+        if: always()
+        run: |
+          mkdir -p reports
+          julia --project=. -e '
+            using Axiom
+            using JSON
+            using Dates
+
+            report = Dict(
+              "timestamp" => now(UTC),
+              "repository" => "Axiom.jl",
+              "workflow" => "verify-certificates",
+              "certificates" => []
+            )
+
+            if isdir("proofs")
+              for (root, dirs, files) in walkdir("proofs")
+                for file in files
+                  if endswith(file, ".proof") || endswith(file, ".json")
+                    cert_file = joinpath(root, file)
+                    try
+                      cert = import_proof_certificate(cert_file)
+                      valid = verify_proof_certificate(cert)
+
+                      push!(report["certificates"], Dict(
+                        "file" => cert_file,
+                        "property" => cert.property,
+                        "status" => string(cert.status),
+                        "valid" => valid,
+                        "timestamp" => cert.timestamp,
+                        "proof_method" => cert.proof_method,
+                        "axiom_version" => cert.axiom_version
+                      ))
+                    catch e
+                      push!(report["certificates"], Dict(
+                        "file" => cert_file,
+                        "valid" => false,
+                        "error" => string(e)
+                      ))
+                    end
+                  end
+                end
+              end
+            end
+
+            open("reports/certificate-verification-report.json", "w") do f
+              JSON.print(f, report, 2)
+            end
+
+            println("Verification report saved to reports/certificate-verification-report.json")
+          '
+
+      - name: Upload verification report
+        if: always()
+        uses: actions/upload-artifact@6d3e1c6c7da08dea67f074b3b34ddf5fd56a1bd7 # v4
+        with:
+          name: certificate-verification-report
+          path: reports/certificate-verification-report.json
+          retention-days: 90
+
+  check-certificate-coverage:
+    name: Check Proof Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+
+      - name: Setup Julia
+        uses: julia-actions/setup-julia@9e6ca3eecabac0e486d6babab8f371b3f5b4b4e5 # v2.7.1
+        with:
+          version: '1.9'
+
+      - name: Check proof coverage
+        run: |
+          julia --project=. -e '
+            using Axiom
+
+            # Count documented properties in wiki
+            wiki_properties = 0
+            if isdir("docs/wiki")
+              for file in readdir("docs/wiki")
+                if endswith(file, ".md")
+                  content = read(joinpath("docs/wiki", file), String)
+                  # Count @prove examples
+                  wiki_properties += count("@prove", content)
+                end
+              end
+            end
+
+            # Count certified proofs
+            certified_proofs = 0
+            if isdir("proofs")
+              for (root, dirs, files) in walkdir("proofs")
+                for file in files
+                  if endswith(file, ".proof") || endswith(file, ".json")
+                    certified_proofs += 1
+                  end
+                end
+              end
+            end
+
+            println("=" ^ 60)
+            println("Proof Coverage Report:")
+            println("  📚 Documented properties: $wiki_properties")
+            println("  ✅ Certified proofs: $certified_proofs")
+            if wiki_properties > 0
+              coverage = round(100 * certified_proofs / wiki_properties, digits=1)
+              println("  📊 Coverage: $coverage%")
+            end
+            println("=" ^ 60)
+
+            if certified_proofs == 0
+              println()
+              println("💡 Tip: Add proof certificates to the proofs/ directory")
+              println("   Use export_proof_certificate() to save verified proofs")
+            end
+          '
