@@ -281,6 +281,9 @@ using LinearAlgebra
         end
     end
 
+    # Include proof serialization tests
+    include("verification/serialization_tests.jl")
+
 end
 
 println("\nAll tests passed!")
