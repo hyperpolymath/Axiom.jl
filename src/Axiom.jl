@@ -51,6 +51,7 @@ include("verification/properties.jl")
 include("verification/checker.jl")
 include("verification/certificates.jl")
 include("verification/serialization.jl")
+include("proof_export.jl")  # Issue #19 - Proof assistant integration
 
 # Backend abstraction
 include("backends/abstract.jl")
@@ -117,6 +118,10 @@ export from_pytorch, to_onnx
 export ModelMetadata, VerificationClaim
 export create_metadata, save_metadata, load_metadata, validate_metadata
 export add_verification_claim!, verify_and_claim!
+
+# Proof assistant integration (issue #19)
+export export_lean, export_coq, export_isabelle
+export import_lean_certificate, import_coq_certificate, import_isabelle_certificate
 
 # Version info
 const VERSION = v"0.1.0"
