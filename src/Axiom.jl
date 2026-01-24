@@ -60,6 +60,9 @@ include("backends/gpu_hooks.jl")  # GPU backend interface (issue #12)
 # Rust FFI (loaded conditionally)
 include("backends/rust_ffi.jl")
 
+# Model metadata and packaging
+include("model_metadata.jl")
+
 # Utilities
 include("utils/initialization.jl")
 include("utils/data.jl")
@@ -109,6 +112,11 @@ export export_proof_certificate, import_proof_certificate, verify_proof_certific
 
 # Interop
 export from_pytorch, to_onnx
+
+# Model metadata and packaging (issues #15, #16)
+export ModelMetadata, VerificationClaim
+export create_metadata, save_metadata, load_metadata, validate_metadata
+export add_verification_claim!, verify_and_claim!
 
 # Version info
 const VERSION = v"0.1.0"
