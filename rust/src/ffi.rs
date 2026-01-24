@@ -369,6 +369,164 @@ pub unsafe extern "C" fn axiom_maxpool2d(
 // SMT Solver Runner
 // ============================================================================
 
+/// Check if containerized SMT execution is enabled
+fn use_containerized_smt() -> bool {
+    env::var("AXIOM_SMT_RUNNER").unwrap_or_default() == "container"
+}
+
+/// Get container image for SMT runner
+fn get_smt_container_image() -> String {
+    env::var("AXIOM_SMT_CONTAINER_IMAGE")
+        .unwrap_or_else(|_| "axiom-smt-runner:latest".to_string())
+}
+
+/// Get container runtime (podman, svalinn, docker)
+fn get_container_runtime() -> String {
+    env::var("AXIOM_CONTAINER_RUNTIME")
+        .unwrap_or_else(|_| "podman".to_string())
+}
+
+/// Run SMT solver in container
+unsafe fn run_smt_containerized(
+    solver_kind: &str,
+    script_path: &std::path::Path,
+    timeout_ms: u64,
+) -> Result<String, String> {
+    let runtime = get_container_runtime();
+    let image = get_smt_container_image();
+
+    let mut cmd = Command::new(&runtime);
+    cmd.arg("run")
+        .arg("--rm")
+        .arg("--read-only")
+        .arg("--security-opt=no-new-privileges")
+        .arg("--cap-drop=ALL")
+        .arg("--network=none")
+        .arg("--memory=2g")
+        .arg("--cpus=2")
+        .arg(format!("-v={}:/tmp/query.smt2:ro", script_path.display()))
+        .arg(&image)
+        .arg(solver_kind)
+        .arg("/tmp/query.smt2")
+        .arg(timeout_ms.to_string())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    match cmd.spawn() {
+        Ok(mut child) => {
+            let timeout = Duration::from_millis(timeout_ms);
+            let start = Instant::now();
+            let mut timed_out = false;
+
+            loop {
+                match child.try_wait() {
+                    Ok(Some(_)) => break,
+                    Ok(None) => {
+                        if start.elapsed() >= timeout {
+                            timed_out = true;
+                            let _ = child.kill();
+                            let _ = child.wait();
+                            break;
+                        }
+                        thread::sleep(Duration::from_millis(10));
+                    }
+                    Err(_) => break,
+                }
+            }
+
+            if timed_out {
+                Ok("timeout".to_string())
+            } else {
+                match child.wait_with_output() {
+                    Ok(out) => {
+                        let mut text = String::from_utf8_lossy(&out.stdout).to_string();
+                        if !out.stderr.is_empty() {
+                            if !text.ends_with('\n') && !text.is_empty() {
+                                text.push('\n');
+                            }
+                            text.push_str(&String::from_utf8_lossy(&out.stderr));
+                        }
+                        Ok(text)
+                    }
+                    Err(e) => Err(format!("Container execution failed: {}", e)),
+                }
+            }
+        }
+        Err(e) => Err(format!("Failed to spawn container: {}", e)),
+    }
+}
+
+/// Run SMT solver directly (without container)
+unsafe fn run_smt_direct(
+    solver_kind: &str,
+    solver_path: &str,
+    script_path: &std::path::Path,
+    timeout_ms: u64,
+) -> Result<String, String> {
+    let timeout = Duration::from_millis(timeout_ms);
+    let timeout_sec = (timeout_ms / 1000) as u64;
+
+    let mut cmd = Command::new(solver_path);
+    match solver_kind {
+        "z3" => {
+            cmd.arg(format!("-T:{}", timeout_sec))
+                .arg(script_path);
+        }
+        "cvc5" => {
+            cmd.arg(format!("--tlimit={}", timeout_ms))
+                .arg(script_path);
+        }
+        "yices" => {
+            cmd.arg(format!("--timeout={}", timeout_sec))
+                .arg(script_path);
+        }
+        _ => {
+            cmd.arg(script_path);
+        }
+    }
+
+    let mut child = match cmd.stdout(Stdio::piped()).stderr(Stdio::piped()).spawn() {
+        Ok(child) => child,
+        Err(e) => return Err(format!("Failed to spawn solver: {}", e)),
+    };
+
+    let start = Instant::now();
+    let mut timed_out = false;
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) => {
+                if start.elapsed() >= timeout {
+                    timed_out = true;
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    break;
+                }
+                thread::sleep(Duration::from_millis(10));
+            }
+            Err(_) => break,
+        }
+    }
+
+    if timed_out {
+        Ok("timeout".to_string())
+    } else {
+        match child.wait_with_output() {
+            Ok(out) => {
+                let mut text = String::from_utf8_lossy(&out.stdout).to_string();
+                if !out.stderr.is_empty() {
+                    if !text.ends_with('\n') && !text.is_empty() {
+                        text.push('\n');
+                    }
+                    text.push_str(&String::from_utf8_lossy(&out.stderr));
+                }
+                Ok(text)
+            }
+            Err(e) => Err(format!("Solver execution failed: {}", e)),
+        }
+    }
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn axiom_smt_run(
     solver_kind: *const libc::c_char,
@@ -390,6 +548,7 @@ pub unsafe extern "C" fn axiom_smt_run(
     let path = CStr::from_ptr(solver_path).to_str().unwrap_or("");
     let script_str = CStr::from_ptr(script).to_str().unwrap_or("");
 
+    // Write script to temporary file
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -401,74 +560,25 @@ pub unsafe extern "C" fn axiom_smt_run(
         return CString::new(format!("error: {}", e)).unwrap().into_raw();
     }
 
-    let timeout = Duration::from_millis(timeout_ms as u64);
-    let timeout_sec = (timeout_ms / 1000) as u64;
-
-    let mut cmd = Command::new(path);
-    match kind {
-        "z3" => {
-            cmd.arg(format!("-T:{}", timeout_sec))
-                .arg(&script_path);
-        }
-        "cvc5" => {
-            cmd.arg(format!("--tlimit={}", timeout_ms))
-                .arg(&script_path);
-        }
-        "yices" => {
-            cmd.arg(format!("--timeout={}", timeout_sec))
-                .arg(&script_path);
-        }
-        _ => {
-            cmd.arg(&script_path);
-        }
-    }
-
-    let mut child = match cmd.stdout(Stdio::piped()).stderr(Stdio::piped()).spawn() {
-        Ok(child) => child,
-        Err(e) => {
-            let _ = std::fs::remove_file(&script_path);
-            return CString::new(format!("error: {}", e)).unwrap().into_raw();
-        }
-    };
-
-    let start = Instant::now();
-    let mut timed_out = false;
-    loop {
-        match child.try_wait() {
-            Ok(Some(_)) => break,
-            Ok(None) => {
-                if start.elapsed() >= timeout {
-                    timed_out = true;
-                    let _ = child.kill();
-                    let _ = child.wait();
-                    break;
-                }
-                thread::sleep(Duration::from_millis(10));
-            }
-            Err(_) => break,
-        }
-    }
-
-    let output = if timed_out {
-        "timeout".to_string()
+    // Choose execution method: containerized or direct
+    let output = if use_containerized_smt() {
+        run_smt_containerized(kind, &script_path, timeout_ms as u64)
     } else {
-        match child.wait_with_output() {
-            Ok(out) => {
-                let mut text = String::from_utf8_lossy(&out.stdout).to_string();
-                if !out.stderr.is_empty() {
-                    if !text.ends_with('\n') && !text.is_empty() {
-                        text.push('\n');
-                    }
-                    text.push_str(&String::from_utf8_lossy(&out.stderr));
-                }
-                text
-            }
-            Err(e) => format!("error: {}", e),
-        }
+        run_smt_direct(kind, path, &script_path, timeout_ms as u64)
     };
 
+    // Clean up temporary file
     let _ = std::fs::remove_file(&script_path);
-    CString::new(output).unwrap_or_else(|_| CString::new("error").unwrap()).into_raw()
+
+    // Return result
+    match output {
+        Ok(text) => CString::new(text)
+            .unwrap_or_else(|_| CString::new("error").unwrap())
+            .into_raw(),
+        Err(e) => CString::new(format!("error: {}", e))
+            .unwrap()
+            .into_raw(),
+    }
 }
 
 #[no_mangle]
