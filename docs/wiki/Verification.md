@@ -151,12 +151,71 @@ environment variables:
 - `AXIOM_SMT_CACHE=1` to enable SMT result caching
 - `AXIOM_SMT_CACHE_MAX` to cap cache entries (default: 128)
 
-### Julia-First Default
+### Execution Modes
 
-By default, Axiom uses the Julia SMT path (SMTLib) and does not require Rust.
+Axiom supports three SMT execution modes:
+
+| Mode | Environment Variable | Security | Performance | Use Case |
+|------|---------------------|----------|-------------|----------|
+| **Julia (default)** | None | Basic | Fast | Development |
+| **Containerized** | `AXIOM_SMT_RUNNER=container` | **High** | Medium | Production |
+| **Rust** | `AXIOM_SMT_RUNNER=rust` | Medium | Fast | Embedded |
+
+**Recommendation:** Use `container` mode for production deployments requiring maximum security.
+
+### Julia Mode (Default)
+
+By default, Axiom uses the Julia SMT path (SMTLib) and does not require Rust or containers.
 
 ```julia
 @prove ∃x. x > 0
+```
+
+**Security:** Basic (no isolation, trusts solver binary)
+
+### Containerized SMT Execution (Recommended for Production)
+
+For maximum security, run SMT solvers in isolated containers using svalinn/vordr.
+
+**Benefits:**
+- Process isolation (PID, network, mount namespaces)
+- Resource limits (2GB RAM, 2 CPU cores)
+- Reproducible solver builds via Guix
+- Supply chain verification
+
+**Setup:**
+
+```bash
+# Build the container (one-time setup)
+cd verified-container-spec/examples/axiom-smt-runner
+podman build -t axiom-smt-runner:latest -f Containerfile .
+
+# Or use pre-built image
+podman pull ghcr.io/hyperpolymath/axiom-smt-runner:latest
+```
+
+**Usage:**
+
+```bash
+# Enable containerized execution
+export AXIOM_SMT_RUNNER=container
+export AXIOM_SMT_CONTAINER_IMAGE=axiom-smt-runner:latest
+export AXIOM_CONTAINER_RUNTIME=podman  # or 'svalinn' or 'docker'
+```
+
+```julia
+using Axiom
+
+# SMT solvers now run in isolated containers automatically
+@prove ∀x. x > 0 ⟹ (x + 1) > 0
+```
+
+**With Svalinn/Vordr (Advanced):**
+
+```bash
+# Use Svalinn for attestation verification
+export AXIOM_CONTAINER_RUNTIME=svalinn
+export AXIOM_SMT_POLICY=/path/to/svalinn-policy.json
 ```
 
 ### Optional Rust Runner Example
