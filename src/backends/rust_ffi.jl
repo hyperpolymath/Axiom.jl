@@ -171,6 +171,223 @@ function backend_conv2d(
 end
 
 """
+Sigmoid via Rust.
+"""
+function backend_sigmoid(::RustBackend, x::Array{Float32})
+    if !rust_available()
+        return sigmoid(x)
+    end
+
+    y = similar(x)
+    n = length(x)
+
+    @rust_call axiom_sigmoid Cvoid (
+        Ptr{Float32}, Ptr{Float32}, Csize_t
+    ) x y n
+
+    y
+end
+
+"""
+GELU via Rust.
+"""
+function backend_gelu(::RustBackend, x::Array{Float32})
+    if !rust_available()
+        return gelu(x)
+    end
+
+    y = similar(x)
+    n = length(x)
+
+    @rust_call axiom_gelu Cvoid (
+        Ptr{Float32}, Ptr{Float32}, Csize_t
+    ) x y n
+
+    y
+end
+
+"""
+Tanh via Rust.
+"""
+function backend_tanh(::RustBackend, x::Array{Float32})
+    if !rust_available()
+        return tanh.(x)
+    end
+
+    y = similar(x)
+    n = length(x)
+
+    @rust_call axiom_tanh Cvoid (
+        Ptr{Float32}, Ptr{Float32}, Csize_t
+    ) x y n
+
+    y
+end
+
+"""
+Leaky ReLU via Rust.
+"""
+function backend_leaky_relu(::RustBackend, x::Array{Float32}, alpha::Float32=0.01f0)
+    if !rust_available()
+        return leaky_relu(x, alpha)
+    end
+
+    y = similar(x)
+    n = length(x)
+
+    @rust_call axiom_leaky_relu Cvoid (
+        Ptr{Float32}, Ptr{Float32}, Csize_t, Cfloat
+    ) x y n alpha
+
+    y
+end
+
+"""
+ELU via Rust.
+"""
+function backend_elu(::RustBackend, x::Array{Float32}, alpha::Float32=1.0f0)
+    if !rust_available()
+        return elu(x, alpha)
+    end
+
+    y = similar(x)
+    n = length(x)
+
+    @rust_call axiom_elu Cvoid (
+        Ptr{Float32}, Ptr{Float32}, Csize_t, Cfloat
+    ) x y n alpha
+
+    y
+end
+
+"""
+SELU via Rust.
+"""
+function backend_selu(::RustBackend, x::Array{Float32})
+    if !rust_available()
+        return selu(x)
+    end
+
+    y = similar(x)
+    n = length(x)
+
+    @rust_call axiom_selu Cvoid (
+        Ptr{Float32}, Ptr{Float32}, Csize_t
+    ) x y n
+
+    y
+end
+
+"""
+Swish/SiLU via Rust.
+"""
+function backend_swish(::RustBackend, x::Array{Float32})
+    if !rust_available()
+        return swish(x)
+    end
+
+    y = similar(x)
+    n = length(x)
+
+    @rust_call axiom_swish Cvoid (
+        Ptr{Float32}, Ptr{Float32}, Csize_t
+    ) x y n
+
+    y
+end
+
+"""
+Mish via Rust.
+"""
+function backend_mish(::RustBackend, x::Array{Float32})
+    if !rust_available()
+        return mish(x)
+    end
+
+    y = similar(x)
+    n = length(x)
+
+    @rust_call axiom_mish Cvoid (
+        Ptr{Float32}, Ptr{Float32}, Csize_t
+    ) x y n
+
+    y
+end
+
+"""
+Hard Swish via Rust.
+"""
+function backend_hardswish(::RustBackend, x::Array{Float32})
+    if !rust_available()
+        return hardswish(x)
+    end
+
+    y = similar(x)
+    n = length(x)
+
+    @rust_call axiom_hardswish Cvoid (
+        Ptr{Float32}, Ptr{Float32}, Csize_t
+    ) x y n
+
+    y
+end
+
+"""
+Hard Sigmoid via Rust.
+"""
+function backend_hardsigmoid(::RustBackend, x::Array{Float32})
+    if !rust_available()
+        return hardsigmoid(x)
+    end
+
+    y = similar(x)
+    n = length(x)
+
+    @rust_call axiom_hardsigmoid Cvoid (
+        Ptr{Float32}, Ptr{Float32}, Csize_t
+    ) x y n
+
+    y
+end
+
+"""
+Log Softmax via Rust.
+"""
+function backend_log_softmax(::RustBackend, x::Array{Float32}, dim::Int)
+    if !rust_available()
+        return log_softmax(x, dims=dim)
+    end
+
+    y = similar(x)
+    batch_size = size(x, 1)
+    num_classes = size(x, 2)
+
+    @rust_call axiom_log_softmax Cvoid (
+        Ptr{Float32}, Ptr{Float32}, Csize_t, Csize_t
+    ) x y batch_size num_classes
+
+    y
+end
+
+"""
+Softplus via Rust.
+"""
+function backend_softplus(::RustBackend, x::Array{Float32})
+    if !rust_available()
+        return softplus(x)
+    end
+
+    y = similar(x)
+    n = length(x)
+
+    @rust_call axiom_softplus Cvoid (
+        Ptr{Float32}, Ptr{Float32}, Csize_t
+    ) x y n
+
+    y
+end
+
+"""
 Batch normalization via Rust.
 """
 function backend_batchnorm(
@@ -199,6 +416,112 @@ function backend_batchnorm(
     ) x y gamma beta running_mean running_var n_elements n_features eps training
 
     y
+end
+
+"""
+Layer normalization via Rust.
+"""
+function backend_layernorm(
+    ::RustBackend,
+    x::Array{Float32},
+    gamma::Vector{Float32},
+    beta::Vector{Float32},
+    eps::Float32
+)
+    if !rust_available()
+        return backend_layernorm(JuliaBackend(), x, gamma, beta, eps)
+    end
+
+    y = similar(x)
+    batch_size = size(x, 1)
+    hidden_size = size(x, 2)
+
+    @rust_call axiom_layernorm Cvoid (
+        Ptr{Float32}, Ptr{Float32},
+        Ptr{Float32}, Ptr{Float32},
+        Csize_t, Csize_t, Cfloat
+    ) x y gamma beta batch_size hidden_size eps
+
+    y
+end
+
+"""
+RMS normalization via Rust.
+"""
+function backend_rmsnorm(
+    ::RustBackend,
+    x::Array{Float32},
+    weight::Vector{Float32},
+    eps::Float32
+)
+    if !rust_available()
+        return backend_rmsnorm(JuliaBackend(), x, weight, eps)
+    end
+
+    y = similar(x)
+    batch_size = size(x, 1)
+    hidden_size = size(x, 2)
+
+    @rust_call axiom_rmsnorm Cvoid (
+        Ptr{Float32}, Ptr{Float32}, Ptr{Float32},
+        Csize_t, Csize_t, Cfloat
+    ) x y weight batch_size hidden_size eps
+
+    y
+end
+
+"""
+MaxPool2D via Rust.
+"""
+function backend_maxpool2d(
+    ::RustBackend,
+    input::Array{Float32, 4},
+    kernel_size::Tuple{Int, Int},
+    stride::Tuple{Int, Int},
+    padding::Tuple{Int, Int}
+)
+    if !rust_available()
+        return backend_maxpool2d(JuliaBackend(), input, kernel_size, stride, padding)
+    end
+
+    N, H_in, W_in, C = size(input)
+    kH, kW = kernel_size
+    sH, sW = stride
+    pH, pW = padding
+
+    H_out = div(H_in + 2*pH - kH, sH) + 1
+    W_out = div(W_in + 2*pW - kW, sW) + 1
+
+    output = Array{Float32}(undef, N, H_out, W_out, C)
+
+    @rust_call axiom_maxpool2d Cvoid (
+        Ptr{Float32}, Ptr{Float32},
+        Csize_t, Csize_t, Csize_t, Csize_t,  # input dims
+        Csize_t, Csize_t,  # kernel size
+        Csize_t, Csize_t,  # stride
+        Csize_t, Csize_t   # padding
+    ) input output N H_in W_in C kH kW sH sW pH pW
+
+    output
+end
+
+"""
+Global Average Pool2D via Rust.
+"""
+function backend_global_avgpool2d(::RustBackend, input::Array{Float32, 4})
+    if !rust_available()
+        return backend_global_avgpool2d(JuliaBackend(), input)
+    end
+
+    N, H, W, C = size(input)
+    output = Array{Float32}(undef, N, C)
+
+    @rust_call axiom_global_avgpool2d Cvoid (
+        Ptr{Float32}, Ptr{Float32},
+        Csize_t, Csize_t, Csize_t, Csize_t
+    ) input output N H W C
+
+    output
 end
 
 # ============================================================================
