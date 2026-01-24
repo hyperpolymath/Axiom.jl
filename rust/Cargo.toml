@@ -2,7 +2,7 @@
 name = "axiom-core"
 version = "0.1.0"
 edition = "2021"
-authors = ["Axiom.jl Contributors"]
+authors = ["Jonathan D.A. Jewell <jonathan.jewell@open.ac.uk>"]
 description = "High-performance Rust backend for Axiom.jl"
 license = "MIT"
 
