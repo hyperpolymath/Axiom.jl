@@ -107,6 +107,170 @@ pub unsafe extern "C" fn axiom_gelu(
     y_slice.copy_from_slice(y.as_slice().unwrap());
 }
 
+/// Tanh activation
+#[no_mangle]
+pub unsafe extern "C" fn axiom_tanh(
+    x_ptr: *const f32,
+    y_ptr: *mut f32,
+    n: libc::size_t,
+) {
+    let x_slice = slice::from_raw_parts(x_ptr, n);
+    let x = ArrayD::from_shape_vec(IxDyn(&[n]), x_slice.to_vec()).unwrap();
+
+    let y = activations::tanh_activation(&x);
+
+    let y_slice = slice::from_raw_parts_mut(y_ptr, n);
+    y_slice.copy_from_slice(y.as_slice().unwrap());
+}
+
+/// Leaky ReLU activation
+#[no_mangle]
+pub unsafe extern "C" fn axiom_leaky_relu(
+    x_ptr: *const f32,
+    y_ptr: *mut f32,
+    n: libc::size_t,
+    alpha: f32,
+) {
+    let x_slice = slice::from_raw_parts(x_ptr, n);
+    let x = ArrayD::from_shape_vec(IxDyn(&[n]), x_slice.to_vec()).unwrap();
+
+    let y = activations::leaky_relu(&x, alpha);
+
+    let y_slice = slice::from_raw_parts_mut(y_ptr, n);
+    y_slice.copy_from_slice(y.as_slice().unwrap());
+}
+
+/// ELU activation
+#[no_mangle]
+pub unsafe extern "C" fn axiom_elu(
+    x_ptr: *const f32,
+    y_ptr: *mut f32,
+    n: libc::size_t,
+    alpha: f32,
+) {
+    let x_slice = slice::from_raw_parts(x_ptr, n);
+    let x = ArrayD::from_shape_vec(IxDyn(&[n]), x_slice.to_vec()).unwrap();
+
+    let y = activations::elu(&x, alpha);
+
+    let y_slice = slice::from_raw_parts_mut(y_ptr, n);
+    y_slice.copy_from_slice(y.as_slice().unwrap());
+}
+
+/// SELU activation
+#[no_mangle]
+pub unsafe extern "C" fn axiom_selu(
+    x_ptr: *const f32,
+    y_ptr: *mut f32,
+    n: libc::size_t,
+) {
+    let x_slice = slice::from_raw_parts(x_ptr, n);
+    let x = ArrayD::from_shape_vec(IxDyn(&[n]), x_slice.to_vec()).unwrap();
+
+    let y = activations::selu(&x);
+
+    let y_slice = slice::from_raw_parts_mut(y_ptr, n);
+    y_slice.copy_from_slice(y.as_slice().unwrap());
+}
+
+/// Swish/SiLU activation
+#[no_mangle]
+pub unsafe extern "C" fn axiom_swish(
+    x_ptr: *const f32,
+    y_ptr: *mut f32,
+    n: libc::size_t,
+) {
+    let x_slice = slice::from_raw_parts(x_ptr, n);
+    let x = ArrayD::from_shape_vec(IxDyn(&[n]), x_slice.to_vec()).unwrap();
+
+    let y = activations::swish(&x);
+
+    let y_slice = slice::from_raw_parts_mut(y_ptr, n);
+    y_slice.copy_from_slice(y.as_slice().unwrap());
+}
+
+/// Mish activation
+#[no_mangle]
+pub unsafe extern "C" fn axiom_mish(
+    x_ptr: *const f32,
+    y_ptr: *mut f32,
+    n: libc::size_t,
+) {
+    let x_slice = slice::from_raw_parts(x_ptr, n);
+    let x = ArrayD::from_shape_vec(IxDyn(&[n]), x_slice.to_vec()).unwrap();
+
+    let y = activations::mish(&x);
+
+    let y_slice = slice::from_raw_parts_mut(y_ptr, n);
+    y_slice.copy_from_slice(y.as_slice().unwrap());
+}
+
+/// Hard Swish activation
+#[no_mangle]
+pub unsafe extern "C" fn axiom_hardswish(
+    x_ptr: *const f32,
+    y_ptr: *mut f32,
+    n: libc::size_t,
+) {
+    let x_slice = slice::from_raw_parts(x_ptr, n);
+    let x = ArrayD::from_shape_vec(IxDyn(&[n]), x_slice.to_vec()).unwrap();
+
+    let y = activations::hardswish(&x);
+
+    let y_slice = slice::from_raw_parts_mut(y_ptr, n);
+    y_slice.copy_from_slice(y.as_slice().unwrap());
+}
+
+/// Hard Sigmoid activation
+#[no_mangle]
+pub unsafe extern "C" fn axiom_hardsigmoid(
+    x_ptr: *const f32,
+    y_ptr: *mut f32,
+    n: libc::size_t,
+) {
+    let x_slice = slice::from_raw_parts(x_ptr, n);
+    let x = ArrayD::from_shape_vec(IxDyn(&[n]), x_slice.to_vec()).unwrap();
+
+    let y = activations::hardsigmoid(&x);
+
+    let y_slice = slice::from_raw_parts_mut(y_ptr, n);
+    y_slice.copy_from_slice(y.as_slice().unwrap());
+}
+
+/// Log Softmax activation
+#[no_mangle]
+pub unsafe extern "C" fn axiom_log_softmax(
+    x_ptr: *const f32,
+    y_ptr: *mut f32,
+    batch_size: libc::size_t,
+    num_classes: libc::size_t,
+) {
+    let n = batch_size * num_classes;
+    let x_slice = slice::from_raw_parts(x_ptr, n);
+    let x = ArrayD::from_shape_vec(IxDyn(&[batch_size, num_classes]), x_slice.to_vec()).unwrap();
+
+    let y = activations::log_softmax(&x);
+
+    let y_slice = slice::from_raw_parts_mut(y_ptr, n);
+    y_slice.copy_from_slice(y.as_slice().unwrap());
+}
+
+/// Softplus activation
+#[no_mangle]
+pub unsafe extern "C" fn axiom_softplus(
+    x_ptr: *const f32,
+    y_ptr: *mut f32,
+    n: libc::size_t,
+) {
+    let x_slice = slice::from_raw_parts(x_ptr, n);
+    let x = ArrayD::from_shape_vec(IxDyn(&[n]), x_slice.to_vec()).unwrap();
+
+    let y = activations::softplus(&x);
+
+    let y_slice = slice::from_raw_parts_mut(y_ptr, n);
+    y_slice.copy_from_slice(y.as_slice().unwrap());
+}
+
 // ============================================================================
 // Convolution
 // ============================================================================
