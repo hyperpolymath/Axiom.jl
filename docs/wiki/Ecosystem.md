@@ -276,22 +276,99 @@ copy_weights!(axiom_model, weights,
 
 ### HuggingFace
 
-Load pretrained transformers.
+Load pretrained transformers with automatic security verification.
 
 ```julia
 using Axiom
 using Axiom.HuggingFaceCompat
 
-# Load pretrained model
+# Load pretrained model (with automatic verification)
 model = from_pretrained("bert-base-uncased")
 
-# Load tokenizer
-tokenizer = load_tokenizer("bert-base-uncased")
+# Load specific revision
+model = from_pretrained("bert-base-uncased", revision="v1.0")
+
+# Private models (requires AXIOM_HF_TOKEN environment variable)
+model = from_pretrained("myorg/private-model")
 
 # Inference
 text = "Hello, world!"
 tokens = tokenize(tokenizer, text)
 output = forward(model, tokens)
+```
+
+#### Security Features
+
+**Automatic Verification:**
+```julia
+# All imported models are verified by default
+model = from_pretrained("bert-base-uncased")  # ← Runs @prove checks
+
+# Verification checks:
+# ✓ Weights are finite (no NaN/Inf injection attacks)
+# ✓ Output bounds verified
+# ✓ Remote code execution disabled by default
+```
+
+**Supply Chain Security:**
+```julia
+# SHA256 verification (when available)
+# Cache directory: ~/.cache/axiom/huggingface
+
+# Environment variables:
+# AXIOM_HF_TOKEN - HuggingFace API token (for private models)
+# AXIOM_HF_TRUST_REMOTE_CODE - Enable custom code (NOT recommended)
+```
+
+**Verification Report:**
+```julia
+model = from_pretrained("bert-base-uncased")
+
+# Output:
+# [ Info: Loading model from HuggingFace Hub
+# [ Info: Detected architecture: bert
+# [ Info: Verifying imported model...
+# [ Info: Model verification passed
+#   passed = ["Weights are finite", "Output bounds verified", ...]
+```
+
+**Skip Verification (NOT recommended):**
+```julia
+# Only for testing/development
+model = from_pretrained("bert-base-uncased", verify=false)
+```
+
+#### Supported Architectures
+
+| Architecture | Status | Verification |
+|--------------|--------|--------------|
+| BERT | ✓ Implemented | Output bounds, finite weights |
+| RoBERTa | ✓ Implemented | Output bounds, finite weights |
+| GPT-2 | 🚧 Planned | - |
+| Vision Transformer (ViT) | 🚧 Planned | - |
+| ResNet | 🚧 Planned | - |
+
+#### Weight Loading
+
+**Note:** Full PyTorch weight loading requires parsing `.bin` files (pickle format).
+Current implementation provides architecture conversion only.
+
+```julia
+# To use with actual weights:
+# 1. Export HF model to ONNX format
+# 2. Import via load_onnx()
+# OR
+# 3. Manually convert weights to Axiom format
+```
+
+#### Tokenizer Support
+
+```julia
+# Tokenizer loading is a placeholder - use Transformers.jl
+using Transformers
+
+tokenizer = hgf"bert-base-uncased"
+tokens = encode(tokenizer, "Hello, world!")
 ```
 
 ### MLflow
