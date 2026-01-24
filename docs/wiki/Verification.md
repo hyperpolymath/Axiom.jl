@@ -189,6 +189,33 @@ export AXIOM_SMT_CACHE_MAX=64
 
 ## SMT Runner Security Hardening
 
+### Quick Start Security Setup
+
+**Essential 3-step setup for secure SMT verification:**
+
+```bash
+# 1. Set timeout (REQUIRED - prevents infinite loops)
+export AXIOM_SMT_TIMEOUT_MS=30000
+
+# 2. Choose allow-listed solver (REQUIRED)
+export AXIOM_SMT_SOLVER=z3  # or cvc5, yices, mathsat
+
+# 3. Enable caching (RECOMMENDED - reduces solver invocations)
+export AXIOM_SMT_CACHE=1
+```
+
+**Verify your configuration:**
+
+```julia
+using Axiom
+
+# Print security report
+print_smt_security_report()
+
+# Or get programmatic report
+report = verify_smt_security_config()
+```
+
 ### Security Checklist
 
 When using external SMT solvers for formal verification, follow these security best practices:
@@ -317,7 +344,25 @@ export AXIOM_RUST_SANDBOX=strict  # Future: seccomp, namespaces
 
 ### Security Verification Checklist
 
-Before deploying verification in production:
+Before deploying verification in production, use the built-in security verification tools:
+
+```julia
+using Axiom
+
+# Method 1: Print full security report
+print_smt_security_report()
+
+# Method 2: Get programmatic report
+report = verify_smt_security_config()
+if !isempty(report["warnings"])
+    @error "Security warnings detected" warnings=report["warnings"]
+end
+
+# Method 3: Print quick checklist
+smt_security_checklist()
+```
+
+**Manual verification steps:**
 
 ```bash
 # 1. Verify solver is allow-listed
