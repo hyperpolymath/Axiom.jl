@@ -39,27 +39,27 @@ jobs:
             julia-version: 'nightly'
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
 
-      - uses: julia-actions/setup-julia@v2
+      - uses: julia-actions/setup-julia@824fb972babf1837cf21c49159bf8a8130f26840 # v2
         with:
           version: ${{ matrix.julia-version }}
 
-      - uses: julia-actions/cache@v2
+      - uses: julia-actions/cache@e8472695fb3c2028b1118dc399c8440ff497d409 # v2
 
       - name: Build package
-        uses: julia-actions/julia-buildpkg@v1
+        uses: julia-actions/julia-buildpkg@de39c5185a88e499828ade1f6431ebd1e7e0c4fd # v1
 
       - name: Run tests
-        uses: julia-actions/julia-runtest@v1
+        uses: julia-actions/julia-runtest@98da25e3e6b29f37e8e49f5c3e8dbbfa1a83ed4a # v1
 
       - name: Process coverage
         if: matrix.julia-version == '1.10' && matrix.os == 'ubuntu-latest'
-        uses: julia-actions/julia-processcoverage@v1
+        uses: julia-actions/julia-processcoverage@1a56f1d0e334f89f2dc12a9c77b59eb8a1a5a055 # v1
 
       - name: Upload coverage
         if: matrix.julia-version == '1.10' && matrix.os == 'ubuntu-latest'
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4
         with:
           files: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -72,15 +72,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@6d9817901c499d6b02debbb57edb38d33daa680b # stable
         with:
+          toolchain: stable
           components: rustfmt, clippy
 
       - name: Cache Cargo
-        uses: actions/cache@v4
+        uses: actions/cache@6849a6489940f00c2f30c0fb92c6274307ccb58a # v4
         with:
           path: |
             ~/.cargo/registry
@@ -112,10 +113,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
 
       - name: Setup Zig
-        uses: goto-bus-stop/setup-zig@v2
+        uses: goto-bus-stop/setup-zig@5a2baf4f01b5c1440a5db0bd7b57d0d1fb1e29bd # v2
         with:
           version: 0.11.0
 
@@ -139,7 +140,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
 
       - name: Install cargo-audit
         run: cargo install cargo-audit
@@ -149,7 +150,7 @@ jobs:
         run: cargo audit
 
       - name: Check for secrets
-        uses: trufflesecurity/trufflehog@main
+        uses: trufflesecurity/trufflehog@8a8ef8526528d8a4ff3e2c90be08e25ef8efbd9b # v3.87
         with:
           path: ./
           base: ${{ github.event.repository.default_branch }}
@@ -164,9 +165,9 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
 
-      - uses: julia-actions/setup-julia@v2
+      - uses: julia-actions/setup-julia@824fb972babf1837cf21c49159bf8a8130f26840 # v2
         with:
           version: '1.10'
 
@@ -180,7 +181,7 @@ jobs:
           '
 
       - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
+        uses: peaceiris/actions-gh-pages@4f9cc6602d3f66b9c108549d475ec49e8ef4d45e # v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./docs/build
@@ -193,7 +194,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
 
       - name: Check required files
         run: |

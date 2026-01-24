@@ -1,12 +1,14 @@
 # SPDX-License-Identifier: PMPL-1.0
 name: Mirror to GitLab and Bitbucket
+# PAUSED: Storage limits reached on mirror targets
+# Re-enable when storage upgraded to paid/education tier
 
 on:
-  push:
-    branches: [main, master]
-    tags:
-      - 'v*'
-  workflow_dispatch:
+  # push:
+  #   branches: [main, master]
+  #   tags:
+  #     - 'v*'
+  workflow_dispatch:  # Manual trigger only
 
 permissions: read-all
 
