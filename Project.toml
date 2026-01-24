@@ -1,7 +1,7 @@
 name = "Axiom"
 uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 version = "0.1.0"
-authors = ["Axiom.jl Contributors"]
+authors = ["Jonathan D.A. Jewell <jonathan.jewell@open.ac.uk>"]
 
 [deps]
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
