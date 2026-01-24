@@ -42,6 +42,7 @@ bincode = "1.3"
 [dev-dependencies]
 criterion = "0.5"
 approx = "0.5"
+rand = "0.8"
 
 [features]
 default = []
@@ -50,7 +51,7 @@ cuda = []  # Future CUDA support
 metal = []  # Future Metal support
 
 [[bench]]
-name = "benchmarks"
+name = "backend_benchmarks"
 harness = false
 
 [profile.release]
