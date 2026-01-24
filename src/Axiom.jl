@@ -63,6 +63,9 @@ include("backends/rust_ffi.jl")
 include("utils/initialization.jl")
 include("utils/data.jl")
 
+# Integrations
+include("integrations/huggingface.jl")
+
 # Re-exports for user convenience
 export @axiom, @ensure  # TODO: @prove requires SMTLib extension
 
