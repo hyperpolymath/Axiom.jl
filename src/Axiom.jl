@@ -55,6 +55,7 @@ include("verification/serialization.jl")
 # Backend abstraction
 include("backends/abstract.jl")
 include("backends/julia_backend.jl")
+include("backends/gpu_hooks.jl")  # GPU backend interface (issue #12)
 
 # Rust FFI (loaded conditionally)
 include("backends/rust_ffi.jl")
