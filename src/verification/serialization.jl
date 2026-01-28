@@ -147,7 +147,7 @@ Deserialize a proof certificate from a dictionary.
 cert = deserialize_proof(JSON.parse(cert_json))
 ```
 """
-function deserialize_proof(data::Dict)
+function deserialize_proof(data::Union{Dict, AbstractDict})
     result_data = data["result"]
     metadata = data["metadata"]
     artifacts = data["artifacts"]

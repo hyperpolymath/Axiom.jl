@@ -69,7 +69,8 @@ include("utils/initialization.jl")
 include("utils/data.jl")
 
 # Integrations
-include("integrations/huggingface.jl")
+# TODO: Re-enable in v1.1 after adding HTTP dependency
+# include("integrations/huggingface.jl")
 
 # Re-exports for user convenience
 export @axiom, @ensure  # TODO: @prove requires SMTLib extension

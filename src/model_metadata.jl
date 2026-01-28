@@ -14,6 +14,28 @@ using JSON
 using SHA
 
 """
+    VerificationClaim
+
+A formal property that has been verified for the model.
+
+# Fields
+- `property::String` - Property description (e.g., "Lipschitz continuity")
+- `specification::String` - Formal specification
+- `verified::Bool` - Verification status
+- `verifier::String` - Verification tool used
+- `timestamp::DateTime` - When verified
+- `certificate_path::Union{String,Nothing}` - Path to verification certificate
+"""
+struct VerificationClaim
+    property::String
+    specification::String
+    verified::Bool
+    verifier::String
+    timestamp::DateTime
+    certificate_path::Union{String,Nothing}
+end
+
+"""
     ModelMetadata
 
 Metadata schema for packaged models with verification claims.
@@ -81,29 +103,6 @@ struct ModelMetadata
     precision::Symbol
     backend_compatibility::Vector{String}
 end
-
-"""
-    VerificationClaim
-
-A formal property that has been verified for the model.
-
-# Fields
-- `property::String` - Property description (e.g., "Lipschitz continuity")
-- `specification::String` - Formal specification
-- `verified::Bool` - Verification status
-- `verifier::String` - Verification tool used
-- `timestamp::DateTime` - When verified
-- `certificate_path::Union{String,Nothing}` - Path to verification certificate
-"""
-struct VerificationClaim
-    property::String
-    specification::String
-    verified::Bool
-    verifier::String
-    timestamp::DateTime
-    certificate_path::Union{String,Nothing}
-end
-
 """
     create_metadata(model; kwargs...) -> ModelMetadata
 
