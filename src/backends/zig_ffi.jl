@@ -31,8 +31,12 @@ C = A × B where A is (m×k) and B is (k×n).
 function zig_matmul!(C::Matrix{Float32}, A::Matrix{Float32}, B::Matrix{Float32})
     m, k = size(A)
     k2, n = size(B)
-    @assert k == k2 "Inner dimensions must match"
-    @assert size(C) == (m, n) "Output size mismatch"
+    if k != k2
+        throw(ArgumentError("Inner dimensions must match: A is ($m×$k), B is ($k2×$n)"))
+    end
+    if size(C) != (m, n)
+        throw(ArgumentError("Output size mismatch: expected ($m×$n), got $(size(C))"))
+    end
 
     ccall((:matmul_tiled, ZIG_LIB), Cvoid,
           (Ptr{Float32}, Ptr{Float32}, Ptr{Float32}, Csize_t, Csize_t, Csize_t),
@@ -47,8 +51,12 @@ Matrix-vector multiplication: y = A × x
 """
 function zig_matvec!(y::Vector{Float32}, A::Matrix{Float32}, x::Vector{Float32})
     m, n = size(A)
-    @assert length(x) == n "Vector size must match matrix columns"
-    @assert length(y) == m "Output size must match matrix rows"
+    if length(x) != n
+        throw(ArgumentError("Vector size must match matrix columns: length(x)=$(length(x)), n=$n"))
+    end
+    if length(y) != m
+        throw(ArgumentError("Output size must match matrix rows: length(y)=$(length(y)), m=$m"))
+    end
 
     ccall((:matvec, ZIG_LIB), Cvoid,
           (Ptr{Float32}, Ptr{Float32}, Ptr{Float32}, Csize_t, Csize_t),
@@ -63,7 +71,9 @@ Matrix transpose: B = A'
 """
 function zig_transpose!(B::Matrix{Float32}, A::Matrix{Float32})
     m, n = size(A)
-    @assert size(B) == (n, m) "Output size must be transposed"
+    if size(B) != (n, m)
+        throw(ArgumentError("Output size must be transposed: expected ($n×$m), got $(size(B))"))
+    end
 
     ccall((:transpose, ZIG_LIB), Cvoid,
           (Ptr{Float32}, Ptr{Float32}, Csize_t, Csize_t),
@@ -81,7 +91,9 @@ end
 ReLU activation: max(0, x)
 """
 function zig_relu!(output::Vector{Float32}, input::Vector{Float32})
-    @assert length(output) == length(input)
+    if length(output) != length(input)
+        throw(ArgumentError("Output and input lengths must match: length(output)=$(length(output)), length(input)=$(length(input))"))
+    end
     ccall((:relu, ZIG_LIB), Cvoid,
           (Ptr{Float32}, Ptr{Float32}, Csize_t),
           input, output, length(input))
@@ -106,7 +118,9 @@ end
 Leaky ReLU: x if x > 0, else alpha * x
 """
 function zig_leaky_relu!(output::Vector{Float32}, input::Vector{Float32}, alpha::Float32=0.01f0)
-    @assert length(output) == length(input)
+    if length(output) != length(input)
+        throw(ArgumentError("Output and input lengths must match: length(output)=$(length(output)), length(input)=$(length(input))"))
+    end
     ccall((:leaky_relu, ZIG_LIB), Cvoid,
           (Ptr{Float32}, Ptr{Float32}, Csize_t, Cfloat),
           input, output, length(input), alpha)
@@ -119,7 +133,9 @@ end
 GELU activation (Gaussian Error Linear Unit).
 """
 function zig_gelu!(output::Vector{Float32}, input::Vector{Float32})
-    @assert length(output) == length(input)
+    if length(output) != length(input)
+        throw(ArgumentError("Output and input lengths must match: length(output)=$(length(output)), length(input)=$(length(input))"))
+    end
     ccall((:gelu, ZIG_LIB), Cvoid,
           (Ptr{Float32}, Ptr{Float32}, Csize_t),
           input, output, length(input))
@@ -132,7 +148,9 @@ end
 Fast GELU approximation using sigmoid.
 """
 function zig_gelu_fast!(output::Vector{Float32}, input::Vector{Float32})
-    @assert length(output) == length(input)
+    if length(output) != length(input)
+        throw(ArgumentError("Output and input lengths must match: length(output)=$(length(output)), length(input)=$(length(input))"))
+    end
     ccall((:gelu_fast, ZIG_LIB), Cvoid,
           (Ptr{Float32}, Ptr{Float32}, Csize_t),
           input, output, length(input))
@@ -145,7 +163,9 @@ end
 Sigmoid activation: 1 / (1 + exp(-x))
 """
 function zig_sigmoid!(output::Vector{Float32}, input::Vector{Float32})
-    @assert length(output) == length(input)
+    if length(output) != length(input)
+        throw(ArgumentError("Output and input lengths must match: length(output)=$(length(output)), length(input)=$(length(input))"))
+    end
     ccall((:sigmoid, ZIG_LIB), Cvoid,
           (Ptr{Float32}, Ptr{Float32}, Csize_t),
           input, output, length(input))
@@ -158,7 +178,9 @@ end
 Tanh activation.
 """
 function zig_tanh!(output::Vector{Float32}, input::Vector{Float32})
-    @assert length(output) == length(input)
+    if length(output) != length(input)
+        throw(ArgumentError("Output and input lengths must match: length(output)=$(length(output)), length(input)=$(length(input))"))
+    end
     ccall((:tanh_activation, ZIG_LIB), Cvoid,
           (Ptr{Float32}, Ptr{Float32}, Csize_t),
           input, output, length(input))
@@ -171,7 +193,9 @@ end
 Swish/SiLU activation: x * sigmoid(x)
 """
 function zig_swish!(output::Vector{Float32}, input::Vector{Float32})
-    @assert length(output) == length(input)
+    if length(output) != length(input)
+        throw(ArgumentError("Output and input lengths must match: length(output)=$(length(output)), length(input)=$(length(input))"))
+    end
     ccall((:swish, ZIG_LIB), Cvoid,
           (Ptr{Float32}, Ptr{Float32}, Csize_t),
           input, output, length(input))
@@ -184,7 +208,9 @@ end
 Softmax activation (numerically stable).
 """
 function zig_softmax!(output::Vector{Float32}, input::Vector{Float32})
-    @assert length(output) == length(input)
+    if length(output) != length(input)
+        throw(ArgumentError("Output and input lengths must match: length(output)=$(length(output)), length(input)=$(length(input))"))
+    end
     ccall((:softmax, ZIG_LIB), Cvoid,
           (Ptr{Float32}, Ptr{Float32}, Csize_t),
           input, output, length(input))
@@ -198,7 +224,9 @@ Batched softmax activation.
 """
 function zig_softmax_batched!(output::Matrix{Float32}, input::Matrix{Float32})
     batch_size, num_classes = size(input)
-    @assert size(output) == (batch_size, num_classes)
+    if size(output) != (batch_size, num_classes)
+        throw(ArgumentError("Output size must match input size: expected ($batch_size×$num_classes), got $(size(output))"))
+    end
     ccall((:softmax_batched, ZIG_LIB), Cvoid,
           (Ptr{Float32}, Ptr{Float32}, Csize_t, Csize_t),
           input, output, batch_size, num_classes)
@@ -222,6 +250,10 @@ function zig_conv2d!(
     stride::Tuple{Int,Int},
     padding::Tuple{Int,Int}
 )
+    if stride[1] <= 0 || stride[2] <= 0
+        throw(ArgumentError("Stride must be positive, got $stride"))
+    end
+
     batch, h_in, w_in, c_in = size(input)
     kh, kw, _, c_out = size(weight)
     h_out = (h_in + 2*padding[1] - kh) ÷ stride[1] + 1
@@ -278,6 +310,10 @@ function zig_depthwise_conv2d!(
     stride::Tuple{Int,Int},
     padding::Tuple{Int,Int}
 )
+    if stride[1] <= 0 || stride[2] <= 0
+        throw(ArgumentError("Stride must be positive, got $stride"))
+    end
+
     batch, h_in, w_in, channels = size(input)
     kh, kw, _ = size(weight)
     h_out = (h_in + 2*padding[1] - kh) ÷ stride[1] + 1
@@ -356,7 +392,9 @@ Global Average Pooling: reduces (N,H,W,C) to (N,C).
 """
 function zig_global_avgpool2d!(output::Matrix{Float32}, input::Array{Float32,4})
     batch, h, w, channels = size(input)
-    @assert size(output) == (batch, channels)
+    if size(output) != (batch, channels)
+        throw(ArgumentError("Output size must be ($batch×$channels), got $(size(output))"))
+    end
 
     ccall((:global_avgpool2d, ZIG_LIB), Cvoid,
           (Ptr{Float32}, Ptr{Float32}, Csize_t, Csize_t, Csize_t, Csize_t),
@@ -371,7 +409,9 @@ Global Max Pooling: reduces (N,H,W,C) to (N,C).
 """
 function zig_global_maxpool2d!(output::Matrix{Float32}, input::Array{Float32,4})
     batch, h, w, channels = size(input)
-    @assert size(output) == (batch, channels)
+    if size(output) != (batch, channels)
+        throw(ArgumentError("Output size must be ($batch×$channels), got $(size(output))"))
+    end
 
     ccall((:global_maxpool2d, ZIG_LIB), Cvoid,
           (Ptr{Float32}, Ptr{Float32}, Csize_t, Csize_t, Csize_t, Csize_t),
@@ -413,9 +453,15 @@ function zig_layernorm!(
     eps::Float32=1f-5
 )
     batch_size, hidden_size = size(input)
-    @assert size(output) == (batch_size, hidden_size)
-    @assert length(gamma) == hidden_size
-    @assert length(beta) == hidden_size
+    if size(output) != (batch_size, hidden_size)
+        throw(ArgumentError("Output size must be ($batch_size×$hidden_size), got $(size(output))"))
+    end
+    if length(gamma) != hidden_size
+        throw(ArgumentError("Gamma length must be $hidden_size, got $(length(gamma))"))
+    end
+    if length(beta) != hidden_size
+        throw(ArgumentError("Beta length must be $hidden_size, got $(length(beta))"))
+    end
 
     ccall((:layernorm, ZIG_LIB), Cvoid,
           (Ptr{Float32}, Ptr{Float32}, Ptr{Float32}, Ptr{Float32},
@@ -436,8 +482,12 @@ function zig_rmsnorm!(
     eps::Float32=1f-5
 )
     batch_size, hidden_size = size(input)
-    @assert size(output) == (batch_size, hidden_size)
-    @assert length(weight) == hidden_size
+    if size(output) != (batch_size, hidden_size)
+        throw(ArgumentError("Output size must be ($batch_size×$hidden_size), got $(size(output))"))
+    end
+    if length(weight) != hidden_size
+        throw(ArgumentError("Weight length must be $hidden_size, got $(length(weight))"))
+    end
 
     ccall((:rmsnorm, ZIG_LIB), Cvoid,
           (Ptr{Float32}, Ptr{Float32}, Ptr{Float32},
@@ -461,7 +511,9 @@ function zig_batchnorm!(
     eps::Float32=1f-5
 )
     batch_size, num_features = size(input)
-    @assert size(output) == (batch_size, num_features)
+    if size(output) != (batch_size, num_features)
+        throw(ArgumentError("Output size must be ($batch_size×$num_features), got $(size(output))"))
+    end
 
     ccall((:batchnorm, ZIG_LIB), Cvoid,
           (Ptr{Float32}, Ptr{Float32}, Ptr{Float32}, Ptr{Float32},
@@ -510,7 +562,9 @@ function zig_groupnorm!(
     eps::Float32=1f-5
 )
     batch, h, w, channels = size(input)
-    @assert channels % num_groups == 0 "Channels must be divisible by num_groups"
+    if channels % num_groups != 0
+        throw(ArgumentError("Channels ($channels) must be divisible by num_groups ($num_groups)"))
+    end
 
     ccall((:groupnorm, ZIG_LIB), Cvoid,
           (Ptr{Float32}, Ptr{Float32}, Ptr{Float32}, Ptr{Float32},
