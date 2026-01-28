@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
 # Axiom.jl @axiom DSL Macro
 #
 # The core of Axiom.jl's declarative model definition.

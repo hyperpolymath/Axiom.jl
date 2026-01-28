@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
 # Axiom.jl Pipeline System
 #
 # Functional composition of layers using the |> operator.

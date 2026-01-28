@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
 # Axiom.jl Activation Functions
 #
 # All activations are implemented as both functions and callable layers.

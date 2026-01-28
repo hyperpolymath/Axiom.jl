@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
 # Axiom.jl Convolutional Layers
 #
 # 1D, 2D, and 3D convolutions with compile-time shape verification.

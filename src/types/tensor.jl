@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
 # Axiom.jl Tensor Type System
 #
 # Provides compile-time shape checking through parametric types.

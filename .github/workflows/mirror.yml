@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0
+# SPDX-License-Identifier: PMPL-1.0-or-later
 name: Mirror to GitLab and Bitbucket
 # PAUSED: Storage limits reached on mirror targets
 # Re-enable when storage upgraded to paid/education tier

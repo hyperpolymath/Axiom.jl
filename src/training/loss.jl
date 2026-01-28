@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
 # Axiom.jl Loss Functions
 #
 # Standard loss functions for neural network training.

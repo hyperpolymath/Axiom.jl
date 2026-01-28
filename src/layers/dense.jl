@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
 # Axiom.jl Dense (Fully Connected) Layer
 #
 # Linear transformation: y = Wx + b

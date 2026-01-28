@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
 # Axiom.jl Rust FFI
 #
 # Interface to high-performance Rust backend.

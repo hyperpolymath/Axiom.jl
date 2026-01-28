@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
 # Zig Backend FFI Bindings
 # High-performance kernels implemented in Zig with SIMD optimization
 
