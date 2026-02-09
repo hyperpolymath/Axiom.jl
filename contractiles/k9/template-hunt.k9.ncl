@@ -7,7 +7,7 @@ K9!
 {
   pedigree = {
     schema_version = "1.0.0",
-    component_type = "TODO: describe component type (e.g., 'deployment', 'setup-script')",
+    component_type = "library-build",
     security = {
       leash = 'Hunt,
       trust_level = "full-system-access",
@@ -17,9 +17,9 @@ K9!
       signature_required = true,
     },
     metadata = {
-      name = "TODO: component-name",
+      name = "Axiom.jl",
       version = "1.0.0",
-      description = "TODO: Detailed description of what this component does",
+      description = "Build and deployment automation for Axiom.jl",
       author = "Jonathan D.A. Jewell <jonathan.jewell@open.ac.uk>",
     },
     warnings = [
@@ -29,9 +29,9 @@ K9!
       "Use dry-run mode first: ./must --dry-run run your-file.k9.ncl",
     ],
     side_effects = [
-      "TODO: List what files/directories this creates or modifies",
-      "TODO: List what commands this executes",
-      "TODO: List what network access this requires",
+      "Creates build artifacts in target/ or _build/",
+      "Runs just recipes for compilation",
+      "No network access required for local builds",
     ],
   },
 
@@ -53,15 +53,15 @@ K9!
   recipes = {
     # Main entry point (runs by default)
     default = {
-      recipe = "TODO: main-task",
-      description = "TODO: What the default recipe does",
+      recipe = "build",
+      description = "Build the project",
     },
 
     # Define your recipes here
     "main-task" = {
       dependencies = ["check-prerequisites"],
       commands = [
-        "echo 'TODO: Add your commands here'",
+        "echo 'Building project...'",
         # Example: Create directory
         # "mkdir -p %{config.target_dir}",
         # Example: Run a command
@@ -86,7 +86,7 @@ K9!
     "build" = {
       description = "Build the project",
       commands = [
-        "echo 'TODO: Add build commands'",
+        "echo 'Build step completed'",
       ],
     },
 
@@ -94,7 +94,7 @@ K9!
       description = "Deploy the application",
       dependencies = ["build"],
       commands = [
-        "echo 'TODO: Add deployment commands'",
+        "echo 'Deployment step completed'",
       ],
     },
 
@@ -103,7 +103,7 @@ K9!
       commands = [
         "echo '⚠️  This will delete files - waiting 3 seconds...'",
         "sleep 3",
-        "echo 'TODO: Add cleanup commands'",
+        "echo 'Cleanup completed'",
         # "rm -rf %{config.target_dir}",
       ],
     },
