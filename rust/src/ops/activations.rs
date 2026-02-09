@@ -73,7 +73,7 @@ pub fn softmax(x: &ArrayD<f32>) -> ArrayD<f32> {
         let mut max_val = f32::NEG_INFINITY;
         for class_idx in 0..num_classes {
             let idx = batch_idx * num_classes + class_idx;
-            let val = result.as_slice().unwrap()[idx];
+            let val = result.as_slice().expect("activations: array not contiguous")[idx];
             if val > max_val {
                 max_val = val;
             }
@@ -81,7 +81,7 @@ pub fn softmax(x: &ArrayD<f32>) -> ArrayD<f32> {
 
         // Compute exp(x - max) and sum
         let mut sum = 0.0f32;
-        let result_slice = result.as_slice_mut().unwrap();
+        let result_slice = result.as_slice_mut().expect("activations: array not contiguous");
         for class_idx in 0..num_classes {
             let idx = batch_idx * num_classes + class_idx;
             let exp_val = (result_slice[idx] - max_val).exp();
@@ -113,7 +113,7 @@ pub fn log_softmax(x: &ArrayD<f32>) -> ArrayD<f32> {
         let mut max_val = f32::NEG_INFINITY;
         for class_idx in 0..num_classes {
             let idx = batch_idx * num_classes + class_idx;
-            let val = result.as_slice().unwrap()[idx];
+            let val = result.as_slice().expect("activations: array not contiguous")[idx];
             if val > max_val {
                 max_val = val;
             }
@@ -121,7 +121,7 @@ pub fn log_softmax(x: &ArrayD<f32>) -> ArrayD<f32> {
 
         // Compute log(sum(exp(x - max)))
         let mut log_sum_exp = 0.0f32;
-        let result_slice = result.as_slice().unwrap();
+        let result_slice = result.as_slice().expect("activations: array not contiguous");
         for class_idx in 0..num_classes {
             let idx = batch_idx * num_classes + class_idx;
             log_sum_exp += (result_slice[idx] - max_val).exp();
@@ -129,7 +129,7 @@ pub fn log_softmax(x: &ArrayD<f32>) -> ArrayD<f32> {
         log_sum_exp = log_sum_exp.ln() + max_val;
 
         // Subtract from each element
-        let result_slice = result.as_slice_mut().unwrap();
+        let result_slice = result.as_slice_mut().expect("activations: array not contiguous");
         for class_idx in 0..num_classes {
             let idx = batch_idx * num_classes + class_idx;
             result_slice[idx] -= log_sum_exp;
@@ -195,7 +195,7 @@ mod tests {
         let x = ArrayD::from_shape_vec(
             IxDyn(&[4]),
             vec![-2.0f32, -1.0, 0.0, 1.0]
-        ).unwrap();
+        ).expect("test: shape mismatch");
 
         let y = relu(&x);
 
@@ -210,7 +210,7 @@ mod tests {
         let x = ArrayD::from_shape_vec(
             IxDyn(&[3]),
             vec![0.0f32, 1.0, -1.0]
-        ).unwrap();
+        ).expect("test: shape mismatch");
 
         let y = sigmoid(&x);
 
@@ -224,7 +224,7 @@ mod tests {
         let x = ArrayD::from_shape_vec(
             IxDyn(&[2, 3]),
             vec![1.0f32, 2.0, 3.0, 1.0, 2.0, 3.0]
-        ).unwrap();
+        ).expect("test: shape mismatch");
 
         let y = softmax(&x);
 

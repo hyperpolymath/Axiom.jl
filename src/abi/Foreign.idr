@@ -189,6 +189,9 @@ prim__registerCallback : Bits64 -> AnyPtr -> PrimIO Bits32
 export
 registerCallback : Handle -> Callback -> IO (Either Result ())
 registerCallback h cb = do
+  -- SAFETY: believe_me casts Idris Callback function type to C-compatible AnyPtr.
+  -- Required for FFI callback registration. The Callback type signature MUST match
+  -- the C function pointer type expected by the library's register_callback function.
   result <- primIO (prim__registerCallback (handlePtr h) (believe_me cb))
   pure $ case resultFromInt result of
     Just Ok => Right ()

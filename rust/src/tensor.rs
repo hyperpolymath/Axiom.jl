@@ -94,7 +94,7 @@ impl Tensor<f32> {
 pub unsafe fn tensor_from_ptr<T: Clone>(ptr: *const T, shape: &[usize]) -> Tensor<T> {
     let len: usize = shape.iter().product();
     let slice = std::slice::from_raw_parts(ptr, len);
-    let data = ArrayD::from_shape_vec(IxDyn(shape), slice.to_vec()).unwrap();
+    let data = ArrayD::from_shape_vec(IxDyn(shape), slice.to_vec()).expect("tensor: shape mismatch");
     Tensor::from_array(data)
 }
 
@@ -103,6 +103,6 @@ pub unsafe fn tensor_from_ptr<T: Clone>(ptr: *const T, shape: &[usize]) -> Tenso
 /// # Safety
 /// The destination pointer must have enough space
 pub unsafe fn tensor_to_ptr<T: Clone>(tensor: &Tensor<T>, dst: *mut T) {
-    let src = tensor.data.as_slice().unwrap();
+    let src = tensor.data.as_slice().expect("tensor: array not contiguous");
     std::ptr::copy_nonoverlapping(src.as_ptr(), dst, src.len());
 }

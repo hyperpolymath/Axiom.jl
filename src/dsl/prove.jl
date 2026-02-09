@@ -1098,8 +1098,46 @@ function dict_to_property(d::Dict)
     quantifier = get(d, "quantifier", :none)
     variables = get(d, "variables", Symbol[])
     body_str = get(d, "body", "true")
+    # Security: validate body string before parsing to prevent code injection via tampered certificates
+    _validate_cert_body_str(body_str)
     body = Meta.parse(body_str)
+    _validate_property_expr(body) || error("Certificate body failed structural validation: $(repr(body_str))")
     ParsedProperty(quantifier, variables, body)
+end
+
+"""
+Validate certificate body string doesn't contain dangerous operations before Meta.parse.
+"""
+function _validate_cert_body_str(body_str::AbstractString)
+    disallowed = [
+        "ccall", "eval", "@eval", "include(", "open(", "read(", "write(",
+        "rm(", "run`", "run(", "Base.", "Core.", "Main.", "Libdl.", "dlopen",
+        "dlsym", "unsafe_", "pointer(", "Ptr{", "ENV[",
+    ]
+    for pattern in disallowed
+        if contains(body_str, pattern)
+            error("Certificate body contains disallowed operation '$(pattern)': $(repr(body_str))")
+        end
+    end
+end
+
+"""
+Validate that a parsed expression only contains allowed operations for property expressions.
+Rejects assignments, macro calls, do blocks, and other side-effecting constructs.
+"""
+function _validate_property_expr(expr)
+    expr isa Number && return true
+    expr isa Symbol && return true
+    expr isa Bool && return true
+    expr isa String && return true
+    expr isa QuoteNode && return true
+    expr isa LineNumberNode && return true
+    if expr isa Expr
+        expr.head in (:call, :comparison, :&&, :||, :!, :., :ref, :tuple, :vect, :block, :kw) &&
+            return all(_validate_property_expr, expr.args)
+        return false
+    end
+    false
 end
 
 function dict_to_proof(d::Dict)
