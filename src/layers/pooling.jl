@@ -257,7 +257,7 @@ struct Flatten <: StatelessLayer
 end
 
 Flatten(; start_dim::Int=2) = Flatten(start_dim)
-Flatten() = Flatten(2)
+
 
 function forward(f::Flatten, x::AbstractArray)
     if ndims(x) <= 2

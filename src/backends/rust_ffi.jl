@@ -82,7 +82,7 @@ function backend_matmul(::RustBackend, A::Matrix{Float32}, B::Matrix{Float32})
     end
 
     m, k = size(A)
-    _, n = size(B)
+    k2, n = size(B)
     C = Matrix{Float32}(undef, m, n)
 
     # Call Rust function

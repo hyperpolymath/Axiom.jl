@@ -289,7 +289,7 @@ function build_bert(config)
     # For now, return a placeholder
     @warn "BERT architecture conversion not fully implemented yet"
 
-    return @axiom AxiomModel begin
+    model = Axiom.@axiom AxiomModel begin
         # Embedding layer
         embedding :: Embedding(vocab_size, hidden_size)
 
@@ -304,6 +304,7 @@ function build_bert(config)
         # Pooler
         pooler :: Dense(hidden_size => hidden_size, activation=tanh)
     end
+    return model
 end
 
 """

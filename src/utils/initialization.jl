@@ -139,6 +139,11 @@ function constant!(tensor::AbstractArray{T}, value::Real) where T
 end
 
 # Helper functions
+"""
+    _calculate_fan(tensor) -> (fan_in, fan_out)
+
+Calculate fan-in and fan-out for a tensor, used for initialization schemes.
+"""
 function _calculate_fan(tensor::AbstractArray)
     dimensions = ndims(tensor)
     if dimensions < 2
@@ -160,6 +165,12 @@ function _calculate_fan(tensor::AbstractArray)
     return (fan_in, fan_out)
 end
 
+"""
+    _calculate_gain(nonlinearity, param=0) -> Float64
+
+Calculate the recommended gain value for a given nonlinearity function,
+used in Kaiming and Xavier initialization.
+"""
 function _calculate_gain(nonlinearity::Symbol, param::Real=0)
     if nonlinearity == :linear || nonlinearity == :sigmoid
         return 1.0

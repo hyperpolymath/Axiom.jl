@@ -13,9 +13,9 @@ if !isdefined(@__MODULE__, :ProofResult)
     """
     struct ProofResult
         status::Symbol
-        counterexample::Any
+        counterexample::Union{Dict, String, Nothing}
         confidence::Float64
-        reason::String
+        details::String
         suggestions::Vector{String}
     end
 end
@@ -28,10 +28,10 @@ A complete proof certificate including result, metadata, and SMT artifacts.
 struct ProofCertificate
     # Core proof result
     property::String
-    status::Symbol  # :proven, :disproven, :unknown
-    counterexample::Any
+    status::Symbol  # :proven, :disproven, or :unknown
+    counterexample::Union{Dict, String, Nothing}
     confidence::Float64
-    reason::String
+    details::String
     suggestions::Vector{String}
 
     # Metadata
@@ -85,7 +85,7 @@ function serialize_proof(result::ProofResult, property::String;
         result.status,
         result.counterexample,
         result.confidence,
-        result.reason,
+        result.details,
         result.suggestions,
         iso8601_timestamp(),
         axiom_version_string(),
@@ -108,7 +108,7 @@ function serialize_proof(result::ProofResult, property::String;
             "status" => string(cert.status),
             "counterexample" => serialize_counterexample(cert.counterexample),
             "confidence" => cert.confidence,
-            "reason" => cert.reason,
+            "details" => cert.details,
             "suggestions" => cert.suggestions
         ),
         "metadata" => Dict(
@@ -158,7 +158,7 @@ function deserialize_proof(data::Union{Dict, AbstractDict})
         Symbol(result_data["status"]),
         deserialize_counterexample(result_data["counterexample"]),
         result_data["confidence"],
-        result_data["reason"],
+        result_data["details"],
         result_data["suggestions"],
         metadata["timestamp"],
         metadata["axiom_version"],
@@ -248,7 +248,7 @@ function verify_proof_certificate(cert::ProofCertificate)
         cert.status,
         cert.counterexample,
         cert.confidence,
-        cert.reason,
+        cert.details,
         cert.suggestions
     )
 
@@ -319,7 +319,7 @@ function compute_certificate_hash(property::String, result::ProofResult,
         "status:", result.status, "\n",
         "counterexample:", repr(result.counterexample), "\n",
         "confidence:", result.confidence, "\n",
-        "reason:", result.reason, "\n",
+        "details:", result.details, "\n",
         "smt_query:", something(smt_query, ""), "\n",
         "smt_output:", something(smt_output, ""), "\n"
     )

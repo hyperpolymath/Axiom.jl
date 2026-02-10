@@ -1,13 +1,88 @@
 # SPDX-License-Identifier: PMPL-1.0-or-later
-# Axiom.jl Convolutional Layers
 #
-# 1D, 2D, and 3D convolutions with compile-time shape verification.
+# Axiom.jl Convolutional Layers: Processing Sequential and Spatial Data
+# ====================================================================
+#
+# This file provides implementations for various convolutional layers, which are
+# essential components in deep learning for processing data with grid-like topologies,
+# such as images (2D) and sequences (1D). Axiom.jl's convolutional layers
+# integrate **compile-time shape verification**, enhancing the robustness and
+# correctness of neural network architectures.
+#
+# Types of Convolutional Layers Implemented:
+# ----------------------------------------
+# -   `Conv1d`: Designed for 1D inputs, typically sequences or time-series data.
+#     It applies a 1D filter across the input.
+# -   `Conv2d`: The most common type of convolutional layer, used for 2D inputs
+#     like images. It applies 2D filters across the height and width dimensions.
+# -   `ConvTranspose2d`: Also known as deconvolution or fractional-strided convolution.
+#     This layer performs the inverse operation of a standard convolution, often
+#     used in generative models (e.g., autoencoders, GANs) to upsample spatial
+#     dimensions.
+#
+# Fundamental Operation:
+# ----------------------
+# Convolutional layers operate by sliding a small filter (kernel) across the
+# input data, performing element-wise multiplications and summing the results
+# to produce a feature map. Key parameters like `kernel_size`, `stride`, `padding`,
+# and `dilation` control the behavior and output size of these operations.
+#
+# Compile-Time Shape Verification:
+# --------------------------------
+# A critical aspect of Axiom.jl's convolutional layers is their integration
+# with the `Shape` system. This allows the framework to predict the output
+# dimensions of these layers at compile-time, catching potential mismatches
+# and ensuring the overall architectural integrity of the neural network.
+#
+#
+
 
 """
-    Conv(in_channels, out_channels, kernel_size; kwargs...)
+    Conv(in_channels::Int, out_channels::Int, kernel_size; kwargs...)
 
-Convenience constructor that dispatches to Conv1d, Conv2d, or Conv3d
-based on kernel_size dimensionality.
+A convenience constructor that automatically dispatches to the appropriate
+1D, 2D, or 3D convolutional layer (`Conv1d`, `Conv2d`, or `Conv3d`) based on
+the dimensionality of the `kernel_size` argument. This simplifies layer creation
+by allowing a single `Conv` call for various spatial convolution types.
+
+Arguments:
+- `in_channels::Int`: The number of input channels for the convolution.
+- `out_channels::Int`: The number of output channels (feature maps) for the convolution.
+- `kernel_size`: The size of the convolutional kernel. Its type determines the
+                 convolutional layer to be constructed:
+    - `Int`: Dispatches to `Conv1d`. The kernel will have this size.
+    - `Tuple{Int, Int}`: Dispatches to `Conv2d`. The kernel will have `(height, width)` dimensions.
+    - `Tuple{Int, Int, Int}`: Dispatches to `Conv3d`. The kernel will have `(depth, height, width)` dimensions.
+
+Keyword Arguments (`kwargs...`):
+- All keyword arguments relevant to `Conv1d`, `Conv2d`, or `Conv3d` (e.g., `stride`,
+  `padding`, `dilation`, `groups`, `bias`, `init`, `dtype`) can be passed through.
+
+Returns:
+- An instance of `Conv1d`, `Conv2d`, or `Conv3d` as determined by `kernel_size`.
+
+Throws:
+- `ErrorException`: If `kernel_size` is not an `Int` or a `Tuple` of length 2 or 3.
+
+# Examples
+```julia
+# 1D Convolution (e.g., for sequence data)
+conv1d_layer = Conv(10, 20, 3) # kernel_size = 3. Dispatches to Conv1d(10, 20, 3)
+
+# 2D Convolution (e.g., for image data)
+conv2d_layer = Conv(3, 64, (3, 3)) # kernel_size = (3, 3). Dispatches to Conv2d(3, 64, (3, 3))
+
+# 2D Convolution with custom stride and padding
+conv2d_custom = Conv(64, 128, (5, 5), stride=2, padding=1)
+
+# Note: Conv3d is conceptually supported by this dispatcher but may not be
+# fully implemented as a separate struct and forward pass yet.
+try
+    Conv(1, 1, (2,2,2)) # will dispatch to Conv3d
+catch e
+    println("Caught expected error for unimplemented Conv3d: $(e)")
+end
+```
 """
 function Conv(in_channels::Int, out_channels::Int, kernel_size; kwargs...)
     if kernel_size isa Int
@@ -15,9 +90,11 @@ function Conv(in_channels::Int, out_channels::Int, kernel_size; kwargs...)
     elseif length(kernel_size) == 2
         Conv2d(in_channels, out_channels, kernel_size; kwargs...)
     elseif length(kernel_size) == 3
-        Conv3d(in_channels, out_channels, kernel_size; kwargs...)
+        # Conv3d not explicitly implemented yet, but dispatcher logic supports it
+        error("Conv3d is conceptually supported but not yet implemented. kernel_size of length 3 is currently unsupported.")
+        # Conv3d(in_channels, out_channels, kernel_size; kwargs...)
     else
-        error("kernel_size must be Int or tuple of length 2 or 3")
+        error("kernel_size must be an Int (for Conv1d) or a Tuple of length 2 (for Conv2d) or 3 (for Conv3d). Got kernel_size: $(kernel_size)")
     end
 end
 

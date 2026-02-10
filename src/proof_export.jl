@@ -140,13 +140,6 @@ function export_isabelle(certificate::ProofCertificate, output_path::String)
     @info "Isabelle proof exported to $output_path"
 end
 
-# ============================================================================
-# Translation Functions
-# ============================================================================
-
-"""
-Translate Axiom property to Lean 4 syntax.
-"""
 function translate_to_lean(property::String)
     # Basic translation (would need full parser)
     property = replace(property, "∀" => "∀")
@@ -180,10 +173,6 @@ function translate_to_isabelle(property::String)
 
     property
 end
-
-# ============================================================================
-# Model Export
-# ============================================================================
 
 function export_lean_model(io::IO, model)
     println(io, "structure ModelParams where")
@@ -245,7 +234,12 @@ Requires:
 - Trust chain verification
 """
 function import_lean_certificate(lean_file::String)
-    error("Lean import not yet implemented. See docs/wiki/Proof-Assistant-Integration.md")
+    error(
+        "Lean import is a planned feature but not yet implemented. " *
+        "Full integration requires a Lean 4 proof checker, certificate extraction from `.olean` files, " *
+        "and trust chain verification. This is a complex task for future development." *
+        "Please refer to the documentation for more details."
+    )
 end
 
 """
@@ -256,7 +250,12 @@ Import a completed Coq proof as a certificate.
 **Status:** Not yet implemented.
 """
 function import_coq_certificate(coq_file::String)
-    error("Coq import not yet implemented. See docs/wiki/Proof-Assistant-Integration.md")
+    error(
+        "Coq import is a planned feature but not yet implemented. " *
+        "Full integration requires a Coq proof checker, certificate extraction, " *
+        "and trust chain verification. This is a complex task for future development." *
+        "Please refer to the documentation for more details."
+    )
 end
 
 """
@@ -267,5 +266,10 @@ Import a completed Isabelle proof as a certificate.
 **Status:** Not yet implemented.
 """
 function import_isabelle_certificate(thy_file::String)
-    error("Isabelle import not yet implemented. See docs/wiki/Proof-Assistant-Integration.md")
+    error(
+        "Isabelle import is a planned feature but not yet implemented. " *
+        "Full integration requires an Isabelle/HOL proof checker, certificate extraction, " *
+        "and trust chain verification. This is a complex task for future development." *
+        "Please refer to the documentation for more details."
+    )
 end

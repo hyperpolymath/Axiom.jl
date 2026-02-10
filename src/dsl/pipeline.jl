@@ -33,12 +33,17 @@ end
 
 A composed sequence of layers that acts as a single layer.
 """
-struct Pipeline{Layers} <: AbstractLayer
+struct Pipeline{Layers<:Tuple} <: AbstractLayer
     layers::Layers
+
+    # Inner constructor to ensure layers is a tuple
+    function Pipeline(layers::Layers) where Layers<:Tuple
+        new{Layers}(layers)
+    end
 end
 
 function Pipeline(layers...)
-    Pipeline(layers)
+    Pipeline(Tuple(layers)) # Ensure layers is always a tuple
 end
 
 # Forward through pipeline
@@ -86,7 +91,6 @@ Function composition operator for layers: (g ∘ f)(x) = g(f(x))
 """
 Base.:∘(g::AbstractLayer, f::AbstractLayer) = compose(f, g)
 
-# Pipeline construction from |>
 function build_pipeline(expr::Expr)
     if expr.head == :call && expr.args[1] == :|>
         input_or_pipeline = expr.args[2]
@@ -190,12 +194,6 @@ function forward(c::Conditional, x)
     end
 end
 
-# Pipeline optimization
-"""
-    optimize_pipeline(pipeline) -> Pipeline
-
-Optimize a pipeline by fusing compatible operations.
-"""
 function optimize_pipeline(p::Pipeline)
     layers = collect(p.layers)
     optimized = AbstractLayer[]
@@ -233,29 +231,17 @@ function optimize_pipeline(p::Pipeline)
     Pipeline(Tuple(optimized))
 end
 
-"""
-Check if a layer is element-wise (can be fused).
-"""
 is_elementwise(::StatelessLayer) = true
 is_elementwise(::AbstractLayer) = false
 
-"""
-Check if a layer is a linear transformation (Dense, Conv).
-"""
 is_linear_layer(::Dense) = true
 is_linear_layer(::Conv2d) = true
 is_linear_layer(::Conv1d) = true
 is_linear_layer(::AbstractLayer) = false
 
-"""
-Check if a layer is BatchNorm.
-"""
 is_batchnorm(::BatchNorm) = true
 is_batchnorm(::AbstractLayer) = false
 
-"""
-Check if a layer is an identity operation that can be removed.
-"""
 is_identity_op(::AbstractLayer) = false
 
 """
@@ -347,7 +333,6 @@ forward(f::FusedLinearBatchNorm, x) = forward(f.layer, x)
 parameters(f::FusedLinearBatchNorm) = parameters(f.layer)
 output_shape(f::FusedLinearBatchNorm, input_shape) = output_shape(f.layer, input_shape)
 
-# Shape debugging
 """
     trace_shapes(pipeline, input_shape)
 

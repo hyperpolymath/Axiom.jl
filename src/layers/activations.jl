@@ -242,7 +242,7 @@ struct Softmax <: StatelessLayer
     dims::Int
 end
 Softmax(; dims=-1) = Softmax(dims)
-Softmax() = Softmax(-1)
+
 
 function forward(s::Softmax, x)
     d = s.dims == -1 ? ndims(x) : s.dims
@@ -259,7 +259,7 @@ struct LogSoftmax <: StatelessLayer
     dims::Int
 end
 LogSoftmax(; dims=-1) = LogSoftmax(dims)
-LogSoftmax() = LogSoftmax(-1)
+
 
 function forward(s::LogSoftmax, x)
     d = s.dims == -1 ? ndims(x) : s.dims
