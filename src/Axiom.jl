@@ -162,7 +162,7 @@ export ProofCertificate, serialize_proof, deserialize_proof
 export export_proof_certificate, import_proof_certificate, verify_proof_certificate
 
 # Interop
-export from_pytorch, to_onnx
+# (from_pytorch, to_onnx planned for future development)
 
 # Model metadata and packaging (issues #15, #16)
 export ModelMetadata, VerificationClaim
