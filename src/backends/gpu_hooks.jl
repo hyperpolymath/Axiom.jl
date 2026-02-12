@@ -63,6 +63,21 @@ function detect_gpu()
 end
 
 """
+    cuda_available() -> Bool
+
+Check if CUDA is available.
+"""
+function cuda_available()
+    try
+        # Check for CUDA.jl extension
+        # isdefined(Main, :CUDA) && CUDA.functional()
+        false  # Conservative default (overridden by extension)
+    catch
+        false
+    end
+end
+
+"""
     rocm_available() -> Bool
 
 Check if ROCm is available.
@@ -71,7 +86,22 @@ function rocm_available()
     try
         # Check for AMDGPU.jl extension
         # isdefined(Main, :AMDGPU) && AMDGPU.functional()
-        false  # Conservative default
+        false  # Conservative default (overridden by extension)
+    catch
+        false
+    end
+end
+
+"""
+    metal_available() -> Bool
+
+Check if Metal is available.
+"""
+function metal_available()
+    try
+        # Check for Metal.jl extension
+        # isdefined(Main, :Metal) && Metal.functional()
+        false  # Conservative default (overridden by extension)
     catch
         false
     end
