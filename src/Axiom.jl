@@ -31,9 +31,9 @@ Key Features:
     ML models (e.g., robustness, safety invariants, fairness criteria) using
     specialized DSLs and integration with proof assistants.
 -   **Multi-Backend Support**: Seamlessly integrate with high-performance
-    backends for Rust and Zig via Foreign Function Interfaces (FFI),
+    Rust backend via Foreign Function Interface (FFI),
     allowing for optimized computation without sacrificing verification
-    capabilities. This extends to GPU acceleration through CUDA.jl.
+    capabilities. GPU acceleration available through CUDA/ROCm/Metal extensions.
 -   **Model Interoperability**: Facilitate the import and export of models
     from popular frameworks like PyTorch and ONNX, enabling formal
     verification workflows for existing models.
