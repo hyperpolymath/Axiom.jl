@@ -119,15 +119,7 @@ include("utils/initialization.jl")
 include("utils/data.jl")
 
 # Integrations
-#
-# TODO: (Priority Feature) Implement HuggingFace.jl integration.
-#
-# The `huggingface.jl` integration is temporarily disabled due to a
-# subtle parsing issue that arises when it is included. Attempts to use
-# this feature will fail until the root cause of the parsing error in
-# `Axiom.jl/src/types/shapes.jl` is identified and resolved.
-#
-# include("integrations/huggingface.jl")
+# (HuggingFace integration removed - planned for future development)
 
 # Re-exports for user convenience
 export @axiom, @ensure
