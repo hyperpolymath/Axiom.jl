@@ -85,9 +85,8 @@ function Conv(in_channels::Int, out_channels::Int, kernel_size; kwargs...)
     elseif length(kernel_size) == 2
         Conv2d(in_channels, out_channels, kernel_size; kwargs...)
     elseif length(kernel_size) == 3
-        # Conv3d not explicitly implemented yet, but dispatcher logic supports it
-        error("Conv3d is conceptually supported but not yet implemented. kernel_size of length 3 is currently unsupported.")
-        # Conv3d(in_channels, out_channels, kernel_size; kwargs...)
+        # Conv3d now implemented
+        Conv3d(in_channels, out_channels, kernel_size; kwargs...)
     else
         error("kernel_size must be an Int (for Conv1d) or a Tuple of length 2 (for Conv2d) or 3 (for Conv3d). Got kernel_size: $(kernel_size)")
     end
@@ -471,5 +470,171 @@ function parameters(c::ConvTranspose2d)
         (weight = c.weight, bias = c.bias)
     else
         (weight = c.weight,)
+    end
+end
+
+# ============================================================================
+# Conv3d - 3D Convolution
+# ============================================================================
+
+"""
+    Conv3d(in_channels, out_channels, kernel_size; stride=1, padding=0, dilation=1, groups=1, bias=true)
+
+3D convolution layer for volumetric data (e.g., video, 3D medical imaging).
+
+# Arguments
+- `in_channels`: Number of input channels
+- `out_channels`: Number of output channels
+- `kernel_size`: Size of convolving kernel (Int or Tuple{Int,Int,Int})
+- `stride`: Stride of convolution (default: 1)
+- `padding`: Padding added to input (default: 0)
+- `dilation`: Dilation rate (default: 1)
+- `groups`: Number of blocked connections (default: 1)
+- `bias`: Include bias term (default: true)
+
+# Shape
+- Input: (N, D, H, W, C_in) or (D, H, W, C_in)
+- Output: (N, D', H', W', C_out) or (D', H', W', C_out)
+
+# Examples
+```julia
+conv = Conv3d(3, 16, (3, 3, 3))                      # 3x3x3 conv
+conv = Conv3d(16, 32, (3, 3, 3), stride=(1,1,1))     # Strided conv
+conv = Conv3d(32, 64, (3, 3, 3), padding=(1,1,1))    # Same padding
+```
+"""
+mutable struct Conv3d{T} <: AbstractLayer
+    weight::Array{T, 5}  # (kD, kH, kW, C_in, C_out)
+    bias::Union{Vector{T}, Nothing}
+    stride::Tuple{Int, Int, Int}
+    padding::Tuple{Int, Int, Int}
+    dilation::Tuple{Int, Int, Int}
+    groups::Int
+    in_channels::Int
+    out_channels::Int
+    kernel_size::Tuple{Int, Int, Int}
+end
+
+function Conv3d(
+    in_channels::Int,
+    out_channels::Int,
+    kernel_size::Union{Int, Tuple{Int, Int, Int}};
+    stride::Union{Int, Tuple{Int, Int, Int}} = 1,
+    padding::Union{Int, Tuple{Int, Int, Int}, Symbol} = 0,
+    dilation::Union{Int, Tuple{Int, Int, Int}} = 1,
+    groups::Int = 1,
+    bias::Bool = true,
+    init::AbstractInitializer = HeNormal(),
+    dtype::Type{T} = Float32
+) where T
+    # Normalize tuple arguments
+    ks = kernel_size isa Int ? (kernel_size, kernel_size, kernel_size) : kernel_size
+    st = stride isa Int ? (stride, stride, stride) : stride
+    dl = dilation isa Int ? (dilation, dilation, dilation) : dilation
+
+    # Handle 'same' padding
+    if padding === :same
+        pd = (div(ks[1] - 1, 2), div(ks[2] - 1, 2), div(ks[3] - 1, 2))
+    elseif padding isa Int
+        pd = (padding, padding, padding)
+    else
+        pd = padding
+    end
+
+    # Validate groups
+    @assert in_channels % groups == 0 "in_channels must be divisible by groups"
+    @assert out_channels % groups == 0 "out_channels must be divisible by groups"
+
+    # Initialize weights: (kD, kH, kW, C_in/groups, C_out)
+    weight = T.(init(ks[1], ks[2], ks[3], div(in_channels, groups), out_channels))
+    b = bias ? zeros(T, out_channels) : nothing
+
+    Conv3d{T}(weight, b, st, pd, dl, groups, in_channels, out_channels, ks)
+end
+
+function forward(c::Conv3d, x::AbstractArray)
+    # x shape: (N, D, H, W, C) or (D, H, W, C)
+    # Pure Julia implementation (naive but correct)
+
+    has_batch = ndims(x) == 5
+    if !has_batch
+        x = reshape(x, 1, size(x)...)
+    end
+
+    N, D, H, W, C_in = size(x)
+    kD, kH, kW = c.kernel_size
+    sD, sH, sW = c.stride
+    pD, pH, pW = c.padding
+
+    # Output dimensions
+    D_out = div(D + 2*pD - kD, sD) + 1
+    H_out = div(H + 2*pH - kH, sH) + 1
+    W_out = div(W + 2*pW - kW, sW) + 1
+
+    # Pad input
+    if pD > 0 || pH > 0 || pW > 0
+        x_padded = zeros(eltype(x), N, D + 2*pD, H + 2*pH, W + 2*pW, C_in)
+        x_padded[:, pD+1:pD+D, pH+1:pH+H, pW+1:pW+W, :] = x
+        x = x_padded
+    end
+
+    # Allocate output
+    y = zeros(eltype(x), N, D_out, H_out, W_out, c.out_channels)
+
+    # Convolution (naive implementation)
+    for n in 1:N
+        for oc in 1:c.out_channels
+            for d in 1:D_out
+                for i in 1:H_out
+                    for j in 1:W_out
+                        d_start = (d - 1) * sD + 1
+                        h_start = (i - 1) * sH + 1
+                        w_start = (j - 1) * sW + 1
+
+                        patch = x[n, d_start:d_start+kD-1, h_start:h_start+kH-1, w_start:w_start+kW-1, :]
+                        kernel = c.weight[:, :, :, :, oc]
+
+                        y[n, d, i, j, oc] = sum(patch .* kernel)
+                    end
+                end
+            end
+        end
+    end
+
+    # Add bias
+    if c.bias !== nothing
+        for oc in 1:c.out_channels
+            y[:, :, :, :, oc] .+= c.bias[oc]
+        end
+    end
+
+    has_batch ? y : dropdims(y, dims=1)
+end
+
+function parameters(c::Conv3d)
+    if c.bias !== nothing
+        (weight = c.weight, bias = c.bias)
+    else
+        (weight = c.weight,)
+    end
+end
+
+function output_shape(c::Conv3d, input_shape::Type{Shape{input}}) where input
+    # input: (D, H, W, C_in) or (N, D, H, W, C_in)
+    N = length(input) == 5 ? input[1] : nothing
+    D, H, W, C_in = length(input) == 5 ? input[2:end] : input
+
+    kD, kH, kW = c.kernel_size
+    sD, sH, sW = c.stride
+    pD, pH, pW = c.padding
+
+    D_out = div(D + 2*pD - kD, sD) + 1
+    H_out = div(H + 2*pH - kH, sH) + 1
+    W_out = div(W + 2*pW - kW, sW) + 1
+
+    if N !== nothing
+        Shape{Tuple{N, D_out, H_out, W_out, c.out_channels}}
+    else
+        Shape{Tuple{D_out, H_out, W_out, c.out_channels}}
     end
 end
