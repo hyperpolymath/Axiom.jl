@@ -52,20 +52,6 @@ function Axiom.smt_proof(property::Axiom.ParsedProperty)
 
     smt_cache_put(cache_key, result)
     return finalize_smt_result(property, result)
-
-    if result.status == :sat
-        if property.quantifier == :exists
-            return Axiom.ProofResult(:proven, result.model, 1.0)
-        end
-        return Axiom.ProofResult(:disproven, result.model, 1.0)
-    elseif result.status == :unsat
-        if property.quantifier == :exists
-            return Axiom.ProofResult(:disproven, nothing, 1.0)
-        end
-        return Axiom.ProofResult(:proven, nothing, 1.0)
-    end
-
-    Axiom.ProofResult(:unknown, nothing, 0.0)
 end
 
 """
