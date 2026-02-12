@@ -195,28 +195,9 @@ Concrete layers should override this method if:
   `Shape` (e.g., non-negative values, specific range).
 
 # Example
-```julia
-# A hypothetical custom layer that requires a minimum batch size of 2
-struct MyCustomLayer <: AbstractLayer end
-function verify_input_shape(::MyCustomLayer, x::Tensor{T, 2, Shape{Tuple{B, F}}}) where {T, B, F}
-    if B !== :dynamic && B < 2
-        error("MyCustomLayer requires a batch size of at least 2, got $B")
-    end
-    return true
-end
-
-# Usage
-my_layer = MyCustomLayer()
-input_ok = axiom_randn(2, 10) # Batch size 2
-verify_input_shape(my_layer, input_ok) # true
-
-input_fail = axiom_randn(1, 10) # Batch size 1
-try
-    verify_input_shape(my_layer, input_fail) # Throws ErrorException
-catch e
-    println("Caught expected error: $(e)")
-end
-```
+Concrete layers can override this method to add runtime validation.
+For instance, a layer might check minimum batch size or specific constraints
+that cannot be expressed at compile-time.
 """
 function verify_input_shape(layer::AbstractLayer, x::AbstractTensor)
     # Default: no specific runtime verification. Concrete layers may override this.
@@ -256,21 +237,9 @@ training/evaluation mode (e.g., to enable/disable dropout, use population
 statistics in BatchNorm) should override this method.
 
 # Example
-```julia
-# Assuming a Dropout layer has a 'training' field
-mutable struct MyDropout <: AbstractLayer
-    p::Float32
-    training::Bool
-    MyDropout(p) = new(p, true) # Default to training mode
-end
-forward(l::MyDropout, x) = l.training ? dropout(x, l.p) : x
-
-dropout_layer = MyDropout(0.5f0)
-println("Dropout layer in training mode: $(dropout_layer.training)") # true
-
-set_training!(dropout_layer, false) # Set to evaluation mode
-println("Dropout layer in evaluation mode: $(dropout_layer.training)") # false
-```
+Layers with a `training` field can use this method to switch between
+training and evaluation modes. For instance, Dropout layers are active
+during training but disabled during evaluation.
 """
 function set_training!(layer::AbstractLayer, mode::Bool)
     if hasfield(typeof(layer), :training)
@@ -365,12 +334,8 @@ Concrete layers should implement `show_layer_params` to print a comma-separated
 list of their fields or relevant attributes.
 
 # Example
-```julia
-# For a Dense layer with fields `in_features` and `out_features`
-function show_layer_params(io::IO, layer::Dense)
-    print(io, "in_features=$(layer.in_features), out_features=$(layer.out_features)")
-end
-```
+Concrete layers override this to print their specific parameters,
+such as in_features and out_features for a Dense layer.
 """
 function show_layer_params(io::IO, layer::AbstractLayer)
     # Override in specific layers

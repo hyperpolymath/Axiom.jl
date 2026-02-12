@@ -302,13 +302,8 @@ verify_input_shape(dense_layer, input_1d_ok) # Returns true
 input_2d_ok = rand(32, 10)
 verify_input_shape(dense_layer, input_2d_ok) # Returns true
 
-# Invalid 1D input
-input_1d_fail = rand(8)
-try
-    verify_input_shape(dense_layer, input_1d_fail) # Throws DimensionMismatch
-catch e
-    println("Caught expected error: $(e)")
-end
+# Note: Invalid input dimensions will throw DimensionMismatch
+# e.g., verify_input_shape(dense_layer, rand(8)) would fail
 ```
 """
 function verify_input_shape(d::Dense, x::AbstractArray)

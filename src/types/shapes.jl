@@ -115,12 +115,7 @@ output2 = shape_after_dense(Shape{Tuple{32, 784}}, 128) # Shape{Tuple{32, 128}}
 # 2D input with dynamic batch: (typeof(:dynamic), 784) -> (typeof(:dynamic), 128)
 output3 = shape_after_dense(Shape{Tuple{typeof(:dynamic), 784}}, 128) # Shape{Tuple{typeof(:dynamic), 128}}
 
-# Invalid input rank (e.g., 3D input)
-try
-    shape_after_dense(Shape{Tuple{10, 20, 30}}, 50)
-catch e
-    println("Caught expected error: $(e)") # ErrorException
-end
+# Note: Invalid input rank (e.g., 3D input) will throw ErrorException
 ```
 """
 function shape_after_dense(input_shape::Type{Shape{input}}, out_features::Int) where input
@@ -491,12 +486,7 @@ broadcast_shapes(Shape{Tuple{typeof(:dynamic), 3}}, Shape{Tuple{2, 3}}) # Shape{
 broadcast_shapes(Shape{Tuple{typeof(:dynamic), 1}}, Shape{Tuple{2, 3}}) # Shape{Tuple{2, 3}}
 broadcast_shapes(Shape{Tuple{typeof(:dynamic), 3}}, Shape{Tuple{typeof(:dynamic), 3}}) # Shape{Tuple{typeof(:dynamic), 3}}
 
-# Error: incompatible fixed dimensions
-try
-    broadcast_shapes(Shape{Tuple{2, 3}}, Shape{Tuple{4, 3}})
-catch e
-    println("Caught expected error: $(e)") # ErrorException
-end
+# Note: Incompatible fixed dimensions will throw ErrorException
 ```
 """
 function broadcast_shapes(::Type{Shape{s1}}, ::Type{Shape{s2}}) where {s1, s2}

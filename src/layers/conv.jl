@@ -76,12 +76,7 @@ conv2d_layer = Conv(3, 64, (3, 3)) # kernel_size = (3, 3). Dispatches to Conv2d(
 conv2d_custom = Conv(64, 128, (5, 5), stride=2, padding=1)
 
 # Note: Conv3d is conceptually supported by this dispatcher but may not be
-# fully implemented as a separate struct and forward pass yet.
-try
-    Conv(1, 1, (2,2,2)) # will dispatch to Conv3d
-catch e
-    println("Caught expected error for unimplemented Conv3d: $(e)")
-end
+# fully implemented yet. Conv(1, 1, (2,2,2)) would dispatch to Conv3d.
 ```
 """
 function Conv(in_channels::Int, out_channels::Int, kernel_size; kwargs...)

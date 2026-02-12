@@ -356,12 +356,7 @@ dynamic_tensor = DynamicTensor(rand(Float32, 2, 3))
 # Convert to a static tensor with known shape (2, 3)
 static_tensor = to_static(dynamic_tensor, Tensor{Float32, 2, Tuple{2, 3}})
 
-# Attempting to convert to a mismatched shape will throw an error
-try
-    to_static(dynamic_tensor, Tensor{Float32, 2, Tuple{3, 2}})
-catch e
-    println("Caught expected error: $(e)") # DimensionMismatch
-end
+# Note: Attempting to convert to a mismatched shape will throw DimensionMismatch
 ```
 """
 function to_static(t::DynamicTensor{T, N}, ::Type{Tensor{T, N, Shape}}) where {T, N, Shape}
