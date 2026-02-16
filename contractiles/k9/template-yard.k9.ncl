@@ -7,7 +7,7 @@ K9!
 {
   pedigree = {
     schema_version = "1.0.0",
-    component_type = "TODO: describe component type (e.g., 'validated-config', 'schema')",
+    component_type = "REQUIRED: describe component type (e.g., 'validated-config', 'schema')",
     security = {
       leash = 'Yard,
       trust_level = "validated-config",
@@ -16,9 +16,9 @@ K9!
       allow_subprocess = false,
     },
     metadata = {
-      name = "TODO: component-name",
+      name = "REQUIRED: component-name",
       version = "1.0.0",
-      description = "TODO: Brief description with validation details",
+      description = "REQUIRED: Brief description with validation details",
       author = "Jonathan D.A. Jewell <jonathan.jewell@open.ac.uk>",
     },
   },
@@ -29,7 +29,7 @@ K9!
     name
       | String
       | std.string.NonEmpty
-      = "TODO: default value",
+      = "REQUIRED: default value",
 
     # Example: Number with range constraint
     port
@@ -76,7 +76,7 @@ K9!
 }
 
 # Usage:
-# 1. Fill in TODO items above
+# 1. Fill in open-item fields above
 # 2. Define your config with appropriate contracts
 # 3. Add validation rules in validation = { ... }
 # 4. Validate: nickel typecheck your-file.k9.ncl

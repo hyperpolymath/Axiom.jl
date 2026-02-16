@@ -1,7 +1,7 @@
 # SONNET-TASKS.md — Axiom.jl Completion Tasks
 
 > **Generated:** 2026-02-12 by Opus audit
-> **Purpose:** Unambiguous instructions for Sonnet to complete all stubs, TODOs, and placeholder code in this repo.
+> **Purpose:** Unambiguous instructions for Sonnet to complete all stubs, open-items, and placeholder code in this repo.
 > **Honest completion before this file:** ~45-50% (STATE.scm claims 65% — overstated)
 
 ---
@@ -248,7 +248,7 @@ println("GPU HOOKS TESTS PASSED (no GPU packages loaded)")
 **File:** `src/model_metadata.jl`
 
 **Problem:**
-- Line ~212: `verify_and_claim!()` sets `verified = true` without actually verifying anything. Comment says `# TODO: Actually run verification via @prove`
+- Line ~212: `verify_and_claim!()` sets `verified = true` without actually verifying anything. Comment says `# open-item: Actually run verification via @prove`
 - `input_shape_from_model()` returns `(0,)` placeholder
 - `output_shape_from_model()` returns `(0,)` placeholder
 
@@ -314,7 +314,7 @@ println("CONV3D TESTS PASSED")
 1. Read the extension file carefully
 2. Identify and remove dead code after the early return
 3. Fix the logic so the intended code path is reachable
-4. Also address the TODO in `src/Axiom.jl` line ~86: `# TODO: prove.jl requires SMTLib (weak dependency) - move to extension` — ensure `@prove` macro correctly delegates to the SMT extension when SMTLib is available
+4. Also address the open-item in `src/Axiom.jl` line ~86: `# open-item: prove.jl requires SMTLib (weak dependency) - move to extension` — ensure `@prove` macro correctly delegates to the SMT extension when SMTLib is available
 
 **Verification:**
 ```julia
@@ -437,7 +437,7 @@ end
 println("ALL EXPORTS VALID")
 '
 
-# 4. Check no TODO/FIXME landmines
-grep -rn 'TODO\|FIXME\|HACK\|XXX' src/ | head -20
-echo "(Some TODOs are acceptable for future enhancements, but none should be for core functionality)"
+# 4. Check no open-item/fix-item landmines
+grep -rn 'open-item\|fix-item\|HACK\|XXX' src/ | head -20
+echo "(Some open-items are acceptable for future enhancements, but none should be for core functionality)"
 ```

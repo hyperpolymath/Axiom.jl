@@ -91,7 +91,7 @@ function train_mnist()
 
         for (batch_x, batch_y) in train_loader
             # Forward pass
-            pred = model(batch_x)
+            pred = model(batch_x).data
 
             # Compute loss
             loss = crossentropy(pred, batch_y)
@@ -108,10 +108,10 @@ function train_mnist()
     test_input = randn(Float32, 1, 784)
     output = model(test_input)
 
-    println("  ✓ Output shape: $(size(output))")
-    println("  ✓ Probabilities sum to: $(sum(output))")
-    println("  ✓ All non-negative: $(all(output .>= 0))")
-    println("  ✓ No NaN values: $(!any(isnan, output))")
+    println("  ✓ Output shape: $(size(output.data))")
+    println("  ✓ Probabilities sum to: $(sum(output.data))")
+    println("  ✓ All non-negative: $(all(output.data .>= 0))")
+    println("  ✓ No NaN values: $(!any(isnan, output.data))")
 
     # Formal verification
     result = verify(model,

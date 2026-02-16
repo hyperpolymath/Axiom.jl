@@ -199,9 +199,10 @@ end
 """
     verify_and_claim!(metadata::ModelMetadata, property::String, specification::String)
 
-Verify a property and add claim to metadata.
+Record a verification claim in metadata.
 
-Returns `true` if verification succeeds.
+Returns `true` only when an explicit `verified=true` marker is present in
+`specification`. This function does not execute formal verification on its own.
 """
 function verify_and_claim!(
     metadata::ModelMetadata,
@@ -209,29 +210,10 @@ function verify_and_claim!(
     specification::String;
     verifier::String = "Axiom.jl @prove"
 )
-    # Attempt to run verification via @prove if available
-    verified = false
-    try
-        # Try to evaluate the specification as a verification query
-        # In a real implementation, this would parse specification and run @prove
-        # For now, we do basic heuristic checks
-        if property == "finite_output"
-            # Check if model has finite layers
-            verified = true
-        elseif property == "bounded_weights"
-            # Check if weights exist and are finite
-            params = metadata.framework_metadata
-            if haskey(params, "parameters")
-                all_finite = all(isfinite, values(get(params, "parameters", Dict())))
-                verified = all_finite
-            end
-        else
-            # Unknown property - cannot verify without full @prove integration
-            verified = false
-        end
-    catch e
-        @warn "Verification failed for property $(property)" exception=e
-        verified = false
+    # Conservative by default: never mark a claim verified without explicit evidence.
+    verified = occursin(r"\bverified\s*=\s*true\b"i, specification)
+    if !verified
+        @warn "Claim recorded as unverified: provide external proof evidence in `specification` to mark verified=true" property verifier
     end
 
     claim = VerificationClaim(
@@ -412,9 +394,8 @@ function input_shape_from_model(model)
     elseif hasproperty(model, :layers) && !isempty(model.layers)
         # Sequential/pipeline - get input shape from first layer
         return input_shape_from_model(model.layers[1])
-    else
-        return (0,)  # Unknown
     end
+    return ()
 end
 
 function output_shape_from_model(model)
@@ -428,9 +409,8 @@ function output_shape_from_model(model)
     elseif hasproperty(model, :layers) && !isempty(model.layers)
         # Sequential/pipeline - get output shape from last layer
         return output_shape_from_model(model.layers[end])
-    else
-        return (0,)  # Unknown
     end
+    return ()
 end
 
 function detect_precision(params::Dict)

@@ -6,7 +6,7 @@
 :source-highlighter: rouge
 
 image:https://img.shields.io/badge/License-PMPL--1.0-blue.svg[License: PMPL-1.0,link="https://github.com/hyperpolymath/palimpsest-license"]
-image:https://img.shields.io/badge/Julia-1.9+-9558B2?logo=julia[Julia,link="https://julialang.org/"]
+image:https://img.shields.io/badge/Julia-1.10+-9558B2?logo=julia[Julia,link="https://julialang.org/"]
 image:https://img.shields.io/badge/Rust-Backend-DEA584?logo=rust[Rust,link="https://www.rust-lang.org/"]
 
 *Provably Correct Machine Learning*
@@ -76,19 +76,18 @@ cert = verify(model) |> generate_certificate
 save_certificate(cert, "fda_submission.cert")
 ----
 
-=== PyTorch Compatibility
+=== Model Interoperability (Roadmap)
 
 [source,julia]
 ----
-# Load any PyTorch model
-model = from_pytorch("resnet50.pth")
-
-# Get 2-3x speedup immediately
-output = model(input)  # Uses Rust backend
-
-# Add verification
-result = verify(model, properties=[ValidProbabilities()])
+# Build a model and verify it in Axiom directly
+model = Sequential(Dense(784, 128, relu), Dense(128, 10), Softmax())
+input = Tensor(randn(Float32, 16, 784))
+output = model(input)
+result = verify(model, properties=[ValidProbabilities(), FiniteOutput()], data=[(input, nothing)])
 ----
+
+PyTorch/ONNX import paths are tracked as future work and are not yet a stable public API.
 
 === High Performance
 
@@ -98,7 +97,32 @@ result = verify(model, properties=[ValidProbabilities()])
 model = Sequential(Dense(784, 128, relu), Dense(128, 10))
 
 # Production: Rust backend (2-3x faster)
-prod_model = compile(model, backend=:rust, optimize=:aggressive)
+prod_model = compile(model, backend=RustBackend("/path/to/libaxiom_core.so"), optimize=:aggressive)
+----
+
+=== Coprocessor Targets
+
+[source,julia]
+----
+# Non-GPU accelerator targets with safe fallback
+cop = detect_coprocessor()  # TPU/NPU/DSP/FPGA or nothing
+if cop !== nothing
+    model_accel = compile(model, backend=cop, verify=false)
+end
+----
+
+=== Serving APIs
+
+[source,julia]
+----
+# REST
+rest_server = serve_rest(model; host="0.0.0.0", port=8080, background=true)
+
+# GraphQL
+graphql_server = serve_graphql(model; host="0.0.0.0", port=8081, background=true)
+
+# gRPC contract generation
+generate_grpc_proto("axiom_inference.proto")
 ----
 
 == Quick Start
@@ -196,11 +220,15 @@ Axiom.jl catches bugs *before* they cause harm:
 == Documentation
 
 * link:docs/wiki/Home.md[Home] - Start here
+* link:docs/wiki/User-Guide.md[User Guide] - Install, infer, verify
+* link:docs/wiki/Developer-Guide.md[Developer Guide] - Build/test/release workflow
+* link:RELEASE-CHECKLIST.adoc[Release Checklist] - Pre-release and release-day gates
 * link:docs/wiki/Vision.md[Vision] - Why we built this
 * link:docs/wiki/Axiom-DSL.md[@axiom DSL] - Model definition guide
 * link:docs/wiki/Verification.md[Verification] - @ensure and @prove
 * link:docs/wiki/Migration-Guide.md[Migration Guide] - From PyTorch
 * link:docs/wiki/FAQ.md[FAQ] - Common questions
+* link:ROADMAP.md[Roadmap] - Tracked commitments and delivery criteria
 
 == Project Structure
 
@@ -287,4 +315,4 @@ Axiom.jl builds on the shoulders of giants:
 
 _The future of ML is verified._
 
-link:docs/wiki/Home.md[Get Started] | link:docs/wiki/Roadmap-TODOs.md[Roadmap] | https://github.com/hyperpolymath/Axiom.jl[Star on GitHub]
+link:docs/wiki/Home.md[Get Started] | link:RELEASE-CHECKLIST.adoc[Release Checklist] | link:ROADMAP.md[Roadmap] | https://github.com/hyperpolymath/Axiom.jl[Star on GitHub]

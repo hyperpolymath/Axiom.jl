@@ -13,8 +13,17 @@ using Axiom
 # Availability Detection
 # ============================================================================
 
-Axiom.cuda_available() = CUDA.functional()
-Axiom.cuda_device_count() = CUDA.ndevices()
+function Axiom.cuda_available()
+    forced = Axiom._backend_env_available("AXIOM_CUDA_AVAILABLE")
+    forced !== nothing && return forced
+    CUDA.functional()
+end
+
+function Axiom.cuda_device_count()
+    forced = Axiom._backend_env_count("AXIOM_CUDA_AVAILABLE", "AXIOM_CUDA_DEVICE_COUNT")
+    forced !== nothing && return forced
+    CUDA.ndevices()
+end
 
 # ============================================================================
 # GPU Operations

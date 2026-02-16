@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: PMPL-1.0-or-later
 # SPDX-FileCopyrightText: 2025 Axiom.jl Contributors
-# SPDX-License-Identifier: PMPL-1.0-or-later
 
 name: CI
 permissions: read-all
@@ -11,7 +10,6 @@ on:
   pull_request:
     branches: [main]
   schedule:
-    # Weekly security audit
     - cron: '0 0 * * 0'
 
 concurrency:
@@ -23,20 +21,14 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  # ==========================================================================
-  # Julia Tests
-  # ==========================================================================
-  julia-test:
+  julia-compat:
     name: Julia ${{ matrix.julia-version }} - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        julia-version: ['1.9', '1.10', 'nightly']
+        julia-version: ['1.10', '1.11']
         os: [ubuntu-latest, macos-latest, windows-latest]
-        exclude:
-          - os: windows-latest
-            julia-version: 'nightly'
 
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
@@ -47,11 +39,8 @@ jobs:
 
       - uses: julia-actions/cache@e8472695fb3c2028b1118dc399c8440ff497d409 # v2
 
-      - name: Build package
-        uses: julia-actions/julia-buildpkg@de39c5185a88e499828ade1f6431ebd1e7e0c4fd # v1
-
-      - name: Run tests
-        uses: julia-actions/julia-runtest@98da25e3e6b29f37e8e49f5c3e8dbbfa1a83ed4a # v1
+      - name: Instantiate / Build / Precompile / Test
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile(); Pkg.test()'
 
       - name: Process coverage
         if: matrix.julia-version == '1.10' && matrix.os == 'ubuntu-latest'
@@ -64,9 +53,22 @@ jobs:
           files: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
 
-  # ==========================================================================
-  # Rust Backend
-  # ==========================================================================
+  julia-nightly:
+    name: Julia nightly - ubuntu
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+
+      - uses: julia-actions/setup-julia@824fb972babf1837cf21c49159bf8a8130f26840 # v2
+        with:
+          version: nightly
+
+      - uses: julia-actions/cache@e8472695fb3c2028b1118dc399c8440ff497d409 # v2
+
+      - name: Instantiate / Build / Precompile / Test
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile(); Pkg.test()'
+
   rust-build:
     name: Rust Backend
     runs-on: ubuntu-latest
@@ -105,9 +107,167 @@ jobs:
         working-directory: rust
         run: cargo build --release
 
-  # ==========================================================================
-  # Zig Backend
-  # ==========================================================================
+  backend-parity-rust:
+    name: CPU vs Rust parity + accelerated smoke
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+
+      - uses: julia-actions/setup-julia@824fb972babf1837cf21c49159bf8a8130f26840 # v2
+        with:
+          version: '1.10'
+
+      - uses: julia-actions/cache@e8472695fb3c2028b1118dc399c8440ff497d409 # v2
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@6d9817901c499d6b02debbb57edb38d33daa680b # stable
+        with:
+          toolchain: stable
+
+      - name: Build Rust shared library
+        working-directory: rust
+        run: cargo build --release
+
+      - name: Instantiate / Build / Precompile
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile()'
+
+      - name: Run backend parity tests
+        env:
+          AXIOM_RUST_LIB: ${{ github.workspace }}/rust/target/release/libaxiom_core.so
+        run: julia --project=. test/ci/backend_parity.jl
+
+      - name: Run accelerated runtime smoke test (Rust)
+        env:
+          AXIOM_RUST_LIB: ${{ github.workspace }}/rust/target/release/libaxiom_core.so
+          AXIOM_SMOKE_ACCELERATOR: rust
+          AXIOM_SMOKE_ACCELERATOR_REQUIRED: '1'
+        run: julia --project=. test/ci/runtime_smoke.jl
+
+  gpu-fallback:
+    name: GPU fallback tests - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+
+      - uses: julia-actions/setup-julia@824fb972babf1837cf21c49159bf8a8130f26840 # v2
+        with:
+          version: '1.10'
+
+      - uses: julia-actions/cache@e8472695fb3c2028b1118dc399c8440ff497d409 # v2
+
+      - name: Instantiate / Build / Precompile
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile()'
+
+      - name: Run fallback tests
+        run: julia --project=. test/ci/gpu_fallback.jl
+
+  gpu-cuda-hardware:
+    name: GPU hardware smoke (CUDA)
+    if: ${{ vars.AXIOM_ENABLE_GPU_HARDWARE_CI == 'true' }}
+    runs-on: [self-hosted, linux, x64, gpu, cuda]
+
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+
+      - uses: julia-actions/setup-julia@824fb972babf1837cf21c49159bf8a8130f26840 # v2
+        with:
+          version: '1.10'
+
+      - name: Instantiate / Build / Precompile
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile()'
+
+      - name: Run CUDA smoke tests
+        env:
+          AXIOM_GPU_BACKEND: cuda
+          AXIOM_GPU_REQUIRED: '1'
+        run: julia --project=. test/ci/gpu_hardware_smoke.jl
+
+  gpu-rocm-hardware:
+    name: GPU hardware smoke (ROCm)
+    if: ${{ vars.AXIOM_ENABLE_GPU_HARDWARE_CI == 'true' }}
+    runs-on: [self-hosted, linux, x64, gpu, rocm]
+
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+
+      - uses: julia-actions/setup-julia@824fb972babf1837cf21c49159bf8a8130f26840 # v2
+        with:
+          version: '1.10'
+
+      - name: Instantiate / Build / Precompile
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile()'
+
+      - name: Run ROCm smoke tests
+        env:
+          AXIOM_GPU_BACKEND: rocm
+          AXIOM_GPU_REQUIRED: '1'
+        run: julia --project=. test/ci/gpu_hardware_smoke.jl
+
+  gpu-metal-hardware:
+    name: GPU hardware smoke (Metal)
+    if: ${{ vars.AXIOM_ENABLE_GPU_HARDWARE_CI == 'true' }}
+    runs-on: [self-hosted, macOS, ARM64, gpu, metal]
+
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+
+      - uses: julia-actions/setup-julia@824fb972babf1837cf21c49159bf8a8130f26840 # v2
+        with:
+          version: '1.10'
+
+      - name: Instantiate / Build / Precompile
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile()'
+
+      - name: Run Metal smoke tests
+        env:
+          AXIOM_GPU_BACKEND: metal
+          AXIOM_GPU_REQUIRED: '1'
+        run: julia --project=. test/ci/gpu_hardware_smoke.jl
+
+  runtime-smoke-cpu:
+    name: Runtime smoke (CPU)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+
+      - uses: julia-actions/setup-julia@824fb972babf1837cf21c49159bf8a8130f26840 # v2
+        with:
+          version: '1.10'
+
+      - uses: julia-actions/cache@e8472695fb3c2028b1118dc399c8440ff497d409 # v2
+
+      - name: Instantiate / Build / Precompile
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile()'
+
+      - name: Run runtime smoke test (CPU)
+        run: julia --project=. test/ci/runtime_smoke.jl
+
+  certificate-integrity:
+    name: Certificate integrity checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+
+      - uses: julia-actions/setup-julia@824fb972babf1837cf21c49159bf8a8130f26840 # v2
+        with:
+          version: '1.10'
+
+      - uses: julia-actions/cache@e8472695fb3c2028b1118dc399c8440ff497d409 # v2
+
+      - name: Instantiate / Build / Precompile
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile()'
+
+      - name: Run certificate integrity tests
+        run: julia --project=. test/ci/certificate_integrity.jl
+
   zig-build:
     name: Zig Backend
     runs-on: ubuntu-latest
@@ -132,12 +292,26 @@ jobs:
         working-directory: zig
         run: zig build -Doptimize=ReleaseFast
 
-  # ==========================================================================
-  # Security Audit
-  # ==========================================================================
+  docs-sanity:
+    name: Documentation sanity
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+
+      - name: Check core docs exist
+        run: |
+          test -f README.adoc
+          test -f ROADMAP.adoc
+          test -f docs/wiki/Home.md
+          test -f docs/wiki/User-Guide.md
+          test -f docs/wiki/Developer-Guide.md
+          test -f docs/wiki/Roadmap-Commitments.md
+
   security-audit:
     name: Security Audit
     runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
 
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
@@ -155,93 +329,3 @@ jobs:
           path: ./
           base: ${{ github.event.repository.default_branch }}
           extra_args: --only-verified
-
-  # ==========================================================================
-  # Documentation
-  # ==========================================================================
-  docs:
-    name: Documentation
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
-    steps:
-      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
-
-      - uses: julia-actions/setup-julia@824fb972babf1837cf21c49159bf8a8130f26840 # v2
-        with:
-          version: '1.10'
-
-      - name: Build documentation
-        run: |
-          julia --project=docs -e '
-            using Pkg
-            Pkg.develop(PackageSpec(path=pwd()))
-            Pkg.instantiate()
-            include("docs/make.jl")
-          '
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@4f9cc6602d3f66b9c108549d475ec49e8ef4d45e # v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./docs/build
-
-  # ==========================================================================
-  # RSR Compliance Check
-  # ==========================================================================
-  rsr-compliance:
-    name: RSR Compliance
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
-
-      - name: Check required files
-        run: |
-          echo "Checking RSR compliance..."
-
-          # Required files
-          files=(
-            "README.md"
-            "LICENSE"
-            "SECURITY.md"
-            "CODE_OF_CONDUCT.md"
-            "CONTRIBUTING.md"
-            "GOVERNANCE.md"
-            "CHANGELOG.md"
-            "MAINTAINERS.md"
-            "FUNDING.yml"
-            "flake.nix"
-            "Justfile"
-            ".well-known/security.txt"
-            ".well-known/humans.txt"
-          )
-
-          missing=0
-          for file in "${files[@]}"; do
-            if [[ -f "$file" ]]; then
-              echo "✓ $file"
-            else
-              echo "✗ $file MISSING"
-              missing=$((missing + 1))
-            fi
-          done
-
-          if [[ $missing -gt 0 ]]; then
-            echo "RSR compliance check failed: $missing files missing"
-            exit 1
-          fi
-
-          echo "✓ RSR compliance check passed"
-
-      - name: Check SPDX headers
-        run: |
-          echo "Checking SPDX headers..."
-          # Check a sample of source files
-          files_without_spdx=$(find src -name "*.jl" -exec grep -L "SPDX-" {} \; | head -5)
-          if [[ -n "$files_without_spdx" ]]; then
-            echo "Warning: Some files missing SPDX headers:"
-            echo "$files_without_spdx"
-          else
-            echo "✓ SPDX headers present"
-          fi

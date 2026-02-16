@@ -63,48 +63,14 @@ function detect_gpu()
 end
 
 """
-    cuda_available() -> Bool
-
-Check if CUDA is available.
-"""
-function cuda_available()
-    try
-        # Check for CUDA.jl extension
-        # isdefined(Main, :CUDA) && CUDA.functional()
-        false  # Conservative default (overridden by extension)
-    catch
-        false
-    end
-end
-
-"""
     rocm_available() -> Bool
 
 Check if ROCm is available.
 """
 function rocm_available()
-    try
-        # Check for AMDGPU.jl extension
-        # isdefined(Main, :AMDGPU) && AMDGPU.functional()
-        false  # Conservative default (overridden by extension)
-    catch
-        false
-    end
-end
-
-"""
-    metal_available() -> Bool
-
-Check if Metal is available.
-"""
-function metal_available()
-    try
-        # Check for Metal.jl extension
-        # isdefined(Main, :Metal) && Metal.functional()
-        false  # Conservative default (overridden by extension)
-    catch
-        false
-    end
+    forced = _backend_env_available("AXIOM_ROCM_AVAILABLE")
+    forced !== nothing && return forced
+    false
 end
 
 """
@@ -113,12 +79,9 @@ end
 Get number of available CUDA devices.
 """
 function cuda_device_count()
-    try
-        # Would normally call: CUDA.ndevices()
-        0  # Conservative default
-    catch
-        0
-    end
+    forced = _backend_env_count("AXIOM_CUDA_AVAILABLE", "AXIOM_CUDA_DEVICE_COUNT")
+    forced !== nothing && return forced
+    0
 end
 
 """
@@ -127,12 +90,9 @@ end
 Get number of available ROCm devices.
 """
 function rocm_device_count()
-    try
-        # Would normally call: AMDGPU.ndevices()
-        0  # Conservative default
-    catch
-        0
-    end
+    forced = _backend_env_count("AXIOM_ROCM_AVAILABLE", "AXIOM_ROCM_DEVICE_COUNT")
+    forced !== nothing && return forced
+    0
 end
 
 """
@@ -143,7 +103,7 @@ Select specific CUDA device.
 function select_device!(backend::CUDABackend, device::Int)
     # In full implementation: CUDA.device!(device)
     @warn "CUDA device selection requires CUDA.jl extension"
-    backend.device = device
+    CUDABackend(device)
 end
 
 """
@@ -154,7 +114,7 @@ Select specific ROCm device.
 function select_device!(backend::ROCmBackend, device::Int)
     # In full implementation: AMDGPU.device!(device)
     @warn "ROCm device selection requires AMDGPU.jl extension"
-    backend.device = device
+    ROCmBackend(device)
 end
 
 """
@@ -164,6 +124,7 @@ Metal device selection (no-op on macOS - OS manages).
 """
 function select_device!(backend::MetalBackend, device::Int)
     @debug "Metal device selection managed by macOS"
+    MetalBackend(device)
 end
 
 # ============================================================================

@@ -149,9 +149,14 @@ function save_certificate(cert::Certificate, path::String)
         println(f, "")
         println(f, "model_name: $(cert.model_name)")
         println(f, "model_hash: $(cert.model_hash)")
+        println(f, "created_at: $(cert.created_at)")
         println(f, "axiom_version: $(cert.axiom_version)")
         println(f, "verification_mode: $(cert.verification_mode)")
         println(f, "proof_type: $(cert.proof_type)")
+        println(f, "verifier_id: $(cert.verifier_id)")
+        if cert.test_data_hash !== nothing
+            println(f, "test_data_hash: $(cert.test_data_hash)")
+        end
         println(f, "")
         println(f, "properties:")
         for prop in cert.properties
@@ -193,6 +198,16 @@ function load_certificate(path::String)
         startswith(line, "#") && continue
         isempty(line) && continue
 
+        # Parse list entries in properties section
+        if startswith(line, "- ") && current_section == :properties
+            prop_name = strip(line[3:end])
+            prop = parse_property_type(prop_name)
+            if prop !== nothing
+                push!(properties, prop)
+            end
+            continue
+        end
+
         # Parse key-value pairs
         if contains(line, ": ")
             parts = split(line, ": ", limit=2)
@@ -205,21 +220,20 @@ function load_certificate(path::String)
                 model_hash = value
             elseif key == "axiom_version"
                 axiom_version = value
+            elseif key == "created_at"
+                created_at = tryparse(Float64, value) === nothing ? 0.0 : parse(Float64, value)
             elseif key == "verification_mode"
                 verification_mode = parse_verification_mode(value)
             elseif key == "proof_type"
                 proof_type = Symbol(value)
+            elseif key == "verifier_id"
+                verifier_id = value
+            elseif key == "test_data_hash"
+                test_data_hash = isempty(value) ? nothing : value
             elseif key == "signature"
                 signature = value
             elseif key == "properties"
                 current_section = :properties
-            elseif startswith(key, "- ") && current_section == :properties
-                # Parse property name
-                prop_name = strip(key[3:end])
-                prop = parse_property_type(prop_name)
-                if prop !== nothing
-                    push!(properties, prop)
-                end
             end
         end
     end
@@ -260,14 +274,16 @@ end
 """
 Parse verification mode from string.
 """
-function parse_verification_mode(s::String)
-    s = uppercase(strip(s))
-    if s == "STRICT"
-        return STRICT
-    elseif s == "FAST"
-        return FAST
-    elseif s == "DEBUG"
-        return DEBUG
+function parse_verification_mode(s::AbstractString)
+    s = uppercase(strip(String(s)))
+    if s == "QUICK" || s == "FAST"
+        return QUICK
+    elseif s == "STANDARD"
+        return STANDARD
+    elseif s == "THOROUGH" || s == "STRICT"
+        return THOROUGH
+    elseif s == "EXHAUSTIVE" || s == "DEBUG"
+        return EXHAUSTIVE
     else
         return STANDARD
     end
@@ -276,8 +292,8 @@ end
 """
 Parse property type from name string.
 """
-function parse_property_type(name::String)
-    name = strip(name)
+function parse_property_type(name::AbstractString)
+    name = strip(String(name))
 
     # Map property names to types
     if name == "ValidProbabilities" || name == "ValidProbability"
@@ -286,8 +302,11 @@ function parse_property_type(name::String)
         return FiniteOutput()
     elseif name == "NoNaN" || name == "NoNaNs"
         return NoNaN()
-    elseif name == "BoundedActivation" || name == "BoundedActivations"
-        return BoundedActivation()
+    elseif startswith(name, "BoundedOutput")
+        # Parameterized bounds are not serialized in the current format.
+        return BoundedOutput(-Inf32, Inf32)
+    elseif name == "NoInf" || name == "NoInfs"
+        return NoInf()
     else
         @debug "Unknown property type: $name"
         return nothing
@@ -297,7 +316,7 @@ end
 """
 Verify signature of loaded certificate.
 """
-function verify_loaded_signature(cert::Certificate, expected_signature::String)
+function verify_loaded_signature(cert::Certificate, expected_signature::AbstractString)
     content = string(
         cert.model_hash,
         cert.model_name,
@@ -307,7 +326,7 @@ function verify_loaded_signature(cert::Certificate, expected_signature::String)
     )
 
     computed_signature = bytes2hex(SHA.sha256(content))
-    computed_signature == expected_signature
+    computed_signature == String(expected_signature)
 end
 
 # ============================================================================

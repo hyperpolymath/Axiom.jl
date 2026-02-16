@@ -16,12 +16,12 @@ Area maintainers have expertise and responsibility for specific areas.
 
 | Area | Maintainer(s) | Description |
 |------|---------------|-------------|
-| Julia Core | TBD | Core Julia implementation |
-| Rust Backend | TBD | Rust FFI and performance |
-| Zig Backend | TBD | Zig FFI and SIMD |
-| Verification | TBD | @ensure, @prove, certificates |
-| Documentation | TBD | Wiki, tutorials, API docs |
-| CI/CD | TBD | Build, test, release |
+| Julia Core | Unassigned | Core Julia implementation |
+| Rust Backend | Unassigned | Rust FFI and performance |
+| Zig Backend | Unassigned | Zig FFI and SIMD |
+| Verification | Unassigned | @ensure, @prove, certificates |
+| Documentation | Unassigned | Wiki, tutorials, API docs |
+| CI/CD | Unassigned | Build, test, release |
 
 ## Responsibilities
 

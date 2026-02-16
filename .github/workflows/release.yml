@@ -18,10 +18,37 @@ permissions:
 
 jobs:
   # ============================================================================
+  # Release Readiness Gates (Compatibility + Smoke)
+  # ============================================================================
+  release-readiness:
+    name: Release readiness - Julia ${{ matrix.julia-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        julia-version: ['1.10', '1.11']
+
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+
+      - uses: julia-actions/setup-julia@824fb972babf1837cf21c49159bf8a8130f26840 # v2
+        with:
+          version: ${{ matrix.julia-version }}
+
+      - uses: julia-actions/cache@e8472695fb3c2028b1118dc399c8440ff497d409 # v2
+
+      - name: Instantiate / Build / Precompile / Test
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile(); Pkg.test()'
+
+      - name: Runtime smoke (CPU)
+        run: julia --project=. test/ci/runtime_smoke.jl
+
+  # ============================================================================
   # Build Julia Package
   # ============================================================================
   build-julia:
     name: Build Julia Package
+    needs: [release-readiness]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -37,13 +64,12 @@ jobs:
 
       - uses: julia-actions/cache@e8472695fb3c2028b1118dc399c8440ff497d409 # v2
 
-      - name: Build package
+      - name: Instantiate / Build / Precompile / Test
         run: |
-          julia --project -e 'using Pkg; Pkg.build()'
+          julia --project -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile(); Pkg.test()'
 
-      - name: Run tests
-        run: |
-          julia --project -e 'using Pkg; Pkg.test()'
+      - name: Runtime smoke (CPU)
+        run: julia --project=. test/ci/runtime_smoke.jl
 
       - name: Package artifacts
         run: |
@@ -51,7 +77,7 @@ jobs:
           tar -czf dist/Axiom.jl-${{ matrix.os }}.tar.gz src/ Project.toml README.adoc LICENSE
 
       - name: Upload Julia artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@6d3e1c6c7da08dea67f074b3b34ddf5fd56a1bd7 # v4
         with:
           name: julia-${{ matrix.os }}
           path: dist/
@@ -61,6 +87,7 @@ jobs:
   # ============================================================================
   build-rust:
     name: Build Rust Backend
+    needs: [release-readiness]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -104,7 +131,7 @@ jobs:
           cp rust/target/${{ matrix.target }}/release/${{ matrix.artifact_name }} dist/
 
       - name: Upload Rust artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@6d3e1c6c7da08dea67f074b3b34ddf5fd56a1bd7 # v4
         with:
           name: rust-${{ matrix.os }}
           path: dist/
@@ -163,7 +190,7 @@ jobs:
           cargo sbom > ../sbom-rust.json
 
       - name: Upload SBOMs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@6d3e1c6c7da08dea67f074b3b34ddf5fd56a1bd7 # v4
         with:
           name: sboms
           path: |
@@ -212,7 +239,7 @@ jobs:
 
           ## What's New
 
-          <!-- TODO: Auto-generate from commits -->
+          <!-- Planned: Auto-generate from commits -->
 
           ## Installation
 

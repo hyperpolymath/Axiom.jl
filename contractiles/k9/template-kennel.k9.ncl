@@ -7,7 +7,7 @@ K9!
 {
   pedigree = {
     schema_version = "1.0.0",
-    component_type = "TODO: describe component type (e.g., 'build-config', 'metadata')",
+    component_type = "REQUIRED: describe component type (e.g., 'build-config', 'metadata')",
     security = {
       leash = 'Kennel,
       trust_level = "data-only",
@@ -16,9 +16,9 @@ K9!
       allow_subprocess = false,
     },
     metadata = {
-      name = "TODO: component-name",
+      name = "REQUIRED: component-name",
       version = "1.0.0",
-      description = "TODO: Brief description of what this component contains",
+      description = "REQUIRED: Brief description of what this component contains",
       author = "Jonathan D.A. Jewell <jonathan.jewell@open.ac.uk>",
     },
   },
@@ -48,7 +48,7 @@ K9!
 }
 
 # Usage:
-# 1. Fill in TODO items above
+# 1. Fill in open-item fields above
 # 2. Add your configuration data to config = { ... }
 # 3. Validate: nickel typecheck your-file.k9.ncl
 # 4. Export: nickel export your-file.k9.ncl > output.json

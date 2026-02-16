@@ -166,7 +166,7 @@ grads = gradient(model, x, y, CrossEntropyLoss())
 
 #### CUDA.jl
 
-GPU acceleration (coming soon).
+GPU acceleration is available through extension packages and tracked for further hardening on the roadmap.
 
 ```julia
 using CUDA
@@ -364,7 +364,7 @@ Current implementation provides architecture conversion only.
 #### Tokenizer Support
 
 ```julia
-# Tokenizer loading is a placeholder - use Transformers.jl
+# Use Transformers.jl directly for tokenizer loading
 using Transformers
 
 tokenizer = hgf"bert-base-uncased"
@@ -488,22 +488,14 @@ HTTP.serve(handle_request, "0.0.0.0", 8080)
 
 ### gRPC
 
-High-performance RPC.
+Proto + handler support is available in-tree.
+Network gRPC serving uses the generated proto with your preferred gRPC runtime.
 
 ```julia
-using gRPC
+using Axiom
 
-# Define service
-service = AxiomInference(model)
-
-@grpc function predict(request::PredictRequest)::PredictResponse
-    input = reshape(request.input, 1, :)
-    output = forward(model, input)
-    return PredictResponse(prediction=vec(output))
-end
-
-# Serve
-serve(service, "0.0.0.0:50051")
+generate_grpc_proto("axiom_inference.proto")
+grpc_support_status()
 ```
 
 ### REST API
@@ -511,27 +503,21 @@ serve(service, "0.0.0.0:50051")
 HTTP inference endpoint.
 
 ```julia
-using Genie, JSON
+using Axiom
 
-model = load_model("model.axiom")
+model = Sequential(Dense(10, 5, relu), Dense(5, 3), Softmax())
+server = serve_rest(model; host="0.0.0.0", port=8080, background=true)
+# close(server) when done
+```
 
-route("/predict", method=POST) do
-    data = jsonpayload()
-    input = Float32.(data["input"])
+### GraphQL
 
-    output = forward(model, reshape(input, 1, :))
+```julia
+using Axiom
 
-    return json(Dict(
-        "prediction" => vec(output),
-        "model_version" => model.version
-    ))
-end
-
-route("/health") do
-    return json(Dict("status" => "healthy"))
-end
-
-up(8080)
+model = Sequential(Dense(10, 5, relu), Dense(5, 3), Softmax())
+server = serve_graphql(model; host="0.0.0.0", port=8081, background=true)
+# close(server) when done
 ```
 
 ## Cloud Integrations
@@ -604,7 +590,9 @@ upload_blob("models", "axiom/model.axiom", "model.axiom")
 | W&B | ✓ Stable | Full support |
 | **Deployment** | | |
 | Docker | ✓ Stable | Full support |
-| REST/gRPC | ✓ Stable | Full support |
+| REST | ✓ Stable | In-tree server API |
+| GraphQL | ✓ Stable | In-tree server API |
+| gRPC | ⚠ Beta | Proto + handlers in-tree, network runtime integration in progress |
 | AWS | ✓ Stable | S3, SageMaker |
 | GCP | ✓ Stable | GCS, Vertex AI |
 | Azure | ✓ Stable | Blob, Azure ML |

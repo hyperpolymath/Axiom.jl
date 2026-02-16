@@ -617,7 +617,7 @@
 ;; For creating and reading back scheme objects
 
 ; read a scheme string and evaluate it, returning 'Just result' on success
-; TODO: catch exception!
+; note: catch exception!
 (define (blodwen-eval-scheme str)
   (guard
      (x [#t '()]) ; Nothing on failure

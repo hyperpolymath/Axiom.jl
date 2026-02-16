@@ -401,7 +401,7 @@ end
 
 Creates a new `Tensor` filled with zeros, inheriting the element type (`T`),
 number of dimensions (`N`), and compile-time shape (`Shape`) from an existing `Tensor`.
-This is a convenient way to create a placeholder tensor with identical structural
+This is a convenient way to create a companion tensor with identical structural
 properties for operations like gradients or accumulation.
 
 Arguments:

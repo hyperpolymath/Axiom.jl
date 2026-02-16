@@ -60,13 +60,13 @@ println("   Input shape: $(size(x))")
 
 # Forward pass
 y = model2(x)
-println("   Output shape: $(size(y))")
+println("   Output shape: $(size(y.data))")
 
 # Verify output properties
 println("\n   Verifying output properties:")
-println("   - Probabilities sum to 1: $(all(isapprox.(sum(y, dims=2), 1.0, atol=1e-5)) ? "✓" : "✗")")
-println("   - All non-negative: $(all(y .>= 0) ? "✓" : "✗")")
-println("   - No NaN values: $(!any(isnan, y) ? "✓" : "✗")")
+println("   - Probabilities sum to 1: $(all(isapprox.(sum(y.data, dims=2), 1.0, atol=1e-5)) ? "✓" : "✗")")
+println("   - All non-negative: $(all(y.data .>= 0) ? "✓" : "✗")")
+println("   - No NaN values: $(!any(isnan, y.data) ? "✓" : "✗")")
 
 # ==============================================================================
 # 4. Training Example
@@ -98,7 +98,7 @@ for epoch in 1:10
     n_batches = 0
 
     for (batch_x, batch_y) in train_loader
-        pred = model(batch_x)
+        pred = model(batch_x).data
         loss = crossentropy(pred, batch_y)
         total_loss += loss
         n_batches += 1
@@ -156,6 +156,6 @@ println("
 
   Next steps:
   - Install Rust backend for 2-3x speedup
-  - Import PyTorch models: from_pytorch(\"model.pth\")
+  - Track model import APIs in roadmap (PyTorch/ONNX)
   - Deploy verified models with confidence
 ")

@@ -21,10 +21,16 @@ jobs:
           head: ${{ github.sha }}
         continue-on-error: true
       
-      - name: Check TODO/FIXME
+      - name: Check unresolved markers
         run: |
-          echo "=== TODOs ==="
-          grep -rn "TODO\|FIXME\|HACK\|XXX" --include="*.rs" --include="*.res" --include="*.py" --include="*.ex" . | head -20 || echo "None found"
+          echo "=== unresolved markers (src/ext/test) ==="
+          markers=$(rg -n "TODO|FIXME|TBD|OPEN_ITEM|FIX_ITEM|HACK|XXX" src ext test || true)
+          if [ -n "$markers" ]; then
+            echo "$markers"
+            echo "::error::Unresolved implementation markers found in src/ext/test"
+            exit 1
+          fi
+          echo "✅ None found in src/ext/test"
       
       - name: Check for large files
         run: |

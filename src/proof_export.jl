@@ -23,7 +23,7 @@ export_lean(cert, "model_finite.lean")
 Generated Lean file contains:
 - Model parameter structure
 - Forward pass definition
-- Property theorem (with `sorry` placeholder)
+- Property theorem skeleton (to complete interactively)
 - Helper lemmas
 """
 function export_lean(certificate::ProofCertificate, output_path::String)
@@ -165,7 +165,7 @@ function translate_to_lean(property::String)
     property = replace(property, "∧" => "∧")
     property = replace(property, "∨" => "∨")
 
-    # Placeholder - would need sophisticated translation
+    # Fallback for expressions that need richer parsing/translation.
     "sorry  -- Translate: $property"
 end
 

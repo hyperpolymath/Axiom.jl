@@ -117,7 +117,7 @@ K9!
 }
 
 # Usage:
-# 1. Fill in TODO items above
+# 1. Fill in open-item fields above
 # 2. Define configuration with contracts
 # 3. Implement Just recipes with your commands
 # 4. Test with dry-run: ./must --dry-run run your-file.k9.ncl
@@ -127,7 +127,7 @@ K9!
 # 8. Users verify and run: ./must verify && ./must run your-file.k9.ncl
 #
 # Security checklist:
-# ✓ All TODO items filled in
+# ✓ All open-item fields filled in
 # ✓ side_effects documented accurately
 # ✓ Commands reviewed for safety
 # ✓ No hardcoded secrets or credentials

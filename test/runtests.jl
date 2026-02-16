@@ -5,6 +5,8 @@ using Test
 using Axiom
 using LinearAlgebra
 using Statistics
+using HTTP
+using JSON
 
 @testset "Axiom.jl" begin
 
@@ -193,6 +195,52 @@ using Statistics
         @test opt.weight_decay == 0.01f0
     end
 
+    @testset "Coprocessor Backends" begin
+        model = Sequential(
+            Dense(10, 5, relu),
+            Dense(5, 3),
+            Softmax()
+        )
+
+        old_tpu_available = get(ENV, "AXIOM_TPU_AVAILABLE", nothing)
+        old_tpu_count = get(ENV, "AXIOM_TPU_DEVICE_COUNT", nothing)
+
+        try
+            ENV["AXIOM_TPU_AVAILABLE"] = "1"
+            ENV["AXIOM_TPU_DEVICE_COUNT"] = "2"
+
+            @test tpu_available()
+            @test tpu_device_count() == 2
+            @test detect_coprocessor() == TPUBackend(0)
+
+            compiled_ok = compile(model, backend=TPUBackend(1), verify=false)
+            @test compiled_ok isa Axiom.CoprocessorCompiledModel
+
+            compiled_bad = compile(model, backend=TPUBackend(4), verify=false)
+            @test compiled_bad === model
+        finally
+            if old_tpu_available === nothing
+                delete!(ENV, "AXIOM_TPU_AVAILABLE")
+            else
+                ENV["AXIOM_TPU_AVAILABLE"] = old_tpu_available
+            end
+
+            if old_tpu_count === nothing
+                delete!(ENV, "AXIOM_TPU_DEVICE_COUNT")
+            else
+                ENV["AXIOM_TPU_DEVICE_COUNT"] = old_tpu_count
+            end
+        end
+
+        @test select_device!(TPUBackend(0), 1) == TPUBackend(1)
+        @test select_device!(NPUBackend(0), 2) == NPUBackend(2)
+        @test select_device!(DSPBackend(0), 3) == DSPBackend(3)
+        @test select_device!(FPGABackend(0), 4) == FPGABackend(4)
+
+        accel = detect_accelerator()
+        @test accel === nothing || accel isa AbstractBackend
+    end
+
     @testset "Loss Functions" begin
         pred = randn(Float32, 32, 10)
         target = randn(Float32, 32, 10)
@@ -243,6 +291,100 @@ using Statistics
         @test size(onehot) == (5, 3)
         @test onehot[1, 1] == 1.0f0
         @test onehot[2, 2] == 1.0f0
+    end
+
+    @testset "Serving APIs" begin
+        model = Sequential(
+            Dense(10, 5, relu),
+            Dense(5, 3),
+            Softmax()
+        )
+        input_batch = [Float32.(randn(10)), Float32.(randn(10))]
+
+        function start_test_server(start_fn)
+            for _ in 1:20
+                port = rand(20_000:45_000)
+                try
+                    server = start_fn(port)
+                    return server, port
+                catch
+                    # Retry with another port
+                end
+            end
+            error("Unable to bind test server after multiple attempts")
+        end
+
+        rest_server, rest_port = start_test_server(port ->
+            serve_rest(model; host="127.0.0.1", port=port, background=true)
+        )
+        try
+            sleep(0.2)
+            health_resp = HTTP.get("http://127.0.0.1:$(rest_port)/health")
+            @test health_resp.status == 200
+            health_body = JSON.parse(String(health_resp.body))
+            @test health_body["status"] == "ok"
+
+            predict_resp = HTTP.post(
+                "http://127.0.0.1:$(rest_port)/predict",
+                ["Content-Type" => "application/json"],
+                JSON.json(Dict("input" => input_batch))
+            )
+            @test predict_resp.status == 200
+            predict_body = JSON.parse(String(predict_resp.body))
+            @test haskey(predict_body, "output")
+            @test length(predict_body["output"]) == 2
+        finally
+            close(rest_server)
+        end
+
+        gql_server, gql_port = start_test_server(port ->
+            serve_graphql(model; host="127.0.0.1", port=port, background=true)
+        )
+        try
+            sleep(0.2)
+            gql_health = HTTP.post(
+                "http://127.0.0.1:$(gql_port)/graphql",
+                ["Content-Type" => "application/json"],
+                JSON.json(Dict("query" => "query Health { health }"))
+            )
+            @test gql_health.status == 200
+            gql_health_body = JSON.parse(String(gql_health.body))
+            @test gql_health_body["data"]["health"] == "ok"
+
+            gql_predict = HTTP.post(
+                "http://127.0.0.1:$(gql_port)/graphql",
+                ["Content-Type" => "application/json"],
+                JSON.json(Dict(
+                    "query" => raw"query Predict($input: [[Float!]!]) { predict(input: $input) }",
+                    "variables" => Dict("input" => input_batch)
+                ))
+            )
+            @test gql_predict.status == 200
+            gql_predict_body = JSON.parse(String(gql_predict.body))
+            @test haskey(gql_predict_body["data"], "predict")
+            @test length(gql_predict_body["data"]["predict"]) == 2
+        finally
+            close(gql_server)
+        end
+
+        proto_path = tempname() * ".proto"
+        out_path = generate_grpc_proto(proto_path)
+        @test out_path == proto_path
+        @test isfile(proto_path)
+        proto_content = read(proto_path, String)
+        @test occursin("service AxiomInference", proto_content)
+        @test occursin("rpc Predict", proto_content)
+
+        grpc_pred = grpc_predict(model, input_batch)
+        @test haskey(grpc_pred, "output")
+        @test length(grpc_pred["output"]) == 2
+
+        grpc_stat = grpc_support_status()
+        @test grpc_stat["proto_generation"] == true
+        @test grpc_stat["inprocess_handlers"] == true
+        @test grpc_stat["network_server"] == false
+
+        rm(proto_path)
     end
 
     @testset "Verification" begin

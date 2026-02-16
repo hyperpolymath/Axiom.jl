@@ -304,6 +304,7 @@ output_tensor_forward = forward(dense_layer, input_tensor)
 ```
 """
 (layer::AbstractLayer)(x::AbstractTensor) = forward(layer, x)
+(layer::AbstractLayer)(x::AbstractArray) = forward(layer, Tensor(x))
 
 # Pretty printing
 """

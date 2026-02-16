@@ -13,8 +13,17 @@ using Axiom
 # Availability Detection
 # ============================================================================
 
-Axiom.rocm_available() = AMDGPU.functional()
-Axiom.rocm_device_count() = AMDGPU.ndevices()
+function Axiom.rocm_available()
+    forced = Axiom._backend_env_available("AXIOM_ROCM_AVAILABLE")
+    forced !== nothing && return forced
+    AMDGPU.functional()
+end
+
+function Axiom.rocm_device_count()
+    forced = Axiom._backend_env_count("AXIOM_ROCM_AVAILABLE", "AXIOM_ROCM_DEVICE_COUNT")
+    forced !== nothing && return forced
+    AMDGPU.ndevices()
+end
 
 # ============================================================================
 # GPU Operations

@@ -78,6 +78,23 @@ cargo build --release
 
 Yes! Axiom.jl works on CPU. GPU support (CUDA, Metal) is optional.
 
+### Do you support TPU/NPU/DSP/FPGA?
+
+Yes, Axiom now includes first-class backend targets:
+`TPUBackend`, `NPUBackend`, `DSPBackend`, `FPGABackend`.
+
+Current status:
+- Detection and backend selection APIs are available now.
+- Compilation falls back safely to CPU when a coprocessor runtime is not present.
+- Production-grade non-GPU kernels are still in progress.
+
+### Do you support REST, GraphQL, and gRPC?
+
+Yes, with the following scope:
+- REST: in-tree runtime server via `serve_rest(...)`
+- GraphQL: in-tree runtime server via `serve_graphql(...)`
+- gRPC: in-tree proto generation (`generate_grpc_proto`) and in-process handlers (`grpc_predict`, `grpc_health`); network runtime integration is in progress
+
 ---
 
 ## Model Definition
@@ -126,12 +143,15 @@ parameters(layer::MyLayer) = (weight=layer.weight, bias=layer.bias)
 
 ### Can I use pre-trained weights?
 
-Yes! Load from PyTorch:
+Pre-trained import APIs are on the roadmap but not yet stable public APIs.
+Today, use Axiom-native models/checkpoints or convert models manually.
+
+Planned API shape:
 ```julia
 model = from_pytorch("pretrained.pth")
 ```
 
-Or download from Hugging Face (coming soon):
+Tracked roadmap item for Hugging Face-style loading:
 ```julia
 model = from_huggingface("bert-base-uncased")
 ```
@@ -340,7 +360,7 @@ Reduce batch size or use gradient checkpointing:
 # Smaller batches
 loader = DataLoader(data, batch_size=16)  # Was 64
 
-# Gradient checkpointing (coming soon)
+# Gradient checkpointing (roadmap item)
 model = checkpoint(model, every=3)  # Checkpoint every 3 layers
 ```
 
@@ -367,7 +387,7 @@ Open an issue on [GitHub](https://github.com/Hyperpolymath/Axiom.jl/issues) with
 
 ### Is there a roadmap?
 
-See [Roadmap-TODOs](Roadmap-TODOs.md) for planned work and open TODOs, plus [Vision](Vision.md) for long-term direction.
+See [Roadmap Commitments](Roadmap-Commitments.md) for planned work and delivery stages, plus [Vision](Vision.md) for long-term direction.
 
 ### Is Axiom Julia-first?
 

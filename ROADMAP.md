@@ -1,121 +1,65 @@
-# Axiom.jl Development Roadmap
+# Axiom.jl Roadmap
 
-## Current State (v1.0)
+## Current Baseline (v1.0.0)
 
-Production-ready theorem proving and verification framework:
-- Multi-backend architecture (Julia, Zig, Rust)
-- SMTLib integration (Z3 solver interface)
-- Proof search with strategies (forward/backward chaining)
-- Proof export to Coq, Isabelle, Lean, Idris
-- Expression manipulation and unification
-- Comprehensive security hardening (20+ @assert → proper validation)
+Axiom.jl provides:
+- Core tensor/layer pipeline in Julia
+- Verification checks (`@ensure`, property checks, certificates)
+- Optional Rust backend integration hooks
+- GPU extension hooks for CUDA/ROCm/Metal
 
-**Status:** Complete with security fixes. **Known limitation:** Rust backend compilation issue (num_traits dependency) - Julia backend fully functional.
+Current focus is stabilization: production-grade build/test/runtime reliability, accurate docs, and explicit feature status.
 
----
+## Near-Term Plan
 
-## v1.0 → v1.2 Roadmap (Near-term)
+### Must
+- [ ] Complete backend parity and reliability for CPU + Rust + GPU extension paths.
+- [ ] Harden verification/certificate workflows for repeatable CI and artifact integrity.
+- [ ] Keep README/wiki claims aligned with tested behavior.
 
-### v1.1 - Proof Automation & Usability (3-6 months)
+Must completion gates:
+- [ ] Core-op parity tests pass on CPU Julia and Rust backend (matmul, dense, conv, normalization, activations) with documented tolerance budgets.
+- [ ] GPU extension paths (CUDA/ROCm/Metal) have deterministic CI jobs where hardware is available, and explicit fallback-behavior tests where it is not.
+- [ ] `instantiate/build/precompile/test` succeeds in CI on supported Julia versions without manual steps.
+- [ ] Runtime smoke tests for documented examples pass on CPU and at least one accelerated backend.
+- [ ] No unresolved `TODO`/`FIXME`/`TBD` markers in `src`, `ext`, and `test` for release-scoped areas.
 
-**MUST:**
-- [ ] **Fix Rust backend** - Resolve num_traits dependency issue in packages/rust/Cargo.toml
-- [ ] **Automated tactic learning** - Suggest proof tactics based on goal similarity to past proofs
-- [ ] **Interactive proof assistant** - REPL with proof state visualization (goals, assumptions)
-- [ ] **Proof library** - Pre-proven lemmas for arithmetic, logic, set theory, algebra
+### Should
+- [ ] Improve performance benchmarking and regression tracking across backends.
+- [ ] Expand verification property coverage and diagnostics.
+- [ ] Strengthen release automation and compatibility testing.
 
-**SHOULD:**
-- [ ] **Sledgehammer-style automation** - Call external provers (E, Vampire, SPASS) and reconstruct proofs
-- [ ] **Counter-example generation** - Use model finders (Nitpick, Nunchaku) to disprove false conjectures
-- [ ] **Proof by induction** - Automated induction tactic with well-founded recursion
-- [ ] **Simplification engine** - Rewrite rules, normalization, term ordering
+Should completion gates:
+- [ ] Baseline benchmark suite published for CPU Julia, Rust, and GPU extension paths with trend tracking.
+- [ ] Verification diagnostics include actionable counterexample metadata and failure categorization.
+- [ ] Compatibility matrix is validated across OS/Julia combinations used by supported deployments.
+- [ ] Release process produces versioned artifacts and changelog validation automatically.
 
-**COULD:**
-- [ ] **Jupyter integration** - Pluto.jl notebook for literate theorem proving
-- [ ] **LaTeX export** - Pretty-print proofs for publication (natural deduction trees, sequent calculus)
-- [ ] **Proof visualization** - Graphical proof trees (Makie.jl)
+### Could
+- [ ] Add richer model packaging and registry workflows.
+- [ ] Expand advanced optimization passes (fusion, mixed precision).
+- [ ] Add deeper observability tooling for runtime verification paths.
 
-### v1.2 - Advanced Logics & Integration (6-12 months)
+Could completion gates:
+- [ ] Packaging format includes model metadata, verification claims, and reproducible hashes.
+- [ ] Optional optimization passes are benchmarked and guarded behind explicit flags.
+- [ ] Verification runtime emits structured telemetry suitable for dashboards/incident analysis.
 
-**MUST:**
-- [ ] **Higher-order logic** - HOL support (function types, lambda calculus)
-- [ ] **Dependent type theory** - CIC (Calculus of Inductive Constructions) backend
-- [ ] **Program verification** - Hoare logic for Julia code (pre/post conditions, loop invariants)
-- [ ] **Integration with PolyglotFormalisms.jl** - Import/export TLA+, Alloy, Z specs
+## Deferred Commitments (Tracked)
 
-**SHOULD:**
-- [ ] **Linear logic** - Resource-aware reasoning (session types, concurrency)
-- [ ] **Modal logic** - Temporal logic (LTL, CTL), epistemic logic
-- [ ] **Separation logic** - Memory safety verification (heap reasoning)
-- [ ] **Integration with ProvenCrypto.jl** - Verify crypto protocol implementations
+These are intentionally tracked roadmap promises, not removed features:
 
-**COULD:**
-- [ ] **Category theory library** - Functors, natural transformations, limits, adjunctions
-- [ ] **Homotopy type theory** - Univalence, higher inductive types
-- [ ] **Quantum logic** - Verify quantum algorithms (Grover, Shor)
+1. `from_pytorch(...)` import API
+2. `to_onnx(...)` export API
+3. Production-hardened GPU paths across CUDA/ROCm/Metal
+4. Non-GPU accelerators (TPU/NPU/DSP/FPGA) backend strategy
+5. Proof-assistant export improvements beyond skeleton artifacts
 
----
+See `docs/wiki/Roadmap-Commitments.md` for stage mapping and acceptance criteria.
 
-## v1.3+ Roadmap (Speculative)
+## Definition of Done for "Production Ready"
 
-### Research Frontiers
-
-**AI-Assisted Theorem Proving:**
-- Neural theorem provers (GPT-f, PACT, Thor style)
-- Reinforcement learning for tactic selection (AlphaProof approach)
-- Autoformalization (natural language → formal statement)
-- Proof repair (fix broken proofs after library changes)
-
-**Verified Software at Scale:**
-- Verified compilers (CompCert-style for Julia/Rust)
-- Verified operating systems (seL4-style microkernel)
-- Verified cryptography (full Fiat-Crypto integration)
-- Verified machine learning (neural network correctness proofs)
-
-**Formal Mathematics:**
-- Formalize major theorems (Kepler conjecture, Feit-Thompson, Hales-Jewett)
-- Integration with Lean's mathlib (import/export)
-- Automated conjecture generation (discover new theorems)
-- Collaborative proof engineering (distributed theorem proving)
-
-**Quantum & Beyond:**
-- Quantum Hoare logic (verify quantum circuits)
-- Linear dependent types (quantum resource management)
-- Topological quantum computing verification
-- Non-classical logics (paraconsistent, fuzzy, many-valued)
-
-### Ecosystem Integration
-
-- **Symbolics.jl:** Symbolic math integrated with theorem proving
-- **ModelingToolkit.jl:** Verify correctness of numerical simulations
-- **DifferentialEquations.jl:** Prove stability, convergence properties
-- **Optimization.jl/JuMP.jl:** Certified optimization (verified optimality)
-
-### Ambitious Features
-
-- **Theorem proving foundation model** - Pre-trained on mathlib, Archive of Formal Proofs, Coq stdlib
-- **Autonomous mathematician** - AI agent that formulates and proves conjectures
-- **Global proof repository** - Federated database of verified theorems (blockchain-backed?)
-- **Formal verification as a service** - Cloud API for on-demand proof checking
-
----
-
-## Migration Path
-
-**v1.0 → v1.1:** Backward compatible (Rust backend fix, proof automation additive)
-**v1.1 → v1.2:** Mostly compatible (dependent types may require new expression types)
-**v1.2 → v1.3+:** Breaking changes likely (AI features, HoTT need fundamental redesign)
-
-## Community Goals
-
-- **Formalize 100 theorems** from "100 Theorems" list by v1.2
-- **Publication at ITP conference** (Interactive Theorem Proving) by v1.2
-- **Integration with major provers** (Coq, Isabelle, Lean, Metamath) by v1.2
-- **Verification of real Julia package** (e.g., LinearAlgebra.jl subset) by v1.2
-
-## Critical Next Steps (Pre-v1.1)
-
-1. **Fix Rust backend compilation** - Add num_traits to packages/rust/Cargo.toml
-2. **Performance benchmarking** - Compare proof search against Prover9, E prover
-3. **Documentation** - Tutorial, API reference, example proofs
-4. **Community outreach** - Blog post, JuliaCon talk proposal
+1. Clean `instantiate/build/precompile/test` on supported Julia versions.
+2. Runtime smoke tests for documented examples pass.
+3. No unresolved work-marker markers in `src`, `ext`, and `test`.
+4. Public docs match implemented APIs and backend support status.

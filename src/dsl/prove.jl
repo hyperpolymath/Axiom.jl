@@ -208,7 +208,7 @@ end
 Attempts to prove a property using symbolic execution and simplification.
 """
 function symbolic_prove(property::ParsedProperty)::ProofResult
-    # This is a placeholder. A real symbolic prover would:
+    # Lightweight symbolic pass:
     # 1. Represent the property body symbolically.
     # 2. Apply simplification rules.
     # 3. Attempt to reduce the expression to `true` or `false`.

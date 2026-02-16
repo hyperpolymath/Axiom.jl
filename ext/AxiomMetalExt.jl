@@ -13,7 +13,11 @@ using Axiom
 # Availability Detection
 # ============================================================================
 
-Axiom.metal_available() = Metal.functional()
+function Axiom.metal_available()
+    forced = Axiom._backend_env_available("AXIOM_METAL_AVAILABLE")
+    forced !== nothing && return forced
+    Metal.functional()
+end
 
 # ============================================================================
 # GPU Operations

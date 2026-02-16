@@ -46,6 +46,42 @@ struct MetalBackend <: AbstractBackend
     device::Int
 end
 
+"""
+    TPUBackend
+
+Tensor Processing Unit backend target.
+"""
+struct TPUBackend <: AbstractBackend
+    device::Int
+end
+
+"""
+    NPUBackend
+
+Neural Processing Unit backend target.
+"""
+struct NPUBackend <: AbstractBackend
+    device::Int
+end
+
+"""
+    DSPBackend
+
+Digital Signal Processor backend target.
+"""
+struct DSPBackend <: AbstractBackend
+    device::Int
+end
+
+"""
+    FPGABackend
+
+FPGA accelerator backend target.
+"""
+struct FPGABackend <: AbstractBackend
+    device::Int
+end
+
 # Global current backend
 const _current_backend = Ref{AbstractBackend}(JuliaBackend())
 
@@ -370,30 +406,198 @@ function compile_to_backend(model, backend::MetalBackend)
     MetalCompiledModel(model, backend)
 end
 
+function compile_to_backend(model, backend::TPUBackend)
+    _compile_coprocessor(model, backend, tpu_available(), tpu_device_count(), "TPU")
+end
+
+function compile_to_backend(model, backend::NPUBackend)
+    _compile_coprocessor(model, backend, npu_available(), npu_device_count(), "NPU")
+end
+
+function compile_to_backend(model, backend::DSPBackend)
+    _compile_coprocessor(model, backend, dsp_available(), dsp_device_count(), "DSP")
+end
+
+function compile_to_backend(model, backend::FPGABackend)
+    _compile_coprocessor(model, backend, fpga_available(), fpga_device_count(), "FPGA")
+end
+
+function _compile_coprocessor(model, backend, available::Bool, device_count::Int, label::String)
+    @info "Compiling to $(label) backend on device $(backend.device)..."
+    if !available
+        @warn "$(label) backend not available, falling back to Julia backend"
+        return model
+    end
+    if backend.device < 0 || backend.device >= device_count
+        @warn "$(label) device $(backend.device) out of range (available: 0:$(max(0, device_count - 1))), falling back to Julia backend"
+        return model
+    end
+    CoprocessorCompiledModel(model, backend)
+end
+
 """
 Check if CUDA is available.
 """
 function cuda_available()
-    # Check for CUDA extension
-    try
-        # Would normally check: isdefined(Main, :CUDA) && CUDA.functional()
-        false  # Conservative default without CUDA.jl loaded
-    catch
-        false
-    end
+    forced = _backend_env_available("AXIOM_CUDA_AVAILABLE")
+    forced !== nothing && return forced
+    false
 end
 
 """
 Check if Metal is available.
 """
 function metal_available()
-    # Check for Metal extension (Apple Silicon)
-    try
-        Sys.isapple() && occursin("arm64", string(Sys.ARCH))
-    catch
-        false
-    end
+    forced = _backend_env_available("AXIOM_METAL_AVAILABLE")
+    forced !== nothing && return forced
+    false
 end
+
+"""
+    _backend_env_available(key::String) -> Union{Bool, Nothing}
+
+Read a backend availability override from environment.
+Returns `nothing` when no override is configured.
+"""
+function _backend_env_available(key::String)
+    raw = lowercase(strip(get(ENV, key, "")))
+    isempty(raw) && return nothing
+    if raw in ("1", "true", "yes", "on")
+        return true
+    end
+    if raw in ("0", "false", "no", "off")
+        return false
+    end
+    nothing
+end
+
+"""
+    _backend_env_count(available_key::String, count_key::String) -> Union{Int, Nothing}
+
+Read a backend device-count override from environment.
+Returns `nothing` when no count override is configured.
+"""
+function _backend_env_count(available_key::String, count_key::String)
+    forced_available = _backend_env_available(available_key)
+    forced_available === false && return 0
+    raw = strip(get(ENV, count_key, ""))
+    isempty(raw) && return nothing
+    parsed = tryparse(Int, raw)
+    parsed === nothing && return nothing
+    max(parsed, 0)
+end
+
+function _accelerator_env_flag(key::String)
+    forced = _backend_env_available(key)
+    forced === nothing ? false : forced
+end
+
+function _accelerator_env_count(available_key::String, count_key::String)
+    forced_count = _backend_env_count(available_key, count_key)
+    forced_count !== nothing && return forced_count
+    _accelerator_env_flag(available_key) || return 0
+    1
+end
+
+"""
+    tpu_available() -> Bool
+
+Check if TPU backend is available.
+"""
+tpu_available() = _accelerator_env_flag("AXIOM_TPU_AVAILABLE")
+
+"""
+    npu_available() -> Bool
+
+Check if NPU backend is available.
+"""
+npu_available() = _accelerator_env_flag("AXIOM_NPU_AVAILABLE")
+
+"""
+    dsp_available() -> Bool
+
+Check if DSP backend is available.
+"""
+dsp_available() = _accelerator_env_flag("AXIOM_DSP_AVAILABLE")
+
+"""
+    fpga_available() -> Bool
+
+Check if FPGA backend is available.
+"""
+fpga_available() = _accelerator_env_flag("AXIOM_FPGA_AVAILABLE")
+
+"""
+    tpu_device_count() -> Int
+
+Get number of available TPU devices.
+"""
+tpu_device_count() = _accelerator_env_count("AXIOM_TPU_AVAILABLE", "AXIOM_TPU_DEVICE_COUNT")
+
+"""
+    npu_device_count() -> Int
+
+Get number of available NPU devices.
+"""
+npu_device_count() = _accelerator_env_count("AXIOM_NPU_AVAILABLE", "AXIOM_NPU_DEVICE_COUNT")
+
+"""
+    dsp_device_count() -> Int
+
+Get number of available DSP devices.
+"""
+dsp_device_count() = _accelerator_env_count("AXIOM_DSP_AVAILABLE", "AXIOM_DSP_DEVICE_COUNT")
+
+"""
+    fpga_device_count() -> Int
+
+Get number of available FPGA devices.
+"""
+fpga_device_count() = _accelerator_env_count("AXIOM_FPGA_AVAILABLE", "AXIOM_FPGA_DEVICE_COUNT")
+
+"""
+    detect_coprocessor() -> Union{AbstractBackend, Nothing}
+
+Auto-detect available non-GPU coprocessor backend.
+"""
+function detect_coprocessor()
+    if tpu_available() && tpu_device_count() > 0
+        return TPUBackend(0)
+    end
+    if npu_available() && npu_device_count() > 0
+        return NPUBackend(0)
+    end
+    if fpga_available() && fpga_device_count() > 0
+        return FPGABackend(0)
+    end
+    if dsp_available() && dsp_device_count() > 0
+        return DSPBackend(0)
+    end
+    nothing
+end
+
+"""
+    detect_accelerator() -> Union{AbstractBackend, Nothing}
+
+Auto-detect GPU first, then non-GPU coprocessor backends.
+"""
+function detect_accelerator()
+    if isdefined(@__MODULE__, :detect_gpu)
+        gpu_backend = detect_gpu()
+        gpu_backend !== nothing && return gpu_backend
+    end
+    detect_coprocessor()
+end
+
+"""
+    select_device!(backend::Union{TPUBackend,NPUBackend,DSPBackend,FPGABackend}, device::Int)
+
+Return a backend handle for the selected coprocessor device.
+"""
+select_device!(::TPUBackend, device::Int) = TPUBackend(device)
+select_device!(::NPUBackend, device::Int) = NPUBackend(device)
+select_device!(::DSPBackend, device::Int) = DSPBackend(device)
+select_device!(::FPGABackend, device::Int) = FPGABackend(device)
 
 """
     RustCompiledModel
@@ -475,3 +679,26 @@ output_shape(gm::GPUCompiledModel, input_shape) = output_shape(gm.model, input_s
 # Type aliases for specific GPU backends
 const CUDACompiledModel = GPUCompiledModel{M, CUDABackend} where M
 const MetalCompiledModel = GPUCompiledModel{M, MetalBackend} where M
+
+"""
+    CoprocessorCompiledModel
+
+Wrapper for non-GPU accelerator backends (TPU/NPU/DSP/FPGA).
+"""
+struct CoprocessorCompiledModel{M, B <: AbstractBackend}
+    model::M
+    backend::B
+end
+
+function forward(cm::CoprocessorCompiledModel, x)
+    @debug "CoprocessorCompiledModel: executing on CPU (backend extension not loaded)"
+    forward(cm.model, x)
+end
+
+parameters(cm::CoprocessorCompiledModel) = parameters(cm.model)
+output_shape(cm::CoprocessorCompiledModel, input_shape) = output_shape(cm.model, input_shape)
+
+const TPUCompiledModel = CoprocessorCompiledModel{M, TPUBackend} where M
+const NPUCompiledModel = CoprocessorCompiledModel{M, NPUBackend} where M
+const DSPCompiledModel = CoprocessorCompiledModel{M, DSPBackend} where M
+const FPGACompiledModel = CoprocessorCompiledModel{M, FPGABackend} where M

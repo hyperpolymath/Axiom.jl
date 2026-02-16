@@ -141,6 +141,7 @@ initialization, the forward pass function, and any `@ensure` checks.
 """
 function generate_axiom_code(name::Symbol, def::AxiomDefinition)
     layer_fields, layer_inits = _generate_layer_fields_and_inits(def)
+    persistent_layer_names = [field.args[1] for field in layer_fields]
     forward_body = _generate_forward_body(def)
     ensure_checks = _generate_ensure_checks(def)
 
@@ -151,7 +152,7 @@ function generate_axiom_code(name::Symbol, def::AxiomDefinition)
 
             function $(esc(name))()
                 $(layer_inits...)
-                new($([:($n) for (n, _) in def.layers if n != :output]...))
+                new($([:($n) for n in persistent_layer_names]...))
             end
         end
 
@@ -174,10 +175,23 @@ function _generate_layer_fields_and_inits(def::AxiomDefinition)
         # Skip 'output' as it's a computed value
         layer_name == :output && continue
 
-        push!(layer_fields, :($layer_name::Any))
-        push!(layer_inits, :($layer_name = $(esc(layer_expr))))
+        # Persist only constructor-safe expressions that do not depend on `input`.
+        if !is_pipeline_expr(layer_expr) && !_expr_mentions_symbol(layer_expr, :input)
+            push!(layer_fields, :($layer_name::Any))
+            push!(layer_inits, :($layer_name = $(esc(layer_expr))))
+        end
     end
     return layer_fields, layer_inits
+end
+
+function _expr_mentions_symbol(expr, sym::Symbol)
+    if expr isa Symbol
+        return expr == sym
+    elseif expr isa Expr
+        return any(arg -> _expr_mentions_symbol(arg, sym), expr.args)
+    else
+        return false
+    end
 end
 
 function _generate_forward_body(def::AxiomDefinition)

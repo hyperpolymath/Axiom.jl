@@ -65,6 +65,7 @@ using LinearAlgebra
 using Random
 using Statistics
 using Dates
+using HTTP
 using SHA
 using JSON
 
@@ -83,7 +84,7 @@ include("layers/pooling.jl")
 # DSL macros
 include("dsl/axiom_macro.jl")
 include("dsl/ensure.jl")
-# TODO: prove.jl requires SMTLib (weak dependency) - move to extension
+# `@prove` degrades gracefully when SMT extension is unavailable.
 include("dsl/prove.jl")
 include("dsl/pipeline.jl")
 
@@ -118,8 +119,11 @@ include("model_metadata.jl")
 include("utils/initialization.jl")
 include("utils/data.jl")
 
+# API serving
+include("serving/api.jl")
+
 # Integrations
-# (HuggingFace integration removed - planned for future development)
+# (HuggingFace integration tracked in roadmap commitments)
 
 # Re-exports for user convenience
 export @axiom, @ensure
@@ -152,17 +156,34 @@ export mse_loss, crossentropy, binary_crossentropy
 # Training
 export train!, compile, verify
 
+# Backends
+export AbstractBackend, JuliaBackend, RustBackend
+export CUDABackend, ROCmBackend, MetalBackend
+export TPUBackend, NPUBackend, DSPBackend, FPGABackend
+export current_backend, set_backend!, @with_backend
+export detect_gpu, detect_coprocessor, detect_accelerator
+export cuda_available, rocm_available, metal_available
+export tpu_available, npu_available, dsp_available, fpga_available
+export tpu_device_count, npu_device_count, dsp_device_count, fpga_device_count
+export select_device!
+
 # Data utilities
 export DataLoader, train_test_split, one_hot
+export make_moons, make_blobs
+
+# API serving
+export serve_rest, serve_graphql, graphql_execute
+export generate_grpc_proto, grpc_predict, grpc_health, grpc_support_status
 
 # Verification
-export ValidProbabilities, FiniteOutput, check
+export ValidProbabilities, FiniteOutput, NoNaN, NoInf, check
 export EnsureViolation
 export ProofCertificate, serialize_proof, deserialize_proof
 export export_proof_certificate, import_proof_certificate, verify_proof_certificate
+export VerificationResult, generate_certificate, save_certificate, load_certificate, verify_certificate
 
 # Interop
-# (from_pytorch, to_onnx planned for future development)
+# (`from_pytorch` / `to_onnx` tracked in roadmap commitments)
 
 # Model metadata and packaging (issues #15, #16)
 export ModelMetadata, VerificationClaim
@@ -174,7 +195,7 @@ export export_lean, export_coq, export_isabelle
 export import_lean_certificate, import_coq_certificate, import_isabelle_certificate
 
 # Version info
-const VERSION = v"0.1.0"
+const VERSION = v"1.0.0"
 
 function __init__()
     # Check for Rust backend availability

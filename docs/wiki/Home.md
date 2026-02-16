@@ -7,11 +7,11 @@
 [![Julia](https://img.shields.io/badge/Julia-1.9+-purple.svg)](https://julialang.org/)
 [![Rust](https://img.shields.io/badge/Rust-Backend-orange.svg)](https://www.rust-lang.org/)
 [![Zig](https://img.shields.io/badge/Zig-Backend-yellow.svg)](https://ziglang.org/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-PMPL--1.0-blue.svg)](../../LICENSE)
 
 **The ML framework where bugs are caught before runtime, not after deployment.**
 
-[Quick Start](#-quick-start) | [Why Axiom?](#-why-axiom) | [Vision](Vision.md) | [Roadmap](Roadmap-TODOs.md) | [API Reference](../api/README.md)
+[Quick Start](#-quick-start) | [User Guide](User-Guide.md) | [Developer Guide](Developer-Guide.md) | [Release Checklist](../../RELEASE-CHECKLIST.adoc) | [Vision](Vision.md) | [Roadmap](../../ROADMAP.md) | [API Reference](API-Reference.md)
 
 </div>
 
@@ -105,19 +105,21 @@ output = model(randn(Float32, 32, 784))
 @ensure all(sum(output, dims=2) .≈ 1.0)
 ```
 
-### From PyTorch (60 seconds)
+### Verification-First Workflow (60 seconds)
 
 ```julia
 using Axiom
 
-# Load any PyTorch model
-model = from_pytorch("my_model.pth")
+# Define and verify a model
+model = Sequential(
+    Dense(784, 128, relu),
+    Dense(128, 10),
+    Softmax()
+)
 
-# Get 2-3x speedup immediately
-output = model(input)  # Uses Rust backend
-
-# Add verification
-result = verify(model, properties=[ValidProbabilities()])
+sample = Tensor(randn(Float32, 16, 784))
+batch = [(sample, nothing)]
+result = verify(model, properties=[ValidProbabilities(), FiniteOutput()], data=batch)
 ```
 
 ---
@@ -146,6 +148,9 @@ hardening). Most users can ignore it entirely.
 ## Documentation Map
 
 ### Getting Started
+- [User Guide](User-Guide.md) - Installation and day-1 workflows
+- [Developer Guide](Developer-Guide.md) - Local development, checks, release flow
+- [Release Checklist](../../RELEASE-CHECKLIST.adoc) - Pre-release and release-day checklist
 - [Vision & Philosophy](Vision.md) - Why Axiom.jl exists
 - [Tutorials](Tutorials.md) - From beginner to expert
 - [PyTorch Migration](Migration-Guide.md) - Coming from PyTorch?
