@@ -20,28 +20,24 @@ toc::[]
 Axiom.jl is a *next-generation ML framework* that combines:
 
 * *Compile-time verification* - Shape errors caught before runtime
-* *Formal guarantees* - Mathematical proofs about model behavior
-* *High performance* - Rust backend for production speed
+* *Formal guarantees* - Verification checks and certificate workflows
+* *Optional acceleration* - Rust/GPU backend paths with explicit fallback behavior
 * *Julia elegance* - Express models as mathematical specifications
 
 [source,julia]
 ----
 using Axiom
 
-@axiom ImageClassifier begin
-    input :: Image(224, 224, 3)
-    output :: Probabilities(1000)
+model = Sequential(
+    Dense(784, 128, relu),
+    Dense(128, 10),
+    Softmax()
+)
 
-    features = input |> ResNet50(pretrained=true) |> GlobalAvgPool()
-    output = features |> Dense(2048, 1000) |> Softmax
-
-    # GUARANTEED at compile time
-    @ensure sum(output) ≈ 1.0
-    @ensure all(output .>= 0)
-end
-
-model = ImageClassifier()
-predictions = model(images)  # Type-safe, verified, fast
+x = Tensor(randn(Float32, 16, 784))
+y = model(x)
+result = verify(model, properties=[ValidProbabilities(), FiniteOutput()], data=[(x, nothing)])
+@assert result.passed
 ----
 
 == Features
@@ -68,7 +64,7 @@ end
 @axiom SafeClassifier begin
     # ...
     @ensure valid_probabilities(output)    # Runtime assertion
-    @prove ∀x. sum(softmax(x)) == 1.0      # Mathematical proof
+    @prove ∀x. sum(softmax(x)) == 1.0      # Experimental proof workflow
 end
 
 # Generate verification certificates
@@ -96,7 +92,7 @@ PyTorch/ONNX import paths are tracked as future work and are not yet a stable pu
 # Development: Julia backend
 model = Sequential(Dense(784, 128, relu), Dense(128, 10))
 
-# Production: Rust backend (2-3x faster)
+# Production path: optional Rust backend
 prod_model = compile(model, backend=RustBackend("/path/to/libaxiom_core.so"), optimize=:aggressive)
 ----
 
@@ -210,11 +206,11 @@ Axiom.jl catches bugs *before* they cause harm:
 
 | Invalid probabilities
 | Undetected
-| Guaranteed impossible
+| Checkable with verification properties
 
 | Adversarial fragility
 | Unknown
-| Certifiable bounds
+| Roadmap / partial
 |===
 
 == Documentation

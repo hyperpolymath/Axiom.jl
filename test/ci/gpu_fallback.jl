@@ -28,6 +28,8 @@ function with_env(overrides::Dict{String, String}, f::Function)
     end
 end
 
+with_env(f::Function, overrides::Dict{String, String}) = with_env(overrides, f)
+
 @testset "GPU fallback behavior (no hardware/extension)" begin
     with_env(Dict(
         "AXIOM_CUDA_AVAILABLE" => "0",
@@ -45,8 +47,8 @@ end
         @test !cuda_available()
         @test !rocm_available()
         @test !metal_available()
-        @test cuda_device_count() == 0
-        @test rocm_device_count() == 0
+        @test Axiom.cuda_device_count() == 0
+        @test Axiom.rocm_device_count() == 0
         @test detect_gpu() === nothing
 
         @test compile(model, backend = CUDABackend(0), verify = false, optimize = :none) === model

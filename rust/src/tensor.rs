@@ -1,6 +1,6 @@
 //! Tensor types and operations
 
-use ndarray::{Array, ArrayD, IxDyn, Dimension};
+use ndarray::{ArrayD, IxDyn};
 use std::sync::Arc;
 
 /// A multi-dimensional tensor
@@ -11,7 +11,7 @@ pub struct Tensor<T> {
     grad: Option<Arc<Tensor<T>>>,
 }
 
-impl<T: Clone + Default + num_traits::Zero> Tensor<T> {
+impl<T: Clone + num_traits::Zero> Tensor<T> {
     /// Create a new tensor from shape
     pub fn zeros(shape: &[usize]) -> Self {
         Self {
@@ -20,7 +20,9 @@ impl<T: Clone + Default + num_traits::Zero> Tensor<T> {
             grad: None,
         }
     }
+}
 
+impl<T: Clone> Tensor<T> {
     /// Create tensor from ndarray
     pub fn from_array(data: ArrayD<T>) -> Self {
         Self {

@@ -17,12 +17,26 @@ Current focus is stabilization: production-grade build/test/runtime reliability,
 - [ ] Harden verification/certificate workflows for repeatable CI and artifact integrity.
 - [ ] Keep README/wiki claims aligned with tested behavior.
 
+Must execution order (sorted):
+1. Backend parity/reliability (CPU + Rust + GPU extensions) - In progress.
+2. Verification/certificate workflow hardening - In progress.
+3. README/wiki claim alignment sweep - In progress.
+
 Must completion gates:
 - [ ] Core-op parity tests pass on CPU Julia and Rust backend (matmul, dense, conv, normalization, activations) with documented tolerance budgets.
 - [ ] GPU extension paths (CUDA/ROCm/Metal) have deterministic CI jobs where hardware is available, and explicit fallback-behavior tests where it is not.
 - [ ] `instantiate/build/precompile/test` succeeds in CI on supported Julia versions without manual steps.
 - [ ] Runtime smoke tests for documented examples pass on CPU and at least one accelerated backend.
 - [ ] No unresolved `TODO`/`FIXME`/`TBD` markers in `src`, `ext`, and `test` for release-scoped areas.
+- [ ] README/wiki claims are audited against implemented APIs and CI-tested behavior, with roadmap links for deferred features.
+
+Must progress snapshot (2026-02-16):
+- [x] CI workflow now runs explicit `instantiate/build/precompile/test` steps across supported Julia versions.
+- [x] Added backend parity script with documented tolerance budgets: `test/ci/backend_parity.jl`.
+- [x] Added runtime smoke checks for CPU and accelerated paths: `test/ci/runtime_smoke.jl`.
+- [x] Added deterministic GPU fallback checks and optional hardware smoke jobs: `test/ci/gpu_fallback.jl`, `test/ci/gpu_hardware_smoke.jl`.
+- [x] Added certificate integrity CI checks and digest-report artifacts: `test/ci/certificate_integrity.jl`, `.github/workflows/verify-certificates.yml`.
+- [x] Added consolidated readiness gate script for local/CI release checks: `scripts/readiness-check.sh`.
 
 ### Should
 - [ ] Improve performance benchmarking and regression tracking across backends.

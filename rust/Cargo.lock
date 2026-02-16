@@ -73,6 +73,7 @@ dependencies = [
  "ndarray",
  "ndarray-linalg",
  "ndarray-rand",
+ "num-traits",
  "packed_simd_2",
  "rand",
  "rayon",

@@ -36,7 +36,7 @@ jobs:
           julia --project=benchmark benchmark/benchmarks.jl > benchmark_results.txt
 
       - name: Upload Julia results
-        uses: actions/upload-artifact@8a4e4a4e1b6c2a8c8e8d4e5f6a7b8c9d # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: julia-benchmark-results
           path: |
@@ -69,7 +69,7 @@ jobs:
         run: cargo bench --bench backend_benchmarks | tee ../rust_bench_results.txt
 
       - name: Upload Rust results
-        uses: actions/upload-artifact@8a4e4a4e1b6c2a8c8e8d4e5f6a7b8c9d # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: rust-benchmark-results
           path: |
@@ -85,13 +85,13 @@ jobs:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
 
       - name: Download Julia results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: julia-benchmark-results
           path: benchmark/
 
       - name: Download Rust results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: rust-benchmark-results
           path: rust/target/criterion/

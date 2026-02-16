@@ -14,6 +14,7 @@ crate-type = ["cdylib", "rlib"]
 # Linear algebra
 ndarray = { version = "0.15", features = ["rayon"] }
 ndarray-rand = "0.14"
+num-traits = "0.2"
 blas-src = { version = "0.9", features = ["openblas"] }
 ndarray-linalg = { version = "0.16", features = ["openblas-system"] }
 

@@ -25,13 +25,67 @@ Run the full baseline pipeline before merging:
 julia --project=. -e 'using Pkg; Pkg.build(); Pkg.precompile(); Pkg.test()'
 ```
 
+## One-Command Readiness Gate
+
+Run the consolidated release-readiness checks:
+
+```bash
+./scripts/readiness-check.sh
+```
+
+Useful toggles:
+
+- `AXIOM_READINESS_RUN_RUST=0` disables Rust parity/smoke checks.
+- `AXIOM_READINESS_ALLOW_SKIPS=1` allows skipped checks without failing the run.
+- `JULIA_BIN=/path/to/julia` selects a specific Julia binary.
+
 ## Runtime Smoke Tests
 
 Run quick runtime checks after unit tests:
 
 ```bash
-julia --project=. -e 'using Axiom; model=Sequential(Dense(10,5,relu),Dense(5,3),Softmax()); x=Tensor(randn(Float32,2,10)); y=model(x); @assert size(y.data)==(2,3); result=verify(model, properties=[ValidProbabilities(), FiniteOutput()], data=[(x,nothing)]); @assert result.passed'
-julia --project=. examples/mnist.jl
+julia --project=. test/ci/runtime_smoke.jl
+```
+
+## Backend Parity (CPU vs Rust)
+
+Run parity checks when Rust backend is available:
+
+```bash
+cargo build --release --manifest-path rust/Cargo.toml
+AXIOM_RUST_LIB=$PWD/rust/target/release/libaxiom_core.so julia --project=. test/ci/backend_parity.jl
+```
+
+Tolerance budgets used by CI parity checks:
+
+- `matmul`: `atol=1e-4`, `rtol=1e-4`
+- `dense`: `atol=1e-4`, `rtol=1e-4`
+- `conv2d`: `atol=2e-4`, `rtol=2e-4`
+- `normalization`: `atol=1e-4`, `rtol=1e-4`
+- `activations`: `atol=1e-5`, `rtol=1e-5`
+
+## GPU Fallback and Hardware Smoke
+
+Run explicit fallback checks (no GPU required):
+
+```bash
+julia --project=. test/ci/gpu_fallback.jl
+```
+
+Run hardware smoke checks on GPU runners:
+
+```bash
+AXIOM_GPU_BACKEND=cuda AXIOM_GPU_REQUIRED=1 julia --project=. test/ci/gpu_hardware_smoke.jl
+AXIOM_GPU_BACKEND=rocm AXIOM_GPU_REQUIRED=1 julia --project=. test/ci/gpu_hardware_smoke.jl
+AXIOM_GPU_BACKEND=metal AXIOM_GPU_REQUIRED=1 julia --project=. test/ci/gpu_hardware_smoke.jl
+```
+
+## Certificate Integrity Checks
+
+Run certificate reproducibility and tamper-detection checks:
+
+```bash
+julia --project=. test/ci/certificate_integrity.jl
 ```
 
 ## Quality Gates
@@ -39,7 +93,7 @@ julia --project=. examples/mnist.jl
 Use these checks to keep production paths clean:
 
 ```bash
-rg -n "OPEN_ITEM|FIX_ITEM|XXX|HACK" src test ext docs/wiki examples
+rg -n "TODO|FIXME|TBD|OPEN_ITEM|FIX_ITEM|XXX|HACK" src test ext
 ```
 
 If a marker is required (for templates or roadmap planning), keep it out of production code paths (`src`, `ext`, `test`) and explain it in review notes.
@@ -58,5 +112,6 @@ If a marker is required (for templates or roadmap planning), keep it out of prod
 1. `Pkg.build`, `Pkg.precompile`, and `Pkg.test` pass on a clean environment.
 2. Runtime smoke checks pass.
 3. No unresolved production work-marker markers in `src`, `ext`, or `test`.
-4. README/wiki claims are aligned with actual implementation status.
-5. Version metadata is consistent (`Project.toml` and `Axiom.VERSION`).
+4. CPU vs Rust parity and certificate integrity CI checks pass.
+5. README/wiki claims are aligned with actual implementation status.
+6. Version metadata is consistent (`Project.toml` and `Axiom.VERSION`).
