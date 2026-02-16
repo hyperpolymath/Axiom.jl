@@ -29,12 +29,20 @@ struct RustBackend <: AbstractBackend
 end
 
 """
-    GPUBackend
+    CUDABackend
 
-GPU acceleration via either CUDA or Metal.
+GPU acceleration via CUDA (NVIDIA).
 """
-struct GPUBackend <: AbstractBackend
-    type::Symbol  # :cuda or :metal
+struct CUDABackend <: AbstractBackend
+    device::Int
+end
+
+"""
+    MetalBackend
+
+GPU acceleration via Metal (Apple Silicon).
+"""
+struct MetalBackend <: AbstractBackend
     device::Int
 end
 
@@ -126,13 +134,12 @@ backend_softmax(::JuliaBackend, x, dim) = softmax(x, dims=dim)
 """
     CompilationTarget
 
-Target platform for model compilation.
+Target configuration for model compilation.
 """
 struct CompilationTarget
     backend::AbstractBackend
     optimize::Symbol  # :none, :default, :aggressive
     precision::Symbol  # :float32, :float16, :mixed
-    target_device::Symbol  # :cpu, :gpu, :tpu
 end
 
 """
@@ -156,7 +163,7 @@ function compile(
     precision::Symbol = :float32,
     verify::Bool = true
 )
-    target = CompilationTarget(backend, optimize, precision, :cpu)
+    target = CompilationTarget(backend, optimize, precision)
 
     # Verify model before compilation
     if verify
@@ -319,28 +326,9 @@ end
 parameters(mp::MixedPrecisionWrapper) = parameters(mp.model)
 output_shape(mp::MixedPrecisionWrapper, input_shape) = output_shape(mp.model, input_shape)
 
-# ============================================================================
-# Unified Compiled Model
-# ============================================================================
-
-"""
-    CompiledModel{M, B<:AbstractBackend}
-
-Generic compiled model wrapper that dispatches operations to the appropriate backend.
-"""
-struct CompiledModel{M, B<:AbstractBackend}
-    model::M
-    backend::B
-    extra::Any  # Backend-specific data (e.g., library handles, device contexts)
-end
-
-"""
-    compile_to_backend(model, backend)
-
-Compile model for specific backend.
-"""
 function compile_to_backend(model, backend::JuliaBackend)
-    CompiledModel(model, backend, nothing)
+    # Julia backend - just return the model
+    model
 end
 
 function compile_to_backend(model, backend::RustBackend)
@@ -349,112 +337,38 @@ function compile_to_backend(model, backend::RustBackend)
     # Verify Rust library exists
     if !isfile(backend.lib_path)
         @warn "Rust library not found at $(backend.lib_path), falling back to Julia backend"
-        return CompiledModel(model, JuliaBackend(), nothing)
+        return model
     end
 
-    # Load the Rust shared library
-    lib_handle = try
-        Libdl.dlopen(backend.lib_path)
-    catch e
-        @warn "Failed to load Rust library: $e"
-        Ptr{Nothing}()
+    # Wrap model for Rust execution
+    RustCompiledModel(model, backend)
+end
+
+function compile_to_backend(model, backend::CUDABackend)
+    @info "Compiling to CUDA backend on device $(backend.device)..."
+
+    # Check CUDA availability
+    if !cuda_available()
+        @warn "CUDA not available, falling back to Julia backend"
+        return model
     end
 
-    CompiledModel(model, backend, lib_handle)
+    # Wrap model for CUDA execution
+    CUDACompiledModel(model, backend)
 end
 
-function compile_to_backend(model, backend::GPUBackend)
-    @info "Compiling to $(backend.type) backend on device $(backend.device)..."
+function compile_to_backend(model, backend::MetalBackend)
+    @info "Compiling to Metal backend on device $(backend.device)..."
 
-    # Check GPU availability based on backend type
-    available = if backend.type === :cuda
-        cuda_available()
-    elseif backend.type === :metal
-        metal_available()
-    else
-        false
+    # Check Metal availability
+    if !metal_available()
+        @warn "Metal not available, falling back to Julia backend"
+        return model
     end
 
-    if !available
-        @warn "$(backend.type) not available, falling back to Julia backend"
-        return CompiledModel(model, JuliaBackend(), nothing)
-    end
-
-    # For now, return wrapper that will execute on CPU with warning
-    # In full implementation, would set up GPU context here
-    CompiledModel(model, backend, nothing)
+    # Wrap model for Metal execution
+    MetalCompiledModel(model, backend)
 end
-
-"""
-    forward(cm::CompiledModel, x)
-
-Execute forward pass on compiled model.
-"""
-function forward(cm::CompiledModel, x)
-    backend_forward(cm.backend, cm.model, x, cm.extra)
-end
-
-"""
-    backend_forward(backend, model, input, extra)
-
-Dispatch forward operation to appropriate backend implementation.
-"""
-function backend_forward end
-
-# Default backend_forward (Julia and fallback cases)
-function backend_forward(::Union{JuliaBackend, Type{<:Union{}}}, model, x, ::Nothing)
-    forward(model, x)
-end
-
-# Rust backend implementation
-function backend_forward(::RustBackend, model, x, lib_handle::Ptr{Nothing})
-    if lib_handle == C_NULL
-        # Fallback to Julia if library not loaded
-        return forward(model, x)
-    end
-
-    # Dispatch to Rust backend based on layer type
-    rust_forward(model, x, lib_handle)
-end
-
-# GPU backend implementation (currently falls back to CPU)
-function backend_forward(backend::GPUBackend, model, x, ::Nothing)
-    @debug "GPU backend $(backend.type) executing on CPU (GPU runtime not loaded)"
-    forward(model, x)
-end
-
-"""
-    rust_forward(model, x, lib_handle)
-
-Default Rust implementation (fallback to Julia).
-"""
-function rust_forward(model, x, lib_handle)
-    # Default: fall back to Julia for unsupported layers
-    forward(model, x)
-end
-
-"""
-    rust_forward(model::Dense, x, lib_handle)
-
-Rust implementation for Dense layer.
-"""
-function rust_forward(model::Dense, x, lib_handle)
-    matmul_fn = Libdl.dlsym(lib_handle, :axiom_matmul; throw_error=false)
-    if matmul_fn != C_NULL
-        # Would call: ccall(matmul_fn, ...)
-        # For now, fall back to Julia
-        forward(model, x)
-    else
-        forward(model, x)
-    end
-end
-
-parameters(cm::CompiledModel) = parameters(cm.model)
-output_shape(cm::CompiledModel, input_shape) = output_shape(cm.model, input_shape)
-
-# ============================================================================
-# Helper Functions
-# ============================================================================
 
 """
 Check if CUDA is available.
@@ -480,3 +394,84 @@ function metal_available()
         false
     end
 end
+
+"""
+    RustCompiledModel
+
+Model wrapper that dispatches operations to Rust backend.
+"""
+struct RustCompiledModel{M}
+    model::M
+    backend::RustBackend
+    lib_handle::Ptr{Nothing}
+end
+
+function RustCompiledModel(model, backend::RustBackend)
+    # Load the Rust shared library
+    lib_handle = try
+        Libdl.dlopen(backend.lib_path)
+    catch e
+        @warn "Failed to load Rust library: $e"
+        Ptr{Nothing}()
+    end
+
+    RustCompiledModel(model, backend, lib_handle)
+end
+
+function forward(rm::RustCompiledModel, x)
+    if rm.lib_handle == Ptr{Nothing}()
+        # Fallback to Julia implementation
+        return forward(rm.model, x)
+    end
+
+    # Dispatch to Rust backend based on layer type
+    rust_forward(rm.model, x, rm.lib_handle)
+end
+
+function rust_forward(model, x, lib_handle)
+    # Default: fall back to Julia for unsupported layers
+    forward(model, x)
+end
+
+function rust_forward(model::Dense, x, lib_handle)
+    # Call Rust matmul if available
+    matmul_fn = Libdl.dlsym(lib_handle, :axiom_matmul; throw_error=false)
+    if matmul_fn != C_NULL
+        # Would call: ccall(matmul_fn, ...)
+        # For now, fall back to Julia
+        forward(model, x)
+    else
+        forward(model, x)
+    end
+end
+
+parameters(rm::RustCompiledModel) = parameters(rm.model)
+output_shape(rm::RustCompiledModel, input_shape) = output_shape(rm.model, input_shape)
+
+"""
+    GPUCompiledModel
+
+Base wrapper for GPU-accelerated models (CUDA/Metal).
+"""
+struct GPUCompiledModel{M, B <: AbstractBackend}
+    model::M
+    backend::B
+end
+
+function forward(gm::GPUCompiledModel, x)
+    # In a full implementation, this would:
+    # 1. Transfer x to GPU
+    # 2. Execute forward pass on GPU
+    # 3. Transfer result back
+
+    # For now, fall back to Julia with a log message
+    @debug "GPUCompiledModel: executing on CPU (GPU backend not loaded)"
+    forward(gm.model, x)
+end
+
+parameters(gm::GPUCompiledModel) = parameters(gm.model)
+output_shape(gm::GPUCompiledModel, input_shape) = output_shape(gm.model, input_shape)
+
+# Type aliases for specific GPU backends
+const CUDACompiledModel = GPUCompiledModel{M, CUDABackend} where M
+const MetalCompiledModel = GPUCompiledModel{M, MetalBackend} where M
