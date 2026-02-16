@@ -24,6 +24,8 @@ RUN_RUST="${AXIOM_READINESS_RUN_RUST:-auto}"
 RUN_BASELINE="${AXIOM_READINESS_RUN_BASELINE:-1}"
 RUN_RUNTIME="${AXIOM_READINESS_RUN_RUNTIME:-1}"
 RUN_GPU_FALLBACK="${AXIOM_READINESS_RUN_GPU_FALLBACK:-1}"
+RUN_COPROCESSOR="${AXIOM_READINESS_RUN_COPROCESSOR:-1}"
+RUN_INTEROP="${AXIOM_READINESS_RUN_INTEROP:-1}"
 RUN_CERTIFICATE="${AXIOM_READINESS_RUN_CERTIFICATE:-1}"
 RUN_DOC_ALIGNMENT="${AXIOM_READINESS_RUN_DOC_ALIGNMENT:-1}"
 RUN_MARKERS="${AXIOM_READINESS_RUN_MARKERS:-1}"
@@ -76,7 +78,7 @@ check_dependencies() {
 
 check_markers() {
   local markers
-  markers="$(rg -n "TODO|FIXME|TBD|OPEN_ITEM|FIX_ITEM|HACK|XXX" src ext test || true)"
+  markers="$(rg -n "TO[D]O|FIXM[E]|TB[D]|OPEN_ITEM|FIX_ITEM|HACK|XXX" src ext test || true)"
   if [ -n "$markers" ]; then
     echo "$markers"
     return 1
@@ -87,8 +89,13 @@ check_markers() {
 check_doc_alignment() {
   local status=0
 
-  if ! rg -Fq "PyTorch/ONNX import paths are tracked as future work" README.adoc; then
-    echo "README.adoc is missing the deferred import/export disclaimer."
+  if ! rg -Fq 'model = from_pytorch("model.pt")' README.adoc; then
+    echo "README.adoc is missing the direct checkpoint `from_pytorch(\"model.pt\")` example."
+    status=1
+  fi
+
+  if ! rg -Fq "application/grpc+json" README.adoc; then
+    echo "README.adoc is missing gRPC bridge content-type coverage notes."
     status=1
   fi
 
@@ -102,13 +109,23 @@ check_doc_alignment() {
     status=1
   fi
 
-  if ! rg -Fq '`from_pytorch(...)` model import | Planned' docs/wiki/Roadmap-Commitments.md; then
-    echo "docs/wiki/Roadmap-Commitments.md is missing planned status for from_pytorch."
+  if ! rg -Fq '`from_pytorch(...)` model import | Baseline shipped' docs/wiki/Roadmap-Commitments.md; then
+    echo "docs/wiki/Roadmap-Commitments.md is missing baseline-shipped status for from_pytorch."
     status=1
   fi
 
-  if ! rg -Fq '`to_onnx(...)` export | Planned' docs/wiki/Roadmap-Commitments.md; then
-    echo "docs/wiki/Roadmap-Commitments.md is missing planned status for to_onnx."
+  if ! rg -Fq '`to_onnx(...)` export | Baseline shipped' docs/wiki/Roadmap-Commitments.md; then
+    echo "docs/wiki/Roadmap-Commitments.md is missing baseline-shipped status for to_onnx."
+    status=1
+  fi
+
+  if ! rg -Fq "test/ci/coprocessor_strategy.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing coprocessor strategy test guidance."
+    status=1
+  fi
+
+  if ! rg -Fq 'model = from_pytorch("model.pt")' docs/wiki/User-Guide.md; then
+    echo "docs/wiki/User-Guide.md is missing direct checkpoint import guidance."
     status=1
   fi
 
@@ -216,6 +233,18 @@ run() {
     record_skip "GPU fallback behavior (disabled)"
   fi
 
+  if [ "$RUN_COPROCESSOR" = "1" ]; then
+    run_check "coprocessor strategy behavior" "$JULIA_BIN" --project=. test/ci/coprocessor_strategy.jl
+  else
+    record_skip "coprocessor strategy behavior (disabled)"
+  fi
+
+  if [ "$RUN_INTEROP" = "1" ]; then
+    run_check "interop smoke (from_pytorch/to_onnx)" "$JULIA_BIN" --project=. test/ci/interop_smoke.jl
+  else
+    record_skip "interop smoke (disabled)"
+  fi
+
   if [ "$RUN_CERTIFICATE" = "1" ]; then
     run_check "certificate integrity" "$JULIA_BIN" --project=. test/ci/certificate_integrity.jl
   else
@@ -229,9 +258,9 @@ run() {
   fi
 
   if [ "$RUN_DOC_ALIGNMENT" = "1" ]; then
-    run_check "README/roadmap deferred-commitment alignment" check_doc_alignment
+    run_check "README/wiki roadmap alignment" check_doc_alignment
   else
-    record_skip "README/roadmap deferred-commitment alignment (disabled)"
+    record_skip "README/wiki roadmap alignment (disabled)"
   fi
 
   if should_run_rust_checks; then

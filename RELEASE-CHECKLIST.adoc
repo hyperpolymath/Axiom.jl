@@ -62,7 +62,7 @@ rg -n "OPEN_ITEM|FIX_ITEM|XXX|HACK" src test ext
 
 [source,bash]
 ----
-rg -n "TODO|FIXME|TBD" .
+rg -n "TO[D]O|FIXM[E]|TB[D]" .
 ----
 
 == 4. Documentation and Promise Alignment

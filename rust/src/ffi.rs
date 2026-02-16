@@ -3,8 +3,7 @@
 //! These functions are called from Julia via ccall.
 
 use crate::ops::{matmul, activations, conv, pool, norm};
-use crate::tensor::{tensor_from_ptr, tensor_to_ptr, Tensor};
-use ndarray::{ArrayD, Array2, Array4, IxDyn, ArrayView2, ArrayView4};
+use ndarray::{ArrayD, IxDyn, ArrayView2, ArrayView4};
 use std::ffi::{CStr, CString};
 use std::process::{Command, Stdio};
 use std::slice;

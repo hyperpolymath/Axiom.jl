@@ -32,8 +32,11 @@ Pkg.add("Axiom")
 ```julia
 using Axiom
 
-# Load any PyTorch model
-model = from_pytorch("my_model.pth")
+# Load a checkpoint directly (requires python3 + torch)
+model = from_pytorch("my_model.pt")
+
+# Or load an exported canonical descriptor
+model = from_pytorch("my_model.pytorch.json")
 
 # That's it! Now using Axiom.jl
 output = model(input)
@@ -54,7 +57,7 @@ println(result)  # ✓ PASSED
 
 ```julia
 # Just load and use
-model = from_pytorch("model.pth")
+model = from_pytorch("model.pt")
 output = model(input)
 ```
 
@@ -64,7 +67,7 @@ output = model(input)
 
 ```julia
 # Load model
-model = from_pytorch("model.pth")
+model = from_pytorch("model.pytorch.json")
 
 # Add verification
 verified_model = @axiom VerifiedModel begin
@@ -337,15 +340,15 @@ end
 
 ## Loading Pre-trained Models
 
-### From .pth File
+### From exported descriptor JSON
 
 ```julia
-# Load state dict
-model = from_pytorch("resnet50.pth")
-
-# Load full model
-model = from_pytorch("model.pt", type=:full)
+# Canonical descriptor format
+model = from_pytorch("resnet50.pytorch.json")
 ```
+
+Direct `.pt/.pth/.ckpt` loading is supported through the built-in bridge script
+(`scripts/pytorch_to_axiom_descriptor.py`) and requires `python3` + `torch`.
 
 ### From Hugging Face
 
@@ -424,7 +427,7 @@ After migration, you get verification for free:
 
 ```julia
 # Verify your migrated model
-model = from_pytorch("model.pth")
+model = from_pytorch("model.pytorch.json")
 
 result = verify(model,
     properties = [
@@ -447,7 +450,7 @@ After migration, you can compile for production:
 
 ```julia
 # Development (Julia backend)
-dev_model = from_pytorch("model.pth")
+dev_model = from_pytorch("model.pytorch.json")
 
 # Production (Rust backend) - 2-3x faster
 prod_model = compile(dev_model, backend=:rust, optimize=:aggressive)

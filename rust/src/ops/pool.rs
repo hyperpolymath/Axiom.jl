@@ -1,6 +1,6 @@
 //! Pooling operations
 
-use ndarray::{Array4, ArrayView4, s};
+use ndarray::{Array4, ArrayView4};
 use rayon::prelude::*;
 
 /// 2D Max Pooling

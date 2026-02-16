@@ -30,6 +30,46 @@ end
 
 with_env(f::Function, overrides::Dict{String, String}) = with_env(overrides, f)
 
+const GPU_TEST_HOOKS = Dict{DataType, Dict{Symbol, Int}}(
+    Axiom.CUDABackend => Dict(:matmul => 0, :relu => 0, :softmax => 0),
+    Axiom.ROCmBackend => Dict(:matmul => 0, :relu => 0, :softmax => 0),
+    Axiom.MetalBackend => Dict(:matmul => 0, :relu => 0, :softmax => 0),
+)
+
+function reset_gpu_test_hooks!()
+    for counters in values(GPU_TEST_HOOKS)
+        counters[:matmul] = 0
+        counters[:relu] = 0
+        counters[:softmax] = 0
+    end
+end
+
+function Axiom.backend_gpu_matmul(
+    backend::Union{Axiom.CUDABackend, Axiom.ROCmBackend, Axiom.MetalBackend},
+    A::AbstractMatrix{Float32},
+    B::AbstractMatrix{Float32},
+)
+    GPU_TEST_HOOKS[typeof(backend)][:matmul] += 1
+    A * B
+end
+
+function Axiom.backend_gpu_relu(
+    backend::Union{Axiom.CUDABackend, Axiom.ROCmBackend, Axiom.MetalBackend},
+    x::AbstractArray{Float32},
+)
+    GPU_TEST_HOOKS[typeof(backend)][:relu] += 1
+    max.(x, 0f0)
+end
+
+function Axiom.backend_gpu_softmax(
+    backend::Union{Axiom.CUDABackend, Axiom.ROCmBackend, Axiom.MetalBackend},
+    x::AbstractArray{Float32},
+    dim::Int,
+)
+    GPU_TEST_HOOKS[typeof(backend)][:softmax] += 1
+    Axiom.softmax(x, dims=dim)
+end
+
 @testset "GPU fallback behavior (no hardware/extension)" begin
     with_env(Dict(
         "AXIOM_CUDA_AVAILABLE" => "0",
@@ -62,5 +102,35 @@ with_env(f::Function, overrides::Dict{String, String}) = with_env(overrides, f)
         @test isapprox(Axiom.backend_gpu_matmul(CUDABackend(0), A, B), cpu; atol = 1f-5, rtol = 1f-5)
         @test isapprox(Axiom.backend_gpu_matmul(ROCmBackend(0), A, B), cpu; atol = 1f-5, rtol = 1f-5)
         @test isapprox(Axiom.backend_gpu_matmul(MetalBackend(0), A, B), cpu; atol = 1f-5, rtol = 1f-5)
+    end
+end
+
+@testset "GPU compiled model uses extension hooks when available" begin
+    with_env(Dict(
+        "AXIOM_CUDA_AVAILABLE" => "1",
+        "AXIOM_ROCM_AVAILABLE" => "1",
+        "AXIOM_METAL_AVAILABLE" => "1",
+        "AXIOM_CUDA_DEVICE_COUNT" => "1",
+        "AXIOM_ROCM_DEVICE_COUNT" => "1",
+    )) do
+        model = Sequential(
+            Dense(6, 4, relu),
+            Dense(4, 3),
+            Softmax()
+        )
+        x = Tensor(randn(Float32, 5, 6))
+        cpu = model(x).data
+
+        for backend in (CUDABackend(0), ROCmBackend(0), MetalBackend(0))
+            reset_gpu_test_hooks!()
+            compiled = compile(model, backend=backend, verify=false, optimize=:none)
+            @test compiled !== model
+            y = compiled(x).data
+            @test size(y) == size(cpu)
+            @test isapprox(y, cpu; atol = 1f-5, rtol = 1f-5)
+            @test GPU_TEST_HOOKS[typeof(backend)][:matmul] >= 2
+            @test GPU_TEST_HOOKS[typeof(backend)][:relu] >= 1
+            @test GPU_TEST_HOOKS[typeof(backend)][:softmax] >= 1
+        end
     end
 end

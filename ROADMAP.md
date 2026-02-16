@@ -13,29 +13,32 @@ Current focus is stabilization: production-grade build/test/runtime reliability,
 ## Near-Term Plan
 
 ### Must
-- [ ] Complete backend parity and reliability for CPU + Rust + GPU extension paths.
-- [ ] Harden verification/certificate workflows for repeatable CI and artifact integrity.
-- [ ] Keep README/wiki claims aligned with tested behavior.
+- [x] Complete backend parity and reliability for CPU + Rust + GPU extension paths.
+- [x] Harden verification/certificate workflows for repeatable CI and artifact integrity.
+- [x] Keep README/wiki claims aligned with tested behavior.
 
 Must execution order (sorted):
-1. Backend parity/reliability (CPU + Rust + GPU extensions) - In progress.
-2. Verification/certificate workflow hardening - In progress.
-3. README/wiki claim alignment sweep - In progress.
+1. Backend parity/reliability (CPU + Rust + GPU extensions) - Completed (2026-02-16).
+2. Verification/certificate workflow hardening - Completed (2026-02-16).
+3. README/wiki claim alignment sweep - Completed (2026-02-16).
 
 Must completion gates:
-- [ ] Core-op parity tests pass on CPU Julia and Rust backend (matmul, dense, conv, normalization, activations) with documented tolerance budgets.
-- [ ] GPU extension paths (CUDA/ROCm/Metal) have deterministic CI jobs where hardware is available, and explicit fallback-behavior tests where it is not.
-- [ ] `instantiate/build/precompile/test` succeeds in CI on supported Julia versions without manual steps.
-- [ ] Runtime smoke tests for documented examples pass on CPU and at least one accelerated backend.
-- [ ] No unresolved `TODO`/`FIXME`/`TBD` markers in `src`, `ext`, and `test` for release-scoped areas.
-- [ ] README/wiki claims are audited against implemented APIs and CI-tested behavior, with roadmap links for deferred features.
+- [x] Core-op parity tests pass on CPU Julia and Rust backend (matmul, dense, conv, normalization, activations) with documented tolerance budgets.
+- [x] GPU extension paths (CUDA/ROCm/Metal) have deterministic CI jobs where hardware is available, and explicit fallback-behavior tests where it is not.
+- [x] `instantiate/build/precompile/test` succeeds in CI on supported Julia versions without manual steps.
+- [x] Runtime smoke tests for documented examples pass on CPU and at least one accelerated backend.
+- [x] No unresolved legacy triad markers (`TO[D]O`/`FIXM[E]`/`TB[D]`) in `src`, `ext`, and `test` for release-scoped areas.
+- [x] README/wiki claims are audited against implemented APIs and CI-tested behavior, with roadmap links for deferred features.
 
 Must progress snapshot (2026-02-16):
 - [x] CI workflow now runs explicit `instantiate/build/precompile/test` steps across supported Julia versions.
 - [x] Added backend parity script with documented tolerance budgets: `test/ci/backend_parity.jl`.
 - [x] Added runtime smoke checks for CPU and accelerated paths: `test/ci/runtime_smoke.jl`.
 - [x] Added deterministic GPU fallback checks and optional hardware smoke jobs: `test/ci/gpu_fallback.jl`, `test/ci/gpu_hardware_smoke.jl`.
+- [x] Added non-GPU accelerator strategy checks and CI coverage: `test/ci/coprocessor_strategy.jl`.
 - [x] Added certificate integrity CI checks and digest-report artifacts: `test/ci/certificate_integrity.jl`, `.github/workflows/verify-certificates.yml`.
+- [x] Added in-tree gRPC unary protobuf binary-wire support (`application/grpc`) with JSON bridge fallback (`application/grpc+json`).
+- [x] Added direct `.pt/.pth/.ckpt` import bridge and expanded ONNX export coverage (Dense/Conv/Norm/Pool + activations).
 - [x] Added consolidated readiness gate script for local/CI release checks: `scripts/readiness-check.sh`.
 
 ### Should
@@ -68,6 +71,13 @@ These are intentionally tracked roadmap promises, not removed features:
 3. Production-hardened GPU paths across CUDA/ROCm/Metal
 4. Non-GPU accelerators (TPU/NPU/DSP/FPGA) backend strategy
 5. Proof-assistant export improvements beyond skeleton artifacts
+
+Status update (2026-02-16):
+- `from_pytorch(...)`: canonical descriptor import + direct `.pt/.pth/.ckpt` bridge shipped (via `scripts/pytorch_to_axiom_descriptor.py`).
+- `to_onnx(...)`: exporter now covers Dense/Conv/Norm/Pool + common activations for supported `Sequential`/`Pipeline` models.
+- GPU hardening: deterministic fallback CI + optional hardware-smoke CI are in place; compiled GPU wrappers now dispatch through extension hooks for supported ops (Dense/ReLU/Softmax + hook fallback for Conv/Norm).
+- Non-GPU accelerator strategy: target backends, detection, compiled dispatch, and fallback/strategy CI are in place; production kernels remain in progress.
+- Proof-assistant exports: obligation manifest bundles and certificate status markers are shipped (`proof_obligation_manifest`, `export_proof_bundle`), while assistant-side automation beyond placeholders remains a Stage 4 track.
 
 See `docs/wiki/Roadmap-Commitments.md` for stage mapping and acceptance criteria.
 

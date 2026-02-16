@@ -1,6 +1,6 @@
 //! Matrix multiplication operations
 
-use ndarray::{Array2, ArrayView2, ArrayViewMut2, s};
+use ndarray::{Array2, ArrayView2};
 use rayon::prelude::*;
 
 /// Matrix multiplication: C = A @ B

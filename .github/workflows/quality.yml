@@ -24,7 +24,7 @@ jobs:
       - name: Check unresolved markers
         run: |
           echo "=== unresolved markers (src/ext/test) ==="
-          markers=$(rg -n "TODO|FIXME|TBD|OPEN_ITEM|FIX_ITEM|HACK|XXX" src ext test || true)
+          markers=$(rg -n "TO[D]O|FIXM[E]|TB[D]|OPEN_ITEM|FIX_ITEM|HACK|XXX" src ext test || true)
           if [ -n "$markers" ]; then
             echo "$markers"
             echo "::error::Unresolved implementation markers found in src/ext/test"

@@ -1,6 +1,6 @@
 //! Convolution operations
 
-use ndarray::{Array4, ArrayView4, s};
+use ndarray::{Array4, ArrayView4};
 use rayon::prelude::*;
 
 /// 2D Convolution
@@ -135,12 +135,12 @@ pub fn depthwise_conv2d(
 pub fn conv2d_transpose(
     input: ArrayView4<f32>,
     weight: ArrayView4<f32>,
-    bias: Option<&[f32]>,
+    _bias: Option<&[f32]>,
     stride: (usize, usize),
     padding: (usize, usize),
     output_padding: (usize, usize),
 ) -> Array4<f32> {
-    let (n, h_in, w_in, c_in) = input.dim();
+    let (n, h_in, w_in, _c_in) = input.dim();
     let (kh, kw, c_out, _) = weight.dim();  // Note: weight shape is different
     let (sh, sw) = stride;
     let (ph, pw) = padding;
@@ -149,7 +149,7 @@ pub fn conv2d_transpose(
     let h_out = (h_in - 1) * sh - 2 * ph + kh + oph;
     let w_out = (w_in - 1) * sw - 2 * pw + kw + opw;
 
-    let mut output = Array4::zeros((n, h_out, w_out, c_out));
+    let output = Array4::zeros((n, h_out, w_out, c_out));
 
     // Implementation details omitted for brevity
     // Real implementation would use scatter-add pattern
@@ -158,6 +158,7 @@ pub fn conv2d_transpose(
 }
 
 /// im2col transformation for efficient convolution
+#[allow(dead_code)]
 fn im2col(
     input: ArrayView4<f32>,
     kernel_size: (usize, usize),

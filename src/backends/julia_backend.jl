@@ -147,14 +147,23 @@ function backend_layernorm(
     normalized_shape::Tuple,
     eps::T
 ) where T
+    nd = ndims(x)
     n_dims = length(normalized_shape)
-    norm_dims = collect(ndims(x)-n_dims+1:ndims(x))
+    if n_dims == 0 || n_dims > nd
+        throw(DimensionMismatch("normalized_shape=$(normalized_shape) is incompatible with input shape $(size(x))"))
+    end
+    norm_dims = collect(nd - n_dims + 1:nd)
 
     μ = mean(x, dims=norm_dims)
     σ² = var(x, dims=norm_dims, corrected=false)
 
     x_norm = (x .- μ) ./ sqrt.(σ² .+ eps)
-    gamma .* x_norm .+ beta
+
+    affine_shape = ntuple(i -> i <= nd - n_dims ? 1 : normalized_shape[i - (nd - n_dims)], nd)
+    γ = reshape(gamma, affine_shape)
+    β = reshape(beta, affine_shape)
+
+    γ .* x_norm .+ β
 end
 
 # ============================================================================
@@ -213,7 +222,8 @@ function backend_avgpool2d(
     input::AbstractArray{T, 4},
     kernel_size::Tuple{Int, Int},
     stride::Tuple{Int, Int},
-    padding::Tuple{Int, Int}
+    padding::Tuple{Int, Int},
+    count_include_pad::Bool=true,
 ) where T
     N, H_in, W_in, C = size(input)
     kH, kW = kernel_size
@@ -223,7 +233,7 @@ function backend_avgpool2d(
     H_out = div(H_in + 2*pH - kH, sH) + 1
     W_out = div(W_in + 2*pW - kW, sW) + 1
 
-    # Pad with zeros
+    # Pad with zeros for out-of-bounds regions
     if pH > 0 || pW > 0
         padded = zeros(T, N, H_in + 2*pH, W_in + 2*pW, C)
         padded[:, pH+1:pH+H_in, pW+1:pW+W_in, :] = input
@@ -231,7 +241,6 @@ function backend_avgpool2d(
     end
 
     output = zeros(T, N, H_out, W_out, C)
-    divisor = T(kH * kW)
 
     @inbounds for n in 1:N
         for c in 1:C
@@ -241,14 +250,42 @@ function backend_avgpool2d(
                     w_start = (j - 1) * sW + 1
 
                     sum_val = zero(T)
+                    valid_count = 0
                     for kh in 1:kH
                         for kw in 1:kW
-                            sum_val += input[n, h_start+kh-1, w_start+kw-1, c]
+                            h_idx = h_start + kh - 1
+                            w_idx = w_start + kw - 1
+                            if h_idx >= pH + 1 && h_idx <= pH + H_in &&
+                               w_idx >= pW + 1 && w_idx <= pW + W_in
+                                valid_count += 1
+                            end
+                            sum_val += input[n, h_idx, w_idx, c]
                         end
                     end
-                    output[n, i, j, c] = sum_val / divisor
+                    divisor = count_include_pad ? (kH * kW) : max(valid_count, 1)
+                    output[n, i, j, c] = sum_val / T(divisor)
                 end
             end
+        end
+    end
+
+    output
+end
+
+function backend_global_avgpool2d(::JuliaBackend, input::AbstractArray{T, 4}) where T
+    N, H, W, C = size(input)
+    output = zeros(T, N, C)
+    scale = T(H * W)
+
+    @inbounds for n in 1:N
+        for c in 1:C
+            sum_val = zero(T)
+            for i in 1:H
+                for j in 1:W
+                    sum_val += input[n, i, j, c]
+                end
+            end
+            output[n, c] = sum_val / scale
         end
     end
 

@@ -36,6 +36,7 @@ Run the consolidated release-readiness checks:
 Useful toggles:
 
 - `AXIOM_READINESS_RUN_RUST=0` disables Rust parity/smoke checks.
+- `AXIOM_READINESS_RUN_COPROCESSOR=0` disables coprocessor strategy checks.
 - `AXIOM_READINESS_ALLOW_SKIPS=1` allows skipped checks without failing the run.
 - `JULIA_BIN=/path/to/julia` selects a specific Julia binary.
 
@@ -80,6 +81,14 @@ AXIOM_GPU_BACKEND=rocm AXIOM_GPU_REQUIRED=1 julia --project=. test/ci/gpu_hardwa
 AXIOM_GPU_BACKEND=metal AXIOM_GPU_REQUIRED=1 julia --project=. test/ci/gpu_hardware_smoke.jl
 ```
 
+## Non-GPU Coprocessor Strategy
+
+Run deterministic strategy/fallback checks for TPU/NPU/DSP/FPGA targets:
+
+```bash
+julia --project=. test/ci/coprocessor_strategy.jl
+```
+
 ## Certificate Integrity Checks
 
 Run certificate reproducibility and tamper-detection checks:
@@ -93,7 +102,7 @@ julia --project=. test/ci/certificate_integrity.jl
 Use these checks to keep production paths clean:
 
 ```bash
-rg -n "TODO|FIXME|TBD|OPEN_ITEM|FIX_ITEM|XXX|HACK" src test ext
+rg -n "TO[D]O|FIXM[E]|TB[D]|OPEN_ITEM|FIX_ITEM|XXX|HACK" src test ext
 ```
 
 If a marker is required (for templates or roadmap planning), keep it out of production code paths (`src`, `ext`, `test`) and explain it in review notes.

@@ -158,10 +158,160 @@ Batch normalization on specified backend.
 """
 function backend_batchnorm end
 
+"""
+    backend_layernorm(backend, x, gamma, beta, normalized_shape, eps)
+
+Layer normalization on specified backend.
+"""
+function backend_layernorm end
+
+"""
+    backend_maxpool2d(backend, input, kernel_size, stride, padding)
+
+2D max pooling on specified backend.
+"""
+function backend_maxpool2d end
+
+"""
+    backend_avgpool2d(backend, input, kernel_size, stride, padding, count_include_pad=true)
+
+2D average pooling on specified backend.
+"""
+function backend_avgpool2d end
+
+"""
+    backend_global_avgpool2d(backend, input)
+
+Global average pooling on specified backend.
+"""
+function backend_global_avgpool2d end
+
 # Default implementations (Julia backend)
 backend_matmul(::JuliaBackend, A, B) = A * B
 backend_relu(::JuliaBackend, x) = relu(x)
 backend_softmax(::JuliaBackend, x, dim) = softmax(x, dims=dim)
+
+const CoprocessorBackend = Union{TPUBackend, NPUBackend, DSPBackend, FPGABackend}
+
+function _coprocessor_label(backend::CoprocessorBackend)
+    if backend isa TPUBackend
+        return "TPU"
+    elseif backend isa NPUBackend
+        return "NPU"
+    elseif backend isa DSPBackend
+        return "DSP"
+    elseif backend isa FPGABackend
+        return "FPGA"
+    end
+    string(typeof(backend))
+end
+
+# Coprocessor extension hooks. Concrete accelerator extensions can overload these.
+function backend_coprocessor_matmul end
+function backend_coprocessor_conv2d end
+function backend_coprocessor_relu end
+function backend_coprocessor_softmax end
+function backend_coprocessor_batchnorm end
+function backend_coprocessor_layernorm end
+function backend_coprocessor_maxpool2d end
+function backend_coprocessor_avgpool2d end
+function backend_coprocessor_global_avgpool2d end
+
+for (hook, cpu_op) in (
+    (:backend_coprocessor_matmul, :backend_matmul),
+    (:backend_coprocessor_conv2d, :backend_conv2d),
+    (:backend_coprocessor_relu, :backend_relu),
+    (:backend_coprocessor_softmax, :backend_softmax),
+    (:backend_coprocessor_batchnorm, :backend_batchnorm),
+    (:backend_coprocessor_layernorm, :backend_layernorm),
+    (:backend_coprocessor_maxpool2d, :backend_maxpool2d),
+    (:backend_coprocessor_avgpool2d, :backend_avgpool2d),
+    (:backend_coprocessor_global_avgpool2d, :backend_global_avgpool2d),
+)
+    hook_name = String(hook)
+    @eval function $hook(backend::CoprocessorBackend, args...)
+        @warn string(
+            _coprocessor_label(backend),
+            " extension hook not loaded for `",
+            $hook_name,
+            "`, falling back to Julia backend"
+        ) maxlog=1
+        return $cpu_op(JuliaBackend(), args...)
+    end
+end
+
+backend_matmul(backend::CoprocessorBackend, A::AbstractArray, B::AbstractArray) =
+    backend_coprocessor_matmul(backend, A, B)
+backend_conv2d(
+    backend::CoprocessorBackend,
+    input::AbstractArray{T, 4},
+    weight::AbstractArray{T, 4},
+    bias::Union{AbstractVector{T}, Nothing},
+    stride::Tuple{Int, Int},
+    padding::Tuple{Int, Int},
+) where {T} = backend_coprocessor_conv2d(backend, input, weight, bias, stride, padding)
+backend_relu(backend::CoprocessorBackend, x::AbstractArray) =
+    backend_coprocessor_relu(backend, x)
+backend_softmax(backend::CoprocessorBackend, x::AbstractArray, dim::Int) =
+    backend_coprocessor_softmax(backend, x, dim)
+backend_batchnorm(
+    backend::CoprocessorBackend,
+    x::AbstractArray{T},
+    gamma::AbstractVector{T},
+    beta::AbstractVector{T},
+    running_mean::AbstractVector{T},
+    running_var::AbstractVector{T},
+    eps::T,
+    training::Bool,
+) where {T} = backend_coprocessor_batchnorm(
+    backend,
+    x,
+    gamma,
+    beta,
+    running_mean,
+    running_var,
+    eps,
+    training,
+)
+backend_layernorm(
+    backend::CoprocessorBackend,
+    x::AbstractArray{T},
+    gamma::AbstractArray{T},
+    beta::AbstractArray{T},
+    normalized_shape::Tuple,
+    eps::T,
+) where {T} = backend_coprocessor_layernorm(
+    backend,
+    x,
+    gamma,
+    beta,
+    normalized_shape,
+    eps,
+)
+backend_maxpool2d(
+    backend::CoprocessorBackend,
+    input::AbstractArray{T, 4},
+    kernel_size::Tuple{Int, Int},
+    stride::Tuple{Int, Int},
+    padding::Tuple{Int, Int},
+) where {T} = backend_coprocessor_maxpool2d(backend, input, kernel_size, stride, padding)
+backend_avgpool2d(
+    backend::CoprocessorBackend,
+    input::AbstractArray{T, 4},
+    kernel_size::Tuple{Int, Int},
+    stride::Tuple{Int, Int},
+    padding::Tuple{Int, Int},
+    count_include_pad::Bool=true,
+) where {T} = backend_coprocessor_avgpool2d(
+    backend,
+    input,
+    kernel_size,
+    stride,
+    padding,
+    count_include_pad,
+)
+backend_global_avgpool2d(backend::CoprocessorBackend, input::AbstractArray{T, 4}) where {T} =
+    backend_coprocessor_global_avgpool2d(backend, input)
 
 # ============================================================================
 # Compilation Target
@@ -390,7 +540,7 @@ function compile_to_backend(model, backend::CUDABackend)
     end
 
     # Wrap model for CUDA execution
-    CUDACompiledModel(model, backend)
+    GPUCompiledModel(model, backend)
 end
 
 function compile_to_backend(model, backend::MetalBackend)
@@ -403,7 +553,7 @@ function compile_to_backend(model, backend::MetalBackend)
     end
 
     # Wrap model for Metal execution
-    MetalCompiledModel(model, backend)
+    GPUCompiledModel(model, backend)
 end
 
 function compile_to_backend(model, backend::TPUBackend)
@@ -632,6 +782,8 @@ function forward(rm::RustCompiledModel, x)
     rust_forward(rm.model, x, rm.lib_handle)
 end
 
+(rm::RustCompiledModel)(x) = forward(rm, x)
+
 function rust_forward(model, x, lib_handle)
     # Default: fall back to Julia for unsupported layers
     forward(model, x)
@@ -662,16 +814,97 @@ struct GPUCompiledModel{M, B <: AbstractBackend}
     backend::B
 end
 
-function forward(gm::GPUCompiledModel, x)
-    # In a full implementation, this would:
-    # 1. Transfer x to GPU
-    # 2. Execute forward pass on GPU
-    # 3. Transfer result back
+function _gpu_apply_activation(activation, y, backend::AbstractBackend)
+    if activation === identity
+        return y
+    elseif activation === relu
+        return backend_gpu_relu(backend, y)
+    elseif activation === softmax
+        dim = ndims(y) > 1 ? ndims(y) : 1
+        return backend_gpu_softmax(backend, y, dim)
+    end
+    activation(y)
+end
 
-    # For now, fall back to Julia with a log message
-    @debug "GPUCompiledModel: executing on CPU (GPU backend not loaded)"
+function _gpu_forward_layer(layer::Dense, x::AbstractTensor, backend::AbstractBackend)
+    x_data = x.data
+
+    y = if ndims(x_data) == 1
+        y_mat = backend_gpu_matmul(backend, reshape(x_data, 1, :), layer.weight)
+        vec(y_mat)
+    else
+        backend_gpu_matmul(backend, x_data, layer.weight)
+    end
+
+    if layer.bias !== nothing
+        y = ndims(y) == 1 ? (y .+ layer.bias) : (y .+ layer.bias')
+    end
+
+    Tensor(_gpu_apply_activation(layer.activation, y, backend))
+end
+
+function _gpu_forward_layer(layer::Conv2d, x::AbstractTensor, backend::AbstractBackend)
+    has_batch = ndims(x) == 4
+    x_data = has_batch ? x.data : reshape(x.data, 1, size(x.data)...)
+    y = backend_gpu_conv2d(backend, x_data, layer.weight, layer.bias, layer.stride, layer.padding)
+    Tensor(has_batch ? y : dropdims(y, dims=1))
+end
+
+function _gpu_forward_layer(layer::BatchNorm, x::AbstractTensor, backend::AbstractBackend)
+    x_data = x.data
+    gamma = layer.affine ? layer.γ : ones(eltype(x_data), layer.num_features)
+    beta = layer.affine ? layer.β : zeros(eltype(x_data), layer.num_features)
+    y = backend_gpu_batchnorm(
+        backend,
+        x_data,
+        gamma,
+        beta,
+        layer.running_mean,
+        layer.running_var,
+        eltype(x_data)(layer.eps),
+        layer.training,
+    )
+    Tensor(y)
+end
+
+function _gpu_forward_layer(::ReLU, x::AbstractTensor, backend::AbstractBackend)
+    Tensor(backend_gpu_relu(backend, x.data))
+end
+
+function _gpu_forward_layer(layer::Softmax, x::AbstractTensor, backend::AbstractBackend)
+    dim = layer.dims == -1 ? ndims(x.data) : layer.dims
+    Tensor(backend_gpu_softmax(backend, x.data, dim))
+end
+
+function _gpu_forward_layer(layer::AbstractLayer, x::AbstractTensor, ::AbstractBackend)
+    forward(layer, x)
+end
+
+function _gpu_forward(model::Pipeline, x::AbstractTensor, backend::AbstractBackend)
+    for layer in model.layers
+        x = _gpu_forward_layer(layer, x, backend)
+    end
+    x
+end
+
+function _gpu_forward(model::AbstractLayer, x::AbstractTensor, backend::AbstractBackend)
+    _gpu_forward_layer(model, x, backend)
+end
+
+function _gpu_forward(model, x::AbstractTensor, ::AbstractBackend)
+    forward(model, x)
+end
+
+function forward(gm::GPUCompiledModel, x::AbstractTensor)
+    _gpu_forward(gm.model, x, gm.backend)
+end
+
+function forward(gm::GPUCompiledModel, x)
+    @debug "GPUCompiledModel requires tensor input for accelerated path; falling back to model forward"
     forward(gm.model, x)
 end
+
+(gm::GPUCompiledModel)(x) = forward(gm, x)
 
 parameters(gm::GPUCompiledModel) = parameters(gm.model)
 output_shape(gm::GPUCompiledModel, input_shape) = output_shape(gm.model, input_shape)
@@ -690,10 +923,140 @@ struct CoprocessorCompiledModel{M, B <: AbstractBackend}
     backend::B
 end
 
+function _coprocessor_apply_activation(activation, y, backend::CoprocessorBackend)
+    if activation === identity
+        return y
+    elseif activation === relu
+        return backend_relu(backend, y)
+    elseif activation === softmax
+        dim = ndims(y) > 1 ? ndims(y) : 1
+        return backend_softmax(backend, y, dim)
+    end
+    activation(y)
+end
+
+function _coprocessor_forward_layer(layer::Dense, x::AbstractTensor, backend::CoprocessorBackend)
+    x_data = x.data
+
+    y = if ndims(x_data) == 1
+        layer.weight' * x_data
+    else
+        backend_matmul(backend, x_data, layer.weight)
+    end
+
+    if layer.bias !== nothing
+        y = y .+ layer.bias'
+    end
+
+    Tensor(_coprocessor_apply_activation(layer.activation, y, backend))
+end
+
+function _coprocessor_forward_layer(layer::Conv2d, x::AbstractTensor, backend::CoprocessorBackend)
+    has_batch = ndims(x) == 4
+    x_data = has_batch ? x.data : reshape(x.data, 1, size(x.data)...)
+    y = backend_conv2d(backend, x_data, layer.weight, layer.bias, layer.stride, layer.padding)
+    Tensor(has_batch ? y : dropdims(y, dims=1))
+end
+
+function _coprocessor_forward_layer(layer::BatchNorm, x::AbstractTensor, backend::CoprocessorBackend)
+    x_data = x.data
+    gamma = layer.affine ? layer.γ : ones(eltype(x_data), layer.num_features)
+    beta = layer.affine ? layer.β : zeros(eltype(x_data), layer.num_features)
+    y = backend_batchnorm(
+        backend,
+        x_data,
+        gamma,
+        beta,
+        layer.running_mean,
+        layer.running_var,
+        eltype(x_data)(layer.eps),
+        layer.training
+    )
+    Tensor(y)
+end
+
+function _coprocessor_forward_layer(layer::LayerNorm, x::AbstractTensor, backend::CoprocessorBackend)
+    x_data = x.data
+    normalized_shape = Tuple(layer.normalized_shape)
+    gamma = layer.elementwise_affine ? layer.γ : ones(eltype(x_data), normalized_shape...)
+    beta = layer.elementwise_affine ? layer.β : zeros(eltype(x_data), normalized_shape...)
+    y = backend_layernorm(
+        backend,
+        x_data,
+        gamma,
+        beta,
+        normalized_shape,
+        eltype(x_data)(layer.eps),
+    )
+    Tensor(y)
+end
+
+function _coprocessor_forward_layer(layer::MaxPool2d, x::AbstractTensor, backend::CoprocessorBackend)
+    has_batch = ndims(x) == 4
+    x_data = has_batch ? x.data : reshape(x.data, 1, size(x.data)...)
+    y = backend_maxpool2d(backend, x_data, layer.kernel_size, layer.stride, layer.padding)
+    Tensor(has_batch ? y : dropdims(y, dims=1))
+end
+
+function _coprocessor_forward_layer(layer::AvgPool2d, x::AbstractTensor, backend::CoprocessorBackend)
+    has_batch = ndims(x) == 4
+    x_data = has_batch ? x.data : reshape(x.data, 1, size(x.data)...)
+    y = backend_avgpool2d(
+        backend,
+        x_data,
+        layer.kernel_size,
+        layer.stride,
+        layer.padding,
+        layer.count_include_pad,
+    )
+    Tensor(has_batch ? y : dropdims(y, dims=1))
+end
+
+function _coprocessor_forward_layer(::GlobalAvgPool, x::AbstractTensor, backend::CoprocessorBackend)
+    if ndims(x) == 4
+        return Tensor(backend_global_avgpool2d(backend, x.data))
+    end
+    forward(GlobalAvgPool(), x)
+end
+
+function _coprocessor_forward_layer(::ReLU, x::AbstractTensor, backend::CoprocessorBackend)
+    Tensor(backend_relu(backend, x.data))
+end
+
+function _coprocessor_forward_layer(layer::Softmax, x::AbstractTensor, backend::CoprocessorBackend)
+    dim = layer.dims == -1 ? ndims(x.data) : layer.dims
+    Tensor(backend_softmax(backend, x.data, dim))
+end
+
+function _coprocessor_forward_layer(layer::AbstractLayer, x::AbstractTensor, ::CoprocessorBackend)
+    forward(layer, x)
+end
+
+function _coprocessor_forward(model::Pipeline, x::AbstractTensor, backend::CoprocessorBackend)
+    for layer in model.layers
+        x = _coprocessor_forward_layer(layer, x, backend)
+    end
+    x
+end
+
+function _coprocessor_forward(model::AbstractLayer, x::AbstractTensor, backend::CoprocessorBackend)
+    _coprocessor_forward_layer(model, x, backend)
+end
+
+function _coprocessor_forward(model, x::AbstractTensor, ::CoprocessorBackend)
+    forward(model, x)
+end
+
+function forward(cm::CoprocessorCompiledModel, x::AbstractTensor)
+    _coprocessor_forward(cm.model, x, cm.backend)
+end
+
 function forward(cm::CoprocessorCompiledModel, x)
-    @debug "CoprocessorCompiledModel: executing on CPU (backend extension not loaded)"
+    @debug "CoprocessorCompiledModel requires tensor input for accelerated path; falling back to model forward"
     forward(cm.model, x)
 end
+
+(cm::CoprocessorCompiledModel)(x) = forward(cm, x)
 
 parameters(cm::CoprocessorCompiledModel) = parameters(cm.model)
 output_shape(cm::CoprocessorCompiledModel, input_shape) = output_shape(cm.model, input_shape)

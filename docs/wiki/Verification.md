@@ -526,8 +526,8 @@ For post-hoc verification of existing models:
 ```julia
 using Axiom
 
-# Load a model (from PyTorch, ONNX, or Axiom)
-model = from_pytorch("model.pth")
+# Load a model (from PyTorch descriptor, ONNX export pipeline, or Axiom)
+model = from_pytorch("model.pytorch.json")
 
 # Verify properties
 result = verify(model,

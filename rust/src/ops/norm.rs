@@ -1,7 +1,6 @@
 //! Normalization operations
 
-use ndarray::{ArrayD, IxDyn, Axis};
-use rayon::prelude::*;
+use ndarray::ArrayD;
 
 /// Batch Normalization
 ///
@@ -302,12 +301,12 @@ mod tests {
     #[test]
     fn test_layernorm() {
         let input = ArrayD::from_shape_vec(
-            IxDyn(&[2, 4]),
+            ndarray::IxDyn(&[2, 4]),
             vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
         ).expect("test: shape mismatch");
 
-        let gamma = ArrayD::from_elem(IxDyn(&[4]), 1.0f32);
-        let beta = ArrayD::from_elem(IxDyn(&[4]), 0.0f32);
+        let gamma = ArrayD::from_elem(ndarray::IxDyn(&[4]), 1.0f32);
+        let beta = ArrayD::from_elem(ndarray::IxDyn(&[4]), 0.0f32);
 
         let output = layernorm(&input, &gamma, &beta, &[4], 1e-5);
 
@@ -320,7 +319,7 @@ mod tests {
     #[test]
     fn test_rmsnorm() {
         let input = ArrayD::from_shape_vec(
-            IxDyn(&[2, 4]),
+            ndarray::IxDyn(&[2, 4]),
             vec![1.0, 2.0, 3.0, 4.0, 1.0, 2.0, 3.0, 4.0]
         ).expect("test: shape mismatch");
 

@@ -385,17 +385,13 @@ tflite_model = converter.convert()
 ### PyTorch to Axiom.jl
 
 ```julia
-# Use the compatibility layer
-using Axiom.PyTorchCompat
+using Axiom
 
-# Load PyTorch model directly
-model = load_pytorch("model.pt")
+# Load checkpoint directly (python3 + torch bridge)
+model = from_pytorch("model.pt")
 
-# Or convert layer by layer
-axiom_model = @axiom begin
-    from_pytorch(torch_model.layer1)
-    from_pytorch(torch_model.layer2)
-end
+# Export to ONNX for downstream runtimes
+to_onnx(model, "model.onnx", input_shape=(1, 3, 224, 224))
 ```
 
 ### TensorFlow to Axiom.jl

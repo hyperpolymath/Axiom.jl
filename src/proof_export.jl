@@ -9,6 +9,92 @@
 using Dates
 using SHA
 
+const PROOF_ASSISTANT_BUNDLE_FORMAT = "axiom-proof-assistant-bundle.v1"
+
+function _proof_obligation_id(certificate::ProofCertificate)
+    digest = bytes2hex(sha256("obligation:" * certificate.property * ":" * certificate.hash))
+    digest[1:16]
+end
+
+function _assistant_extension(assistant::Symbol)
+    if assistant == :lean
+        return ".lean"
+    elseif assistant == :coq
+        return ".v"
+    elseif assistant == :isabelle
+        return ".thy"
+    end
+    throw(ArgumentError("Unsupported proof assistant: $assistant"))
+end
+
+function _assistant_placeholder_regex(assistant::Symbol)
+    if assistant == :lean
+        return r"\bsorry\b"
+    elseif assistant == :coq
+        return r"\bAdmitted\b"
+    elseif assistant == :isabelle
+        return r"\boops\b"
+    end
+    throw(ArgumentError("Unsupported proof assistant: $assistant"))
+end
+
+function _assistant_obligation_summary(content::String, assistant::Symbol)
+    unresolved = count(_ -> true, eachmatch(_assistant_placeholder_regex(assistant), content))
+    (
+        unresolved = unresolved,
+        complete = unresolved == 0
+    )
+end
+
+function _emit_certificate_metadata(io::IO, certificate::ProofCertificate, assistant::Symbol)
+    obligation_id = _proof_obligation_id(certificate)
+    status = lowercase(string(certificate.status))
+    method = certificate.proof_method
+    hash_value = certificate.hash
+
+    if assistant == :lean
+        println(io, "-- AXIOM_CERTIFICATE_HASH: $hash_value")
+        println(io, "-- AXIOM_PROOF_STATUS: $status")
+        println(io, "-- AXIOM_PROOF_METHOD: $method")
+        println(io, "-- AXIOM_OBLIGATION_ID: $obligation_id")
+        println(io)
+        println(io, "def axiom_certificate_hash : String := \"$hash_value\"")
+        println(io, "def axiom_proof_status : String := \"$status\"")
+        println(io, "theorem axiom_certificate_witness : axiom_certificate_hash = \"$hash_value\" := by")
+        println(io, "  rfl")
+        println(io)
+    elseif assistant == :coq
+        println(io, "(* AXIOM_CERTIFICATE_HASH: $hash_value *)")
+        println(io, "(* AXIOM_PROOF_STATUS: $status *)")
+        println(io, "(* AXIOM_PROOF_METHOD: $method *)")
+        println(io, "(* AXIOM_OBLIGATION_ID: $obligation_id *)")
+        println(io)
+        println(io, "Definition axiom_certificate_hash : string := \"$hash_value\"%string.")
+        println(io, "Definition axiom_proof_status : string := \"$status\"%string.")
+        println(io, "Lemma axiom_certificate_witness : axiom_certificate_hash = \"$hash_value\"%string.")
+        println(io, "Proof.")
+        println(io, "  reflexivity.")
+        println(io, "Qed.")
+        println(io)
+    elseif assistant == :isabelle
+        println(io, "(* AXIOM_CERTIFICATE_HASH: $hash_value *)")
+        println(io, "(* AXIOM_PROOF_STATUS: $status *)")
+        println(io, "(* AXIOM_PROOF_METHOD: $method *)")
+        println(io, "(* AXIOM_OBLIGATION_ID: $obligation_id *)")
+        println(io)
+        println(io, "definition axiom_certificate_hash :: string where")
+        println(io, "  \"axiom_certificate_hash = ''$hash_value''\"")
+        println(io, "definition axiom_proof_status :: string where")
+        println(io, "  \"axiom_proof_status = ''$status''\"")
+        println(io, "lemma axiom_certificate_witness:")
+        println(io, "  \"axiom_certificate_hash = ''$hash_value''\"")
+        println(io, "  by (simp add: axiom_certificate_hash_def)")
+        println(io)
+    else
+        throw(ArgumentError("Unsupported proof assistant: $assistant"))
+    end
+end
+
 """
     export_lean(certificate::ProofCertificate, output_path::String)
 
@@ -35,14 +121,7 @@ function export_lean(certificate::ProofCertificate, output_path::String)
     println(io, "import Mathlib.Data.Real.Basic")
     println(io, "import Mathlib.Analysis.NormedSpace.Basic")
     println(io)
-
-    # Model structure (if available)
-    if haskey(certificate.metadata, "model")
-        model = certificate.metadata["model"]
-        println(io, "-- Model definition")
-        export_lean_model(io, model)
-        println(io)
-    end
+    _emit_certificate_metadata(io, certificate, :lean)
 
     # Property theorem
     println(io, "-- Verified property: $(certificate.property)")
@@ -51,6 +130,7 @@ function export_lean(certificate::ProofCertificate, output_path::String)
     # Translate property to Lean syntax
     lean_prop = translate_to_lean(certificate.property)
     println(io, "  $lean_prop := by")
+    println(io, "  -- PROOF OBLIGATION: $(_proof_obligation_id(certificate))")
     println(io, "  sorry  -- Complete proof interactively")
     println(io)
 
@@ -70,17 +150,11 @@ function export_coq(certificate::ProofCertificate, output_path::String)
     # Header
     println(io, "(* Exported from Axiom.jl *)")
     println(io, "(* Generated: $(now()) *)")
+    println(io, "Require Import String.")
     println(io, "Require Import Reals Psatz.")
     println(io, "Require Import Coquelicot.Coquelicot.")
     println(io)
-
-    # Model definition
-    if haskey(certificate.metadata, "model")
-        model = certificate.metadata["model"]
-        println(io, "(* Model definition *)")
-        export_coq_model(io, model)
-        println(io)
-    end
+    _emit_certificate_metadata(io, certificate, :coq)
 
     # Property theorem
     println(io, "(* Verified property: $(certificate.property) *)")
@@ -90,6 +164,7 @@ function export_coq(certificate::ProofCertificate, output_path::String)
     coq_prop = translate_to_coq(certificate.property)
     println(io, "  $coq_prop.")
     println(io, "Proof.")
+    println(io, "  (* PROOF OBLIGATION: $(_proof_obligation_id(certificate)) *)")
     println(io, "  (* Interactive proof *)")
     println(io, "Admitted.")
     println(io)
@@ -115,14 +190,7 @@ function export_isabelle(certificate::ProofCertificate, output_path::String)
     println(io, "(* Exported from Axiom.jl *)")
     println(io, "(* Generated: $(now()) *)")
     println(io)
-
-    # Model definition
-    if haskey(certificate.metadata, "model")
-        model = certificate.metadata["model"]
-        println(io, "(* Model definition *)")
-        export_isabelle_model(io, model)
-        println(io)
-    end
+    _emit_certificate_metadata(io, certificate, :isabelle)
 
     # Property theorem
     println(io, "(* Verified property: $(certificate.property) *)")
@@ -132,6 +200,7 @@ function export_isabelle(certificate::ProofCertificate, output_path::String)
     isabelle_prop = translate_to_isabelle(certificate.property)
     println(io, "  \"$isabelle_prop\"")
     println(io, "proof -")
+    println(io, "  (* PROOF OBLIGATION: $(_proof_obligation_id(certificate)) *)")
     println(io, "  (* Use sledgehammer for automated proof search *)")
     println(io, "  sledgehammer")
     println(io, "qed")
@@ -260,6 +329,81 @@ function export_isabelle_model(io::IO, model)
             println(io, "  $name :: \"real vec\"")
         end
     end
+end
+
+"""
+    proof_obligation_manifest(certificate::ProofCertificate; assistants=[:lean, :coq, :isabelle])
+
+Build a machine-readable proof-obligation manifest for proof-assistant workflows.
+"""
+function proof_obligation_manifest(
+    certificate::ProofCertificate;
+    assistants::Vector{Symbol} = [:lean, :coq, :isabelle],
+)
+    obligation_id = _proof_obligation_id(certificate)
+    assistant_status = Dict{String, Any}(string(a) => "pending" for a in assistants)
+    status = lowercase(string(certificate.status))
+
+    Dict(
+        "format" => PROOF_ASSISTANT_BUNDLE_FORMAT,
+        "generated_at" => Dates.format(now(Dates.UTC), "yyyy-mm-ddTHH:MM:SS.sssZ"),
+        "property" => certificate.property,
+        "proof_status" => status,
+        "proof_method" => certificate.proof_method,
+        "certificate_hash" => certificate.hash,
+        "obligations" => Any[
+            Dict(
+                "id" => obligation_id,
+                "kind" => "property_theorem",
+                "property" => certificate.property,
+                "certificate_hash" => certificate.hash,
+                "status" => status == "proven" ? "proven_by_certificate" : "interactive_required",
+                "assistant_status" => assistant_status,
+            )
+        ],
+    )
+end
+
+"""
+    export_proof_bundle(certificate::ProofCertificate, output_dir::String; base_name="axiom_proof", assistants=[:lean, :coq, :isabelle])
+
+Export proof-assistant artifacts and a machine-readable obligation manifest.
+Returns a dictionary containing generated paths.
+"""
+function export_proof_bundle(
+    certificate::ProofCertificate,
+    output_dir::String;
+    base_name::String = "axiom_proof",
+    assistants::Vector{Symbol} = [:lean, :coq, :isabelle],
+)
+    mkpath(output_dir)
+
+    manifest = proof_obligation_manifest(certificate; assistants=assistants)
+    manifest_path = joinpath(output_dir, base_name * ".obligations.json")
+    open(manifest_path, "w") do io
+        JSON.print(io, manifest, 2)
+    end
+
+    assistant_paths = Dict{String, String}()
+    for assistant in assistants
+        ext = _assistant_extension(assistant)
+        path = joinpath(output_dir, base_name * ext)
+        if assistant == :lean
+            export_lean(certificate, path)
+        elseif assistant == :coq
+            export_coq(certificate, path)
+        elseif assistant == :isabelle
+            export_isabelle(certificate, path)
+        else
+            throw(ArgumentError("Unsupported proof assistant: $assistant"))
+        end
+        assistant_paths[string(assistant)] = path
+    end
+
+    Dict(
+        "manifest" => manifest_path,
+        "assistants" => assistant_paths,
+    )
 end
 
 # Overloaded exports that return strings (for verification tests)
@@ -413,17 +557,20 @@ function import_lean_certificate(lean_file::String)
 
     content = read(lean_file, String)
 
-    # Check for unproven obligations
-    has_sorry = occursin("sorry", content)
-    verified = !has_sorry
+    summary = _assistant_obligation_summary(content, :lean)
+    verified = summary.complete
 
     # Extract theorem names
     theorem_matches = eachmatch(r"theorem\s+(\w+)", content)
     theorems = [m.captures[1] for m in theorem_matches]
+    cert_hash_match = match(r"AXIOM_CERTIFICATE_HASH:\s*([0-9a-fA-F]+)", content)
+    cert_hash = cert_hash_match === nothing ? "none" : cert_hash_match.captures[1]
 
     details = "Imported from Lean file: $lean_file\n"
     details *= "Theorems: $(join(theorems, ", "))\n"
-    details *= "Sorry-free: $verified"
+    details *= "Unresolved obligations: $(summary.unresolved)\n"
+    details *= "Sorry-free: $verified\n"
+    details *= "Certificate hash marker: $cert_hash"
 
     return ProofCertificate(
         "imported_from_lean",
@@ -457,17 +604,20 @@ function import_coq_certificate(coq_file::String)
 
     content = read(coq_file, String)
 
-    # Check for unproven obligations
-    has_admitted = occursin("Admitted", content)
-    verified = !has_admitted
+    summary = _assistant_obligation_summary(content, :coq)
+    verified = summary.complete
 
     # Extract theorem names
     theorem_matches = eachmatch(r"Theorem\s+(\w+)", content)
     theorems = [m.captures[1] for m in theorem_matches]
+    cert_hash_match = match(r"AXIOM_CERTIFICATE_HASH:\s*([0-9a-fA-F]+)", content)
+    cert_hash = cert_hash_match === nothing ? "none" : cert_hash_match.captures[1]
 
     details = "Imported from Coq file: $coq_file\n"
     details *= "Theorems: $(join(theorems, ", "))\n"
-    details *= "Admitted-free: $verified"
+    details *= "Unresolved obligations: $(summary.unresolved)\n"
+    details *= "Admitted-free: $verified\n"
+    details *= "Certificate hash marker: $cert_hash"
 
     return ProofCertificate(
         "imported_from_coq",
@@ -501,17 +651,20 @@ function import_isabelle_certificate(thy_file::String)
 
     content = read(thy_file, String)
 
-    # Check for unproven obligations
-    has_oops = occursin("oops", content)
-    verified = !has_oops
+    summary = _assistant_obligation_summary(content, :isabelle)
+    verified = summary.complete
 
     # Extract lemma names
     lemma_matches = eachmatch(r"lemma\s+(\w+)", content)
     lemmas = [m.captures[1] for m in lemma_matches]
+    cert_hash_match = match(r"AXIOM_CERTIFICATE_HASH:\s*([0-9a-fA-F]+)", content)
+    cert_hash = cert_hash_match === nothing ? "none" : cert_hash_match.captures[1]
 
     details = "Imported from Isabelle file: $thy_file\n"
     details *= "Lemmas: $(join(lemmas, ", "))\n"
-    details *= "Oops-free: $verified"
+    details *= "Unresolved obligations: $(summary.unresolved)\n"
+    details *= "Oops-free: $verified\n"
+    details *= "Certificate hash marker: $cert_hash"
 
     return ProofCertificate(
         "imported_from_isabelle",

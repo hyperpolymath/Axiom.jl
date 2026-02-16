@@ -219,32 +219,22 @@ Standard model interchange format.
 using Axiom
 
 # Export to ONNX
-model = @axiom begin
-    Dense(784 => 256, activation=relu)
-    Dense(256 => 10, activation=softmax)
-end
-
-export_onnx(model, "model.onnx",
-    input_names=["input"],
-    output_names=["output"],
-    input_shapes=Dict("input" => (1, 784)),
-    opset_version=13
+model = Sequential(
+    Dense(784, 256, relu),
+    Dense(256, 10),
+    Softmax()
 )
 
-# Import from ONNX
-imported_model = load_onnx("external_model.onnx")
+to_onnx(model, "model.onnx", input_shape=(1, 784))
 ```
 
 **ONNX Compatibility:**
 | Layer Type | Export | Import |
 |------------|--------|--------|
-| Dense | ✓ | ✓ |
-| Conv2D | ✓ | ✓ |
-| MaxPool2D | ✓ | ✓ |
-| BatchNorm | ✓ | ✓ |
-| LayerNorm | ✓ | ✓ |
-| ReLU, GELU, etc. | ✓ | ✓ |
-| Softmax | ✓ | ✓ |
+| Dense | ✓ | Planned |
+| ReLU/Sigmoid/Tanh | ✓ | Planned |
+| Softmax/LeakyReLU/Flatten | ✓ | Planned |
+| Conv2D/Pooling/Norms | ✓ | Planned |
 
 ### PyTorch
 
@@ -252,26 +242,12 @@ Import PyTorch models.
 
 ```julia
 using Axiom
-using Axiom.PyTorchCompat
 
-# Load .pt file
-model = load_pytorch("model.pt")
+# Load checkpoint directly (requires python3 + torch)
+model = from_pytorch("model.pt")
 
-# Load state dict
-model = load_pytorch_state_dict("state_dict.pt", architecture)
-
-# Convert specific layers
-torch_layer = load_pytorch_layer("layer.pt")
-axiom_layer = convert_layer(torch_layer)
-
-# Weight mapping
-weights = load_pytorch_weights("model.pt")
-copy_weights!(axiom_model, weights,
-    mapping=Dict(
-        "fc1.weight" => "layers.1.weight",
-        "fc1.bias" => "layers.1.bias"
-    )
-)
+# Or load canonical descriptor export
+model = from_pytorch("model.pytorch.json")
 ```
 
 ### HuggingFace
@@ -488,11 +464,16 @@ HTTP.serve(handle_request, "0.0.0.0", 8080)
 
 ### gRPC
 
-Proto + handler support is available in-tree.
-Network gRPC serving uses the generated proto with your preferred gRPC runtime.
+Proto + handler support is available in-tree, including a network bridge server.
+The bridge supports both `application/grpc` (binary unary protobuf) and
+`application/grpc+json` (JSON bridge mode).
 
 ```julia
 using Axiom
+
+model = Sequential(Dense(10, 5, relu), Dense(5, 3), Softmax())
+server = serve_grpc(model; host="0.0.0.0", port=50051, background=true)
+# close(server) when done
 
 generate_grpc_proto("axiom_inference.proto")
 grpc_support_status()
@@ -581,8 +562,8 @@ upload_blob("models", "axiom/model.axiom", "model.axiom")
 | CUDA.jl | ⚠ Beta | GPU support in development |
 | Distributed.jl | ⚠ Beta | Multi-node training |
 | **Model Exchange** | | |
-| ONNX | ✓ Stable | Import/Export |
-| PyTorch | ✓ Stable | Import only |
+| ONNX | ⚠ Beta | Export API shipped for Dense/Conv/Norm/Pool + activation Sequential/Pipeline subset |
+| PyTorch | ⚠ Beta | Import API shipped for canonical JSON descriptor + direct `.pt/.pth/.ckpt` bridge |
 | TensorFlow | ⚠ Beta | Via ONNX |
 | HuggingFace | ⚠ Beta | Selected models |
 | **Tracking** | | |
@@ -592,7 +573,7 @@ upload_blob("models", "axiom/model.axiom", "model.axiom")
 | Docker | ✓ Stable | Full support |
 | REST | ✓ Stable | In-tree server API |
 | GraphQL | ✓ Stable | In-tree server API |
-| gRPC | ⚠ Beta | Proto + handlers in-tree, network runtime integration in progress |
+| gRPC | ⚠ Beta | Proto + handlers + in-tree network bridge (`serve_grpc`) |
 | AWS | ✓ Stable | S3, SageMaker |
 | GCP | ✓ Stable | GCS, Vertex AI |
 | Azure | ✓ Stable | Blob, Azure ML |

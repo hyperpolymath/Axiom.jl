@@ -8,7 +8,7 @@ use std::sync::Arc;
 pub struct Tensor<T> {
     data: ArrayD<T>,
     requires_grad: bool,
-    grad: Option<Arc<Tensor<T>>>,
+    _grad: Option<Arc<Tensor<T>>>,
 }
 
 impl<T: Clone + num_traits::Zero> Tensor<T> {
@@ -17,7 +17,7 @@ impl<T: Clone + num_traits::Zero> Tensor<T> {
         Self {
             data: ArrayD::zeros(IxDyn(shape)),
             requires_grad: false,
-            grad: None,
+            _grad: None,
         }
     }
 }
@@ -28,7 +28,7 @@ impl<T: Clone> Tensor<T> {
         Self {
             data,
             requires_grad: false,
-            grad: None,
+            _grad: None,
         }
     }
 

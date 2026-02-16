@@ -20,6 +20,24 @@ function fail_or_skip(msg::String, required::Bool)
     end
 end
 
+function parse_float_env(key::String, default::Float32)
+    raw = strip(get(ENV, key, ""))
+    isempty(raw) && return default
+    parsed = tryparse(Float32, raw)
+    parsed === nothing ? default : parsed
+end
+
+function backend_tolerances(name::String)
+    if name == "cuda"
+        return (atol = 1f-4, rtol = 1f-4)
+    elseif name == "rocm"
+        return (atol = 2f-4, rtol = 2f-4)
+    elseif name == "metal"
+        return (atol = 2f-4, rtol = 2f-4)
+    end
+    (atol = 1f-4, rtol = 1f-4)
+end
+
 backend_name = lowercase(strip(get(ENV, "AXIOM_GPU_BACKEND", "")))
 required = parse_bool_env("AXIOM_GPU_REQUIRED", true)
 
@@ -72,8 +90,15 @@ end
     cpu = model(x).data
     compiled = compile(model, backend = target_backend, verify = false, optimize = :none)
     acc = compiled(x).data
+    acc_repeat = compiled(x).data
+
+    base_tol = backend_tolerances(backend_name)
+    atol = parse_float_env("AXIOM_GPU_ATOL", base_tol.atol)
+    rtol = parse_float_env("AXIOM_GPU_RTOL", base_tol.rtol)
 
     @test size(acc) == size(cpu)
     @test all(isfinite, acc)
     @test all(isapprox.(sum(acc, dims = 2), 1.0f0, atol = 1f-4))
+    @test isapprox(acc, cpu; atol = atol, rtol = rtol)
+    @test isapprox(acc, acc_repeat; atol = atol, rtol = rtol)
 end

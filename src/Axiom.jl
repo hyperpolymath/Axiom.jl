@@ -123,7 +123,7 @@ include("utils/data.jl")
 include("serving/api.jl")
 
 # Integrations
-# (HuggingFace integration tracked in roadmap commitments)
+include("integrations/interop.jl")
 
 # Re-exports for user convenience
 export @axiom, @ensure
@@ -173,7 +173,7 @@ export make_moons, make_blobs
 
 # API serving
 export serve_rest, serve_graphql, graphql_execute
-export generate_grpc_proto, grpc_predict, grpc_health, grpc_support_status
+export serve_grpc, generate_grpc_proto, grpc_predict, grpc_health, grpc_support_status
 
 # Verification
 export ValidProbabilities, FiniteOutput, NoNaN, NoInf, check
@@ -183,7 +183,8 @@ export export_proof_certificate, import_proof_certificate, verify_proof_certific
 export VerificationResult, generate_certificate, save_certificate, load_certificate, verify_certificate
 
 # Interop
-# (`from_pytorch` / `to_onnx` tracked in roadmap commitments)
+export from_pytorch, to_onnx
+export load_pytorch, export_onnx
 
 # Model metadata and packaging (issues #15, #16)
 export ModelMetadata, VerificationClaim
@@ -192,6 +193,7 @@ export add_verification_claim!, verify_and_claim!
 
 # Proof assistant integration (issue #19)
 export export_lean, export_coq, export_isabelle
+export proof_obligation_manifest, export_proof_bundle
 export import_lean_certificate, import_coq_certificate, import_isabelle_certificate
 
 # Version info

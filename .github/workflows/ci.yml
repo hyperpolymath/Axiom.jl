@@ -144,6 +144,25 @@ jobs:
           AXIOM_SMOKE_ACCELERATOR_REQUIRED: '1'
         run: julia --project=. test/ci/runtime_smoke.jl
 
+  interop-smoke:
+    name: Interop smoke (PyTorch import + ONNX export)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+
+      - uses: julia-actions/setup-julia@824fb972babf1837cf21c49159bf8a8130f26840 # v2
+        with:
+          version: '1.10'
+
+      - uses: julia-actions/cache@e8472695fb3c2028b1118dc399c8440ff497d409 # v2
+
+      - name: Instantiate / Build / Precompile
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile()'
+
+      - name: Run interop smoke tests
+        run: julia --project=. test/ci/interop_smoke.jl
+
   gpu-fallback:
     name: GPU fallback tests - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -166,6 +185,25 @@ jobs:
 
       - name: Run fallback tests
         run: julia --project=. test/ci/gpu_fallback.jl
+
+  coprocessor-strategy:
+    name: Coprocessor strategy tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+
+      - uses: julia-actions/setup-julia@824fb972babf1837cf21c49159bf8a8130f26840 # v2
+        with:
+          version: '1.10'
+
+      - uses: julia-actions/cache@e8472695fb3c2028b1118dc399c8440ff497d409 # v2
+
+      - name: Instantiate / Build / Precompile
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile()'
+
+      - name: Run coprocessor strategy tests
+        run: julia --project=. test/ci/coprocessor_strategy.jl
 
   gpu-cuda-hardware:
     name: GPU hardware smoke (CUDA)

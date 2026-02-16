@@ -1,7 +1,6 @@
 //! Activation functions
 
-use ndarray::{Array, ArrayD, IxDyn, Zip};
-use rayon::prelude::*;
+use ndarray::ArrayD;
 
 /// ReLU activation: max(0, x)
 pub fn relu(x: &ArrayD<f32>) -> ArrayD<f32> {
@@ -187,13 +186,12 @@ pub fn hardsigmoid(x: &ArrayD<f32>) -> ArrayD<f32> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ndarray::array;
     use approx::assert_abs_diff_eq;
 
     #[test]
     fn test_relu() {
         let x = ArrayD::from_shape_vec(
-            IxDyn(&[4]),
+            ndarray::IxDyn(&[4]),
             vec![-2.0f32, -1.0, 0.0, 1.0]
         ).expect("test: shape mismatch");
 
@@ -208,7 +206,7 @@ mod tests {
     #[test]
     fn test_sigmoid() {
         let x = ArrayD::from_shape_vec(
-            IxDyn(&[3]),
+            ndarray::IxDyn(&[3]),
             vec![0.0f32, 1.0, -1.0]
         ).expect("test: shape mismatch");
 
@@ -222,7 +220,7 @@ mod tests {
     #[test]
     fn test_softmax() {
         let x = ArrayD::from_shape_vec(
-            IxDyn(&[2, 3]),
+            ndarray::IxDyn(&[2, 3]),
             vec![1.0f32, 2.0, 3.0, 1.0, 2.0, 3.0]
         ).expect("test: shape mismatch");
 

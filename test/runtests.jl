@@ -314,6 +314,119 @@ using JSON
             error("Unable to bind test server after multiple attempts")
         end
 
+        function grpc_varint(value::Integer)
+            u = value >= 0 ? UInt64(value) : reinterpret(UInt64, Int64(value))
+            out = UInt8[]
+            while u >= 0x80
+                push!(out, UInt8((u & 0x7f) | 0x80))
+                u >>= 7
+            end
+            push!(out, UInt8(u))
+            out
+        end
+
+        function grpc_field_key(field::Integer, wire::Integer)
+            grpc_varint((UInt64(field) << 3) | UInt64(wire))
+        end
+
+        function grpc_frame(payload::Vector{UInt8})
+            n = length(payload)
+            out = UInt8[0x00]
+            push!(out, UInt8((n >> 24) & 0xff))
+            push!(out, UInt8((n >> 16) & 0xff))
+            push!(out, UInt8((n >> 8) & 0xff))
+            push!(out, UInt8(n & 0xff))
+            append!(out, payload)
+            out
+        end
+
+        function grpc_unframe(body::Vector{UInt8})
+            @test length(body) >= 5
+            @test body[1] == 0x00
+            n = (Int(body[2]) << 24) | (Int(body[3]) << 16) | (Int(body[4]) << 8) | Int(body[5])
+            @test length(body) == 5 + n
+            body[6:end]
+        end
+
+        function grpc_predict_request(values::Vector{Float32})
+            packed = collect(reinterpret(UInt8, values))
+            out = UInt8[]
+            append!(out, grpc_field_key(1, 2))
+            append!(out, grpc_varint(length(packed)))
+            append!(out, packed)
+            out
+        end
+
+        function grpc_read_varint(data::Vector{UInt8}, idx::Int)
+            result = UInt64(0)
+            shift = 0
+            while true
+                @test idx <= length(data)
+                b = data[idx]
+                idx += 1
+                result |= UInt64(b & 0x7f) << shift
+                if (b & 0x80) == 0
+                    return result, idx
+                end
+                shift += 7
+            end
+        end
+
+        function grpc_decode_floats_field1(payload::Vector{UInt8})
+            vals = Float32[]
+            idx = 1
+            while idx <= length(payload)
+                key, idx = grpc_read_varint(payload, idx)
+                field = Int(key >> 3)
+                wire = Int(key & 0x07)
+                if field == 1 && wire == 2
+                    block_len, idx = grpc_read_varint(payload, idx)
+                    stop_idx = idx + Int(block_len) - 1
+                    while idx <= stop_idx
+                        u = UInt32(payload[idx]) |
+                            (UInt32(payload[idx + 1]) << 8) |
+                            (UInt32(payload[idx + 2]) << 16) |
+                            (UInt32(payload[idx + 3]) << 24)
+                        push!(vals, reinterpret(Float32, u))
+                        idx += 4
+                    end
+                elseif wire == 2
+                    block_len, idx = grpc_read_varint(payload, idx)
+                    idx += Int(block_len)
+                elseif wire == 5
+                    idx += 4
+                elseif wire == 0
+                    _, idx = grpc_read_varint(payload, idx)
+                else
+                    error("Unsupported wire type in gRPC test decoder: $wire")
+                end
+            end
+            vals
+        end
+
+        function grpc_decode_health_response(payload::Vector{UInt8})
+            idx = 1
+            while idx <= length(payload)
+                key, idx = grpc_read_varint(payload, idx)
+                field = Int(key >> 3)
+                wire = Int(key & 0x07)
+                if field == 1 && wire == 2
+                    n, idx = grpc_read_varint(payload, idx)
+                    return String(payload[idx:idx+Int(n)-1])
+                elseif wire == 2
+                    n, idx = grpc_read_varint(payload, idx)
+                    idx += Int(n)
+                elseif wire == 0
+                    _, idx = grpc_read_varint(payload, idx)
+                elseif wire == 5
+                    idx += 4
+                else
+                    error("Unsupported wire type in gRPC test decoder: $wire")
+                end
+            end
+            ""
+        end
+
         rest_server, rest_port = start_test_server(port ->
             serve_rest(model; host="127.0.0.1", port=port, background=true)
         )
@@ -379,12 +492,189 @@ using JSON
         @test haskey(grpc_pred, "output")
         @test length(grpc_pred["output"]) == 2
 
+        grpc_server, grpc_port = start_test_server(port ->
+            serve_grpc(model; host="127.0.0.1", port=port, background=true)
+        )
+        try
+            sleep(0.2)
+            grpc_health_resp = HTTP.post(
+                "http://127.0.0.1:$(grpc_port)/axiom.v1.AxiomInference/Health",
+                ["Content-Type" => "application/grpc+json"],
+                "{}"
+            )
+            @test grpc_health_resp.status == 200
+            grpc_health_body = JSON.parse(String(grpc_health_resp.body))
+            @test grpc_health_body["status"] == "SERVING"
+
+            grpc_predict_resp = HTTP.post(
+                "http://127.0.0.1:$(grpc_port)/axiom.v1.AxiomInference/Predict",
+                ["Content-Type" => "application/grpc+json"],
+                JSON.json(Dict("input" => input_batch))
+            )
+            @test grpc_predict_resp.status == 200
+            grpc_predict_body = JSON.parse(String(grpc_predict_resp.body))
+            @test haskey(grpc_predict_body, "output")
+            @test length(grpc_predict_body["output"]) == 2
+
+            grpc_health_bin = HTTP.post(
+                "http://127.0.0.1:$(grpc_port)/axiom.v1.AxiomInference/Health",
+                ["Content-Type" => "application/grpc"],
+                grpc_frame(UInt8[])
+            )
+            @test grpc_health_bin.status == 200
+            @test HTTP.header(grpc_health_bin, "grpc-status", "") == "0"
+            health_status = grpc_decode_health_response(grpc_unframe(Vector{UInt8}(grpc_health_bin.body)))
+            @test health_status == "SERVING"
+
+            predict_input = Float32.(input_batch[1])
+            grpc_predict_bin = HTTP.post(
+                "http://127.0.0.1:$(grpc_port)/axiom.v1.AxiomInference/Predict",
+                ["Content-Type" => "application/grpc"],
+                grpc_frame(grpc_predict_request(predict_input))
+            )
+            @test grpc_predict_bin.status == 200
+            @test HTTP.header(grpc_predict_bin, "grpc-status", "") == "0"
+            binary_output = grpc_decode_floats_field1(grpc_unframe(Vector{UInt8}(grpc_predict_bin.body)))
+            @test length(binary_output) == 3
+            @test isapprox(sum(binary_output), 1.0f0; atol=1f-4)
+        finally
+            close(grpc_server)
+        end
+
         grpc_stat = grpc_support_status()
         @test grpc_stat["proto_generation"] == true
         @test grpc_stat["inprocess_handlers"] == true
-        @test grpc_stat["network_server"] == false
+        @test grpc_stat["network_server"] == true
+        @test grpc_stat["binary_wire"] == true
 
         rm(proto_path)
+    end
+
+    @testset "Interop APIs" begin
+        spec = Dict(
+            "format" => "axiom.pytorch.sequential.v1",
+            "layers" => Any[
+                Dict(
+                    "type" => "Linear",
+                    "in_features" => 3,
+                    "out_features" => 2,
+                    "weight" => Any[
+                        Any[1.0, 2.0, 3.0],
+                        Any[-1.0, 0.5, 0.25],
+                    ],
+                    "bias" => Any[0.1, -0.2]
+                ),
+                Dict("type" => "ReLU"),
+                Dict(
+                    "type" => "Linear",
+                    "in_features" => 2,
+                    "out_features" => 1,
+                    "weight" => Any[
+                        Any[0.5, -1.0],
+                    ],
+                    "bias" => Any[0.0]
+                ),
+            ],
+        )
+
+        spec_path = tempname() * ".json"
+        open(spec_path, "w") do io
+            write(io, JSON.json(spec))
+        end
+
+        imported = from_pytorch(spec_path)
+        @test imported isa Axiom.Pipeline
+
+        x = Tensor(Float32[
+            1.0 2.0 3.0;
+            0.0 -1.0 2.0;
+        ])
+        y = imported(x)
+        @test size(y) == (2, 1)
+
+        onnx_path = tempname() * ".onnx"
+        out_path = to_onnx(imported, onnx_path; input_shape=(1, 3))
+        @test out_path == onnx_path
+        @test isfile(onnx_path)
+
+        onnx_bytes = read(onnx_path)
+        @test length(onnx_bytes) > 0
+        @test findfirst(Vector{UInt8}(codeunits("Gemm")), onnx_bytes) !== nothing
+        @test findfirst(Vector{UInt8}(codeunits("Relu")), onnx_bytes) !== nothing
+
+        pt_path = tempname() * ".pth"
+        write(pt_path, "placeholder")
+        @test_throws ArgumentError from_pytorch(pt_path; bridge=false)
+
+        bridge_script = tempname() * ".py"
+        open(bridge_script, "w") do io
+            write(io, """
+import argparse
+import json
+
+p = argparse.ArgumentParser()
+p.add_argument("--input", required=True)
+p.add_argument("--output", required=True)
+p.add_argument("--strict", action="store_true")
+p.add_argument("--no-strict", action="store_false", dest="strict")
+args = p.parse_args()
+
+spec = {
+  "format": "axiom.pytorch.sequential.v1",
+  "layers": [
+    {
+      "type": "Linear",
+      "in_features": 3,
+      "out_features": 2,
+      "weight": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+      "bias": [0.0, 0.0]
+    },
+    {"type": "ReLU"}
+  ]
+}
+
+with open(args.output, "w", encoding="utf-8") as f:
+    json.dump(spec, f)
+""")
+        end
+        bridged = from_pytorch(
+            pt_path;
+            python_cmd="python3",
+            bridge_script=bridge_script,
+            strict=true
+        )
+        @test bridged isa Axiom.Pipeline
+
+        cv_model = Sequential(
+            Conv2d(3, 4, (3, 3), padding=1),
+            BatchNorm(4),
+            ReLU(),
+            MaxPool2d((2, 2)),
+            Conv2d(4, 8, (3, 3), padding=1),
+            AvgPool2d((2, 2)),
+            GlobalAvgPool(),
+            Dense(8, 4),
+            Softmax()
+        )
+        cv_onnx_path_a = tempname() * ".onnx"
+        cv_onnx_path_b = tempname() * ".onnx"
+        to_onnx(cv_model, cv_onnx_path_a; input_shape=(1, 16, 16, 3))
+        to_onnx(cv_model, cv_onnx_path_b; input_shape=(1, 16, 16, 3))
+        cv_onnx_a = read(cv_onnx_path_a)
+        cv_onnx_b = read(cv_onnx_path_b)
+        @test cv_onnx_a == cv_onnx_b
+        @test findfirst(Vector{UInt8}(codeunits("Conv")), cv_onnx_a) !== nothing
+        @test findfirst(Vector{UInt8}(codeunits("BatchNormalization")), cv_onnx_a) !== nothing
+        @test findfirst(Vector{UInt8}(codeunits("MaxPool")), cv_onnx_a) !== nothing
+        @test findfirst(Vector{UInt8}(codeunits("AveragePool")), cv_onnx_a) !== nothing
+        @test findfirst(Vector{UInt8}(codeunits("GlobalAveragePool")), cv_onnx_a) !== nothing
+
+        rm(spec_path)
+        rm(onnx_path)
+        rm(pt_path)
+        rm(bridge_script)
+        rm(cv_onnx_path_a)
+        rm(cv_onnx_path_b)
     end
 
     @testset "Verification" begin
@@ -474,6 +764,7 @@ using JSON
 
     # Include proof serialization tests
     include("verification/serialization_tests.jl")
+    include("verification/proof_export_tests.jl")
 
 end
 

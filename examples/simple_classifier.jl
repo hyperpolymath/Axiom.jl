@@ -155,7 +155,7 @@ println("
   6. Rust backend for production performance
 
   Next steps:
-  - Install Rust backend for 2-3x speedup
-  - Track model import APIs in roadmap (PyTorch/ONNX)
+  - Install Rust backend for accelerated production kernels
+  - Use `from_pytorch(...)` and `to_onnx(...)` for interop workflows
   - Deploy verified models with confidence
 ")

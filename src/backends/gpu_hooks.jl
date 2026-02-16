@@ -271,14 +271,15 @@ struct ROCmCompiledModel{M}
 end
 
 function forward(rm::ROCmCompiledModel, x)
-    # In full implementation with AMDGPU.jl:
-    # 1. Transfer x to GPU: x_gpu = ROCArray(x)
-    # 2. Execute forward pass on GPU
-    # 3. Transfer result back: Array(result)
-
-    @debug "ROCmCompiledModel: executing on CPU (AMDGPU.jl not loaded)"
+    @debug "ROCmCompiledModel requires tensor input for accelerated path; falling back to model forward"
     forward(rm.model, x)
 end
+
+function forward(rm::ROCmCompiledModel, x::AbstractTensor)
+    _gpu_forward(rm.model, x, rm.backend)
+end
+
+(rm::ROCmCompiledModel)(x) = forward(rm, x)
 
 parameters(rm::ROCmCompiledModel) = parameters(rm.model)
 output_shape(rm::ROCmCompiledModel, input_shape) = output_shape(rm.model, input_shape)

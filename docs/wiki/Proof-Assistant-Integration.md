@@ -331,9 +331,9 @@ export_coq(model, "model.v")
 
 Current integration is **experimental**:
 
-1. **Manual Proof Completion** - Exported proofs contain `sorry`/`Admitted`, must be filled manually
-2. **Limited Automation** - Tactics for ML-specific properties not yet developed
-3. **Round-Trip** - Cannot automatically import completed proofs back to Axiom
+1. **Manual Proof Completion** - Exported proofs still contain `sorry`/`Admitted` placeholders for assistant-side completion
+2. **Limited Automation** - Tactics for ML-specific properties are still a research/development track
+3. **Round-Trip Scope** - Completed Lean/Coq/Isabelle files can be imported for obligation-status summaries, but full assistant proof replay/validation is not yet automated
 4. **Performance** - Proof checking can be slow for large models
 
 ## Future Work

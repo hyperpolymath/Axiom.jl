@@ -76,7 +76,7 @@ cargo build --release
 
 ### Can I use Axiom.jl without GPU?
 
-Yes! Axiom.jl works on CPU. GPU support (CUDA, Metal) is optional.
+Yes! Axiom.jl works on CPU. GPU support (CUDA, ROCm, Metal) is optional.
 
 ### Do you support TPU/NPU/DSP/FPGA?
 
@@ -93,7 +93,8 @@ Current status:
 Yes, with the following scope:
 - REST: in-tree runtime server via `serve_rest(...)`
 - GraphQL: in-tree runtime server via `serve_graphql(...)`
-- gRPC: in-tree proto generation (`generate_grpc_proto`) and in-process handlers (`grpc_predict`, `grpc_health`); network runtime integration is in progress
+- gRPC: in-tree proto generation, in-process handlers, and network bridge server via `serve_grpc(...)`
+  (supports `application/grpc` binary unary protobuf and `application/grpc+json` bridge mode)
 
 ---
 
@@ -143,17 +144,15 @@ parameters(layer::MyLayer) = (weight=layer.weight, bias=layer.bias)
 
 ### Can I use pre-trained weights?
 
-Pre-trained import APIs are on the roadmap but not yet stable public APIs.
-Today, use Axiom-native models/checkpoints or convert models manually.
-
-Planned API shape:
+`from_pytorch(...)` supports both direct checkpoints and descriptor import:
 ```julia
-model = from_pytorch("pretrained.pth")
+model = from_pytorch("pretrained.pt")           # requires python3 + torch
+model = from_pytorch("pretrained.pytorch.json")
 ```
 
-Tracked roadmap item for Hugging Face-style loading:
+ONNX export API is available in the currently supported subset:
 ```julia
-model = from_huggingface("bert-base-uncased")
+to_onnx(model, "model.onnx", input_shape=(1, 3, 224, 224))
 ```
 
 ### How do I freeze layers?

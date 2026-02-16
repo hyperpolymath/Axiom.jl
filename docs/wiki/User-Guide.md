@@ -116,17 +116,39 @@ server = serve_graphql(model; host="127.0.0.1", port=8081, background=true)
 # close(server) when done
 ```
 
-gRPC contract + handlers:
+gRPC bridge server + proto contract:
 
 ```julia
 using Axiom
+
+model = Sequential(Dense(10, 5, relu), Dense(5, 3), Softmax())
+server = serve_grpc(model; host="127.0.0.1", port=50051, background=true)
+# close(server) when done
 
 generate_grpc_proto("axiom_inference.proto")
 grpc_support_status()
 ```
 
-`generate_grpc_proto` and the in-process `grpc_predict`/`grpc_health` handlers are included in-tree.
-Network gRPC serving is intended to use the generated proto with your chosen gRPC runtime.
+`generate_grpc_proto`, in-process handlers, and an in-tree network gRPC bridge are included.
+The bridge serves `POST /axiom.v1.AxiomInference/Predict` and `POST|GET /axiom.v1.AxiomInference/Health`.
+Supported content types:
+- `application/grpc` (binary unary protobuf frames)
+- `application/grpc+json` (JSON bridge mode)
+
+## Interop APIs (PyTorch import / ONNX export)
+
+```julia
+using Axiom
+
+# Import a PyTorch checkpoint directly (requires python3 + torch)
+model = from_pytorch("model.pt")
+
+# Or import a canonical descriptor (axiom.pytorch.sequential.v1)
+model = from_pytorch("model.pytorch.json")
+
+# Export to ONNX (Dense/Conv/Norm/Pool + common activations)
+to_onnx(model, "model.onnx", input_shape=(1, 3, 224, 224))
+```
 
 ## Troubleshooting
 

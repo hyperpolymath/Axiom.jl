@@ -693,22 +693,28 @@ model = load_model("model.axiom")
 
 ---
 
-### export_onnx
+### to_onnx / export_onnx
 
-Export to ONNX format.
+Export a supported model to ONNX format.
+Current coverage includes `Dense`, `Conv2d`, `BatchNorm`, `LayerNorm`,
+`MaxPool2d`, `AvgPool2d`, `AdaptiveAvgPool2d` (output `(1,1)`), `GlobalAvgPool`,
+`Flatten`, and common activations in `Sequential`/`Pipeline` models.
 
 ```julia
-export_onnx(model, "model.onnx", input_shape=(1, 784))
+to_onnx(model, "model.onnx", input_shape=(1, 3, 224, 224))
 ```
 
 ---
 
-### load_pytorch
+### from_pytorch / load_pytorch
 
-Load PyTorch model.
+Load a PyTorch model from:
+- canonical JSON descriptor (`axiom.pytorch.sequential.v1`)
+- direct `.pt/.pth/.ckpt` checkpoints via the built-in Python bridge (`python3` + `torch`)
 
 ```julia
-model = load_pytorch("model.pt")
+model = from_pytorch("model.pt")
+model = from_pytorch("model.pytorch.json")
 ```
 
 ---

@@ -72,18 +72,25 @@ cert = verify(model) |> generate_certificate
 save_certificate(cert, "fda_submission.cert")
 ----
 
-=== Model Interoperability (Roadmap)
+=== Model Interoperability
 
 [source,julia]
 ----
-# Build a model and verify it in Axiom directly
-model = Sequential(Dense(784, 128, relu), Dense(128, 10), Softmax())
-input = Tensor(randn(Float32, 16, 784))
-output = model(input)
-result = verify(model, properties=[ValidProbabilities(), FiniteOutput()], data=[(input, nothing)])
+# Import from a PyTorch checkpoint (.pt/.pth/.ckpt) via built-in Python bridge
+# (requires python3 + torch in the selected runtime)
+model = from_pytorch("model.pt")
+
+# Or import canonical descriptor JSON
+model2 = from_pytorch("model.pytorch.json")
+
+# Export supported models to ONNX
+to_onnx(model, "model.onnx", input_shape=(1, 3, 224, 224))
 ----
 
-PyTorch/ONNX import paths are tracked as future work and are not yet a stable public API.
+Current scope:
+
+* `from_pytorch(...)`: canonical descriptor import + direct `.pt/.pth/.ckpt` bridge.
+* `to_onnx(...)`: export for `Sequential`/`Pipeline` models built from Dense/Conv/Norm/Pool + common activations.
 
 === High Performance
 
@@ -117,8 +124,23 @@ rest_server = serve_rest(model; host="0.0.0.0", port=8080, background=true)
 # GraphQL
 graphql_server = serve_graphql(model; host="0.0.0.0", port=8081, background=true)
 
-# gRPC contract generation
+# gRPC bridge server + contract generation
+# - binary unary protobuf (`application/grpc`)
+# - JSON bridge mode (`application/grpc+json`)
+grpc_server = serve_grpc(model; host="0.0.0.0", port=50051, background=true)
 generate_grpc_proto("axiom_inference.proto")
+----
+
+=== Interop APIs
+
+[source,julia]
+----
+# PyTorch import (checkpoint bridge or canonical descriptor JSON)
+model = from_pytorch("model.pt")
+model = from_pytorch("model.pytorch.json")
+
+# ONNX export (Dense/Conv/Norm/Pool + common activations)
+to_onnx(model, "model.onnx", input_shape=(1, 3, 224, 224))
 ----
 
 == Quick Start
