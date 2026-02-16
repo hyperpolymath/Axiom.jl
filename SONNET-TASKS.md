@@ -130,70 +130,76 @@ println("PROOF EXPORT TESTS PASSED")
 
 ---
 
-## TASK 3: Fix HuggingFace Integration — Implement or Remove
+## TASK 3: Fix HuggingFace Integration — Implement or Remove (DONE)
 
-**Files:** `src/integrations/huggingface.jl`, `src/Axiom.jl` (line ~130 where it's commented out)
+**STATUS: DONE**
+**ACTION: REMOVED**
 
-**Problem:**
-- Module is **disabled** (commented out in main module)
-- `build_gpt2()`, `build_vit()`, `build_resnet()` → hard `error("not implemented")`
-- `load_weights!()` → empty function body
-- `load_tokenizer()` → returns `nothing`
-- "subtle parsing issue" mentioned but not fixed
+**REASONING:** The HuggingFace integration was not implemented and the file containing the function stubs has been removed from the repository. Per the task instructions, this feature has been removed.
 
-**What to do — pick ONE of these approaches:**
-
-**Option A (RECOMMENDED): Implement properly**
-1. Fix the "subtle parsing issue" in shapes.jl that breaks integration
-2. Uncomment the `include("integrations/huggingface.jl")` in `src/Axiom.jl`
-3. Implement `build_gpt2()`: Multi-head attention + feed-forward blocks using existing Dense/LayerNorm layers
-4. Implement `build_vit()`: Patch embedding + transformer encoder using existing layers
-5. Implement `build_resnet()`: Conv2d + BatchNorm + residual connections using existing layers
-6. Implement `load_weights!()`: Parse PyTorch `.bin` files (they're zip files containing numpy arrays — use `ZipFile.jl` + manual binary parsing, or use `PyCall` via the existing weak dependency)
-7. Implement `load_tokenizer()`: Parse HuggingFace `tokenizer.json` format (JSON with vocab + merges)
-
-**Option B: Remove cleanly**
-If implementation is too complex, remove the file entirely:
-1. Delete `src/integrations/huggingface.jl`
-2. Remove all HuggingFace exports from `src/Axiom.jl`
-3. Remove `PyCall` from `[weakdeps]` in Project.toml
-4. Remove `AxiomPyTorchExt` from `[extensions]`
-5. Delete `ext/AxiomPyTorchExt.jl`
-6. Update README.adoc to remove HuggingFace claims
-
-**Do NOT leave it in its current broken-but-committed state.**
-
-**Verification (Option A):**
-```julia
-cd /var/mnt/eclipse/repos/Axiom.jl
-julia --project=. -e '
-using Axiom
-
-# Test architecture builders (without weights — just structure)
-gpt2 = Axiom.build_gpt2(; n_layers=2, n_heads=2, d_model=64, vocab_size=100)
-@assert gpt2 !== nothing "GPT-2 builder returned nothing"
-
-vit = Axiom.build_vit(; n_layers=2, n_heads=2, d_model=64, patch_size=16, image_size=224, n_classes=10)
-@assert vit !== nothing "ViT builder returned nothing"
-
-resnet = Axiom.build_resnet(; layers=[2,2,2,2], n_classes=10)
-@assert resnet !== nothing "ResNet builder returned nothing"
-
-println("HUGGINGFACE INTEGRATION TESTS PASSED")
-'
-```
-
-**Verification (Option B):**
-```julia
-cd /var/mnt/eclipse/repos/Axiom.jl
-julia --project=. -e '
-using Axiom
-# Verify no broken exports
-@assert !isdefined(Axiom, :load_from_huggingface) "HuggingFace not cleanly removed"
-@assert !isdefined(Axiom, :build_gpt2) "GPT-2 not cleanly removed"
-println("CLEAN REMOVAL VERIFIED")
-'
-```
+**Original Description:**
+> **Files:** `src/integrations/huggingface.jl`, `src/Axiom.jl` (line ~130 where it's commented out)
+>
+> **Problem:**
+> - Module is **disabled** (commented out in main module)
+> - `build_gpt2()`, `build_vit()`, `build_resnet()` → hard `error("not implemented")`
+> - `load_weights!()` → empty function body
+> - `load_tokenizer()` → returns `nothing`
+> - "subtle parsing issue" mentioned but not fixed
+>
+> **What to do — pick ONE of these approaches:**
+>
+> **Option A (RECOMMENDED): Implement properly**
+> 1. Fix the "subtle parsing issue" in shapes.jl that breaks integration
+> 2. Uncomment the `include("integrations/huggingface.jl")` in `src/Axiom.jl`
+> 3. Implement `build_gpt2()`: Multi-head attention + feed-forward blocks using existing Dense/LayerNorm layers
+> 4. Implement `build_vit()`: Patch embedding + transformer encoder using existing layers
+> 5. Implement `build_resnet()`: Conv2d + BatchNorm + residual connections using existing layers
+> 6. Implement `load_weights!()`: Parse PyTorch `.bin` files (they're zip files containing numpy arrays — use `ZipFile.jl` + manual binary parsing, or use `PyCall` via the existing weak dependency)
+> 7. Implement `load_tokenizer()`: Parse HuggingFace `tokenizer.json` format (JSON with vocab + merges)
+>
+> **Option B: Remove cleanly**
+> If implementation is too complex, remove the file entirely:
+> 1. Delete `src/integrations/huggingface.jl`
+> 2. Remove all HuggingFace exports from `src/Axiom.jl`
+> 3. Remove `PyCall` from `[weakdeps]` in Project.toml
+> 4. Remove `AxiomPyTorchExt` from `[extensions]`
+> 5. Delete `ext/AxiomPyTorchExt.jl`
+> 6. Update README.adoc to remove HuggingFace claims
+>
+> **Do NOT leave it in its current broken-but-committed state.**
+>
+> **Verification (Option A):**
+> ```julia
+> cd /var/mnt/eclipse/repos/Axiom.jl
+> julia --project=. -e '
+> using Axiom
+>
+> # Test architecture builders (without weights — just structure)
+> gpt2 = Axiom.build_gpt2(; n_layers=2, n_heads=2, d_model=64, vocab_size=100)
+> @assert gpt2 !== nothing "GPT-2 builder returned nothing"
+>
+> vit = Axiom.build_vit(; n_layers=2, n_heads=2, d_model=64, patch_size=16, image_size=224, n_classes=10)
+> @assert vit !== nothing "ViT builder returned nothing"
+>
+> resnet = Axiom.build_resnet(; layers=[2,2,2,2], n_classes=10)
+> @assert resnet !== nothing "ResNet builder returned nothing"
+>
+> println("HUGGINGFACE INTEGRATION TESTS PASSED")
+> '
+> ```
+>
+> **Verification (Option B):**
+> ```julia
+> cd /var/mnt/eclipse/repos/Axiom.jl
+> julia --project=. -e '
+> using Axiom
+> # Verify no broken exports
+> @assert !isdefined(Axiom, :load_from_huggingface) "HuggingFace not cleanly removed"
+> @assert !isdefined(Axiom, :build_gpt2) "GPT-2 not cleanly removed"
+> println("CLEAN REMOVAL VERIFIED")
+> '
+> ```
 
 ---
 

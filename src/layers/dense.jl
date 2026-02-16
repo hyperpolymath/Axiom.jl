@@ -161,21 +161,21 @@ input_2d = rand(16, 5) # Batch size 16
 output_2d = forward(dense, input_2d) # output_2d is a Matrix{Float32} of size (16, 3)
 ```
 """
-function forward(d::Dense, x::AbstractArray)
+function forward(d::Dense, x::AbstractTensor)
     # x: (batch, in_features) or (in_features,)
     # output: (batch, out_features) or (out_features,)
 
     if ndims(x) == 1
-        y = d.weight' * x # W'x
+        y = d.weight' * x.data # W'x
     else
-        y = x * d.weight # xW
+        y = x.data * d.weight # xW
     end
 
     if d.bias !== nothing
         y = y .+ d.bias' # Add bias, broadcasting if y is 2D
     end
 
-    d.activation(y)
+    Tensor(d.activation(y))
 end
 
 """
@@ -266,7 +266,7 @@ function output_shape(d::Dense, input_shape::Type{Shape{input}}) where input
 end
 
 """
-    verify_input_shape(d::Dense, x::AbstractArray) -> Bool
+    verify_input_shape(d::Dense, x::AbstractTensor) -> Bool
 
 Performs runtime verification of the input tensor `x`'s feature dimension
 against the `Dense` layer's `d.in_features`. This check ensures that the
@@ -276,7 +276,7 @@ catch for dynamic dimensions.
 
 Arguments:
 - `d::Dense`: The `Dense` layer instance.
-- `x::AbstractArray`: The input data to the layer.
+- `x::AbstractTensor`: The input data to the layer.
 
 Returns:
 - `Bool`: Always returns `true` if the verification passes. This function
@@ -306,8 +306,8 @@ verify_input_shape(dense_layer, input_2d_ok) # Returns true
 # e.g., verify_input_shape(dense_layer, rand(8)) would fail
 ```
 """
-function verify_input_shape(d::Dense, x::AbstractArray)
-    in_dim = ndims(x) == 1 ? length(x) : size(x, 2)
+function verify_input_shape(d::Dense, x::AbstractTensor)
+    in_dim = ndims(x) == 1 ? length(x.data) : size(x.data, 2)
     if in_dim != d.in_features
         throw(DimensionMismatch(
             "Dense layer expects input with $(d.in_features) features, got $in_dim"

@@ -145,6 +145,20 @@ end
 
 function translate_to_lean(property::String)
     # Basic translation (would need full parser)
+    if property == "ValidProbabilities"
+        return "∀ x, (∑ i, (model x)[i] = 1) ∧ (∀ i, (model x)[i] ≥ 0 ∧ (model x)[i] ≤ 1)"
+    elseif startswith(property, "BoundedOutput")
+        m = match(r"BoundedOutput\((.*), (.*)\)", property)
+        if m !== nothing
+            low, high = m.captures
+            return "∀ x, ∀ i, (model x)[i] ≥ $low ∧ (model x)[i] ≤ $high"
+        end
+    elseif property == "NoNaN"
+        return "∀ x, ∀ i, ¬ (is_nan (model x)[i])"
+    elseif property == "NoInf"
+        return "∀ x, ∀ i, ¬ (is_inf (model x)[i])"
+    end
+    
     property = replace(property, "∀" => "∀")
     property = replace(property, "∈" => "∈")
     property = replace(property, "⟹" => "→")
@@ -157,6 +171,20 @@ end
 
 function translate_to_coq(property::String)
     # Basic translation
+    if property == "ValidProbabilities"
+        return "forall x, (sum (model x) = 1) /\\ (forall i, (model x) i >= 0 /\\ (model x) i <= 1)"
+    elseif startswith(property, "BoundedOutput")
+        m = match(r"BoundedOutput\((.*), (.*)\)", property)
+        if m !== nothing
+            low, high = m.captures
+            return "forall x i, (model x) i >= $low /\\ (model x) i <= $high"
+        end
+    elseif property == "NoNaN"
+        return "forall x i, ~ (is_nan ((model x) i))"
+    elseif property == "NoInf"
+        return "forall x i, ~ (is_inf ((model x) i))"
+    end
+
     property = replace(property, "∀" => "forall")
     property = replace(property, "∈" => "∈")  # Coq uses notation
     property = replace(property, "⟹" => "->")
@@ -168,6 +196,20 @@ end
 
 function translate_to_isabelle(property::String)
     # Isabelle uses ASCII syntax
+    if property == "ValidProbabilities"
+        return "\"\\<forall>x. (\\<Sum>i. (model x) i = 1) \\<and> (\\<forall>i. (model x) i \\<ge> 0 \\<and> (model x) i \\<le> 1)\""
+    elseif startswith(property, "BoundedOutput")
+        m = match(r"BoundedOutput\((.*), (.*)\)", property)
+        if m !== nothing
+            low, high = m.captures
+            return "\"\\<forall>x i. (model x) i \\<ge> $low \\<and> (model x) i \\<le> $high\""
+        end
+    elseif property == "NoNaN"
+        return "\"\\<forall>x i. \\<not> (is_nan ((model x) i))\""
+    elseif property == "NoInf"
+        return "\"\\<forall>x i. \\<not> (is_inf ((model x) i))\""
+    end
+
     property = replace(property, "∀" => "\\<forall>")
     property = replace(property, "∈" => "\\<in>")
     property = replace(property, "⟹" => "\\<Longrightarrow>")

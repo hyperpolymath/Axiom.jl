@@ -3,6 +3,8 @@
 #
 # High-level training API with automatic verification.
 
+using Zygote
+
 """
     train!(model, data, optimizer; kwargs...)
 
@@ -46,19 +48,17 @@ function train!(
         n_batches = 0
 
         for (x, y) in data
-            # Forward pass
-            pred = model(x)
+            # Compute loss and gradients
+            loss, grads = Zygote.withgradient(params) do
+                pred = model(Tensor(x))
+                loss_fn(pred, Tensor(y))
+            end
 
-            # Compute loss
-            loss = loss_fn(pred, y)
             epoch_loss += loss
             n_batches += 1
 
-            # Backward pass (simplified - real implementation uses Zygote)
-            grads = compute_gradients(model, x, y, loss_fn)
-
             # Update parameters
-            step!(optimizer, params, grads)
+            step!(optimizer, params, grads[1])
         end
 
         avg_loss = epoch_loss / n_batches
@@ -93,44 +93,14 @@ end
     compute_gradients(model, x, y, loss_fn)
 
 Compute gradients of loss with respect to model parameters.
-This is a placeholder - production uses Zygote.jl or Enzyme.jl.
 """
 function compute_gradients(model, x, y, loss_fn)
     params = parameters(model)
-
-    # Numerical gradient (very slow, for illustration only)
-    grads = NamedTuple{keys(params)}(
-        Tuple(numerical_gradient(p, model, x, y, loss_fn) for p in values(params))
-    )
-
-    grads
-end
-
-"""
-Compute numerical gradient using finite differences.
-"""
-function numerical_gradient(param, model, x, y, loss_fn; eps=Float32(1e-5))
-    grad = similar(param)
-
-    original = copy(param)
-
-    for i in eachindex(param)
-        # f(x + eps)
-        param[i] = original[i] + eps
-        loss_plus = loss_fn(model(x), y)
-
-        # f(x - eps)
-        param[i] = original[i] - eps
-        loss_minus = loss_fn(model(x), y)
-
-        # Central difference
-        grad[i] = (loss_plus - loss_minus) / (2 * eps)
-
-        # Restore
-        param[i] = original[i]
+    grads = Zygote.gradient(params) do
+        pred = model(Tensor(x))
+        loss_fn(pred, Tensor(y))
     end
-
-    grad
+    return grads[1]
 end
 
 """
@@ -163,13 +133,14 @@ function fit!(
         n_train = 0
 
         for (x, y) in train_data
-            pred = model(x)
-            loss = loss_fn(pred, y)
+            loss, grads = Zygote.withgradient(parameters(model)) do
+                pred = model(Tensor(x))
+                loss_fn(pred, Tensor(y))
+            end
             train_loss += loss
             n_train += 1
 
-            grads = compute_gradients(model, x, y, loss_fn)
-            step!(optimizer, parameters(model), grads)
+            step!(optimizer, parameters(model), grads[1])
         end
 
         train_loss /= n_train
@@ -179,8 +150,8 @@ function fit!(
         n_val = 0
 
         for (x, y) in val_data
-            pred = model(x)
-            loss = loss_fn(pred, y)
+            pred = model(Tensor(x))
+            loss = loss_fn(pred, Tensor(y))
             val_loss += loss
             n_val += 1
         end
@@ -231,8 +202,8 @@ function evaluate(model::Union{AbstractLayer, AxiomModel}, data, metrics::Dict)
         n = 0
 
         for (x, y) in data
-            pred = model(x)
-            total += metric_fn(pred, y)
+            pred = model(Tensor(x))
+            total += metric_fn(pred, Tensor(y))
             n += 1
         end
 

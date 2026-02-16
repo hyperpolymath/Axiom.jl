@@ -48,14 +48,15 @@ function BatchNorm(
                  affine, track_running_stats, true, num_features)
 end
 
-function forward(bn::BatchNorm, x::AbstractArray)
+function forward(bn::BatchNorm, x::AbstractTensor)
     # x shape: (N, ..., C) where C is the feature dimension
+    x_data = x.data
 
     if bn.training
         # Use batch statistics
-        dims = collect(1:ndims(x)-1)  # All dims except channels
-        μ = mean(x, dims=dims)
-        σ² = var(x, dims=dims, corrected=false)
+        dims = collect(1:ndims(x_data)-1)  # All dims except channels
+        μ = mean(x_data, dims=dims)
+        σ² = var(x_data, dims=dims, corrected=false)
 
         # Update running statistics
         if bn.track_running_stats
@@ -64,21 +65,21 @@ function forward(bn::BatchNorm, x::AbstractArray)
         end
     else
         # Use running statistics
-        μ = reshape(bn.running_mean, ones(Int, ndims(x)-1)..., :)
-        σ² = reshape(bn.running_var, ones(Int, ndims(x)-1)..., :)
+        μ = reshape(bn.running_mean, ones(Int, ndims(x_data)-1)..., :)
+        σ² = reshape(bn.running_var, ones(Int, ndims(x_data)-1)..., :)
     end
 
     # Normalize
-    x_norm = (x .- μ) ./ sqrt.(σ² .+ bn.eps)
+    x_norm = (x_data .- μ) ./ sqrt.(σ² .+ bn.eps)
 
     # Scale and shift
     if bn.affine
-        γ = reshape(bn.γ, ones(Int, ndims(x)-1)..., :)
-        β = reshape(bn.β, ones(Int, ndims(x)-1)..., :)
+        γ = reshape(bn.γ, ones(Int, ndims(x_data)-1)..., :)
+        β = reshape(bn.β, ones(Int, ndims(x_data)-1)..., :)
         x_norm = γ .* x_norm .+ β
     end
 
-    x_norm
+    Tensor(x_norm)
 end
 
 function parameters(bn::BatchNorm)
@@ -133,27 +134,28 @@ function LayerNorm(
     LayerNorm{T, typeof(shape)}(γ, β, shape, eps, elementwise_affine)
 end
 
-function forward(ln::LayerNorm, x::AbstractArray)
+function forward(ln::LayerNorm, x::AbstractTensor)
     # Normalize over the last n dimensions matching normalized_shape
+    x_data = x.data
     n_dims = length(ln.normalized_shape)
-    norm_dims = collect(ndims(x)-n_dims+1:ndims(x))
+    norm_dims = collect(ndims(x_data)-n_dims+1:ndims(x_data))
 
-    μ = mean(x, dims=norm_dims)
-    σ² = var(x, dims=norm_dims, corrected=false)
+    μ = mean(x_data, dims=norm_dims)
+    σ² = var(x_data, dims=norm_dims, corrected=false)
 
-    x_norm = (x .- μ) ./ sqrt.(σ² .+ ln.eps)
+    x_norm = (x_data .- μ) ./ sqrt.(σ² .+ ln.eps)
 
     if ln.elementwise_affine
         # Reshape γ and β to match input dimensions for broadcasting
         # Prepend singleton dimensions for batch/non-normalized dims
-        leading_ones = ntuple(_ -> 1, ndims(x) - n_dims)
+        leading_ones = ntuple(_ -> 1, ndims(x_data) - n_dims)
         reshape_size = (leading_ones..., ln.normalized_shape...)
         γ_reshaped = reshape(ln.γ, reshape_size)
         β_reshaped = reshape(ln.β, reshape_size)
         x_norm = γ_reshaped .* x_norm .+ β_reshaped
     end
 
-    x_norm
+    Tensor(x_norm)
 end
 
 function parameters(ln::LayerNorm)
@@ -195,23 +197,24 @@ function InstanceNorm(
     InstanceNorm{T}(γ, β, eps, affine, num_features)
 end
 
-function forward(inst::InstanceNorm, x::AbstractArray)
+function forward(inst::InstanceNorm, x::AbstractTensor)
     # x shape: (N, H, W, C) or similar
     # Normalize over spatial dimensions (not batch or channel)
-    spatial_dims = collect(2:ndims(x)-1)
+    x_data = x.data
+    spatial_dims = collect(2:ndims(x_data)-1)
 
-    μ = mean(x, dims=spatial_dims)
-    σ² = var(x, dims=spatial_dims, corrected=false)
+    μ = mean(x_data, dims=spatial_dims)
+    σ² = var(x_data, dims=spatial_dims, corrected=false)
 
-    x_norm = (x .- μ) ./ sqrt.(σ² .+ inst.eps)
+    x_norm = (x_data .- μ) ./ sqrt.(σ² .+ inst.eps)
 
     if inst.affine
-        γ = reshape(inst.γ, ones(Int, ndims(x)-1)..., :)
-        β = reshape(inst.β, ones(Int, ndims(x)-1)..., :)
+        γ = reshape(inst.γ, ones(Int, ndims(x_data)-1)..., :)
+        β = reshape(inst.β, ones(Int, ndims(x_data)-1)..., :)
         x_norm = γ .* x_norm .+ β
     end
 
-    x_norm
+    Tensor(x_norm)
 end
 
 function parameters(inst::InstanceNorm)
@@ -257,24 +260,25 @@ function GroupNorm(
     GroupNorm{T}(γ, β, num_groups, num_channels, eps, affine)
 end
 
-function forward(gn::GroupNorm, x::AbstractArray)
+function forward(gn::GroupNorm, x::AbstractTensor)
     # Simplified implementation
     # x shape: (N, ..., C)
-    N = size(x, 1)
-    C = size(x, ndims(x))
+    x_data = x.data
+    N = size(x_data, 1)
+    C = size(x_data, ndims(x_data))
     group_size = C ÷ gn.num_groups
 
     # Reshape to separate groups
-    original_shape = size(x)
+    original_shape = size(x_data)
     spatial = original_shape[2:end-1]
 
     # Normalize per group
-    y = similar(x)
+    y = similar(x_data)
     for g in 1:gn.num_groups
         c_start = (g - 1) * group_size + 1
         c_end = g * group_size
 
-        group_data = selectdim(x, ndims(x), c_start:c_end)
+        group_data = selectdim(x_data, ndims(x_data), c_start:c_end)
 
         μ = mean(group_data)
         σ² = var(group_data, corrected=false)
@@ -288,12 +292,12 @@ function forward(gn::GroupNorm, x::AbstractArray)
     end
 
     if gn.affine
-        γ = reshape(gn.γ, ones(Int, ndims(x)-1)..., :)
-        β = reshape(gn.β, ones(Int, ndims(x)-1)..., :)
+        γ = reshape(gn.γ, ones(Int, ndims(x_data)-1)..., :)
+        β = reshape(gn.β, ones(Int, ndims(x_data)-1)..., :)
         y = γ .* y .+ β
     end
 
-    y
+    Tensor(y)
 end
 
 function parameters(gn::GroupNorm)
@@ -320,10 +324,11 @@ function RMSNorm(dim::Int; eps::Float32=Float32(1e-6), dtype::Type{T}=Float32) w
     RMSNorm{T}(ones(T, dim), eps)
 end
 
-function forward(rn::RMSNorm, x::AbstractArray)
-    rms = sqrt.(mean(x .^ 2, dims=ndims(x)) .+ rn.eps)
-    x_norm = x ./ rms
-    x_norm .* rn.weight'
+function forward(rn::RMSNorm, x::AbstractTensor)
+    x_data = x.data
+    rms = sqrt.(mean(x_data .^ 2, dims=ndims(x_data)) .+ rn.eps)
+    x_norm = x_data ./ rms
+    Tensor(x_norm .* rn.weight')
 end
 
 parameters(rn::RMSNorm) = (weight = rn.weight,)

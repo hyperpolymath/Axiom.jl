@@ -167,17 +167,19 @@ function Conv2d(
     Conv2d{T}(weight, b, st, pd, dl, groups, in_channels, out_channels, ks)
 end
 
-function forward(c::Conv2d, x::AbstractArray)
+function forward(c::Conv2d, x::AbstractTensor)
     # x shape: (N, H, W, C) or (H, W, C)
     # Pure Julia implementation (slow but correct)
     # Real implementation would use BLAS or Rust backend
 
     has_batch = ndims(x) == 4
     if !has_batch
-        x = reshape(x, 1, size(x)...)
+        x_data = reshape(x.data, 1, size(x.data)...)
+    else
+        x_data = x.data
     end
 
-    N, H, W, C_in = size(x)
+    N, H, W, C_in = size(x_data)
     kH, kW = c.kernel_size
     sH, sW = c.stride
     pH, pW = c.padding
@@ -188,13 +190,13 @@ function forward(c::Conv2d, x::AbstractArray)
 
     # Pad input
     if pH > 0 || pW > 0
-        x_padded = zeros(eltype(x), N, H + 2*pH, W + 2*pW, C_in)
-        x_padded[:, pH+1:pH+H, pW+1:pW+W, :] = x
-        x = x_padded
+        x_padded = zeros(eltype(x_data), N, H + 2*pH, W + 2*pW, C_in)
+        x_padded[:, pH+1:pH+H, pW+1:pW+W, :] = x_data
+        x_data = x_padded
     end
 
     # Allocate output
-    y = zeros(eltype(x), N, H_out, W_out, c.out_channels)
+    y = zeros(eltype(x_data), N, H_out, W_out, c.out_channels)
 
     # Convolution (naive implementation)
     for n in 1:N
@@ -204,7 +206,7 @@ function forward(c::Conv2d, x::AbstractArray)
                     h_start = (i - 1) * sH + 1
                     w_start = (j - 1) * sW + 1
 
-                    patch = x[n, h_start:h_start+kH-1, w_start:w_start+kW-1, :]
+                    patch = x_data[n, h_start:h_start+kH-1, w_start:w_start+kW-1, :]
                     kernel = c.weight[:, :, :, oc]
 
                     y[n, i, j, oc] = sum(patch .* kernel)
@@ -220,7 +222,7 @@ function forward(c::Conv2d, x::AbstractArray)
         end
     end
 
-    has_batch ? y : dropdims(y, dims=1)
+    Tensor(has_batch ? y : dropdims(y, dims=1))
 end
 
 function parameters(c::Conv2d)
@@ -294,16 +296,18 @@ function Conv1d(
     Conv1d{T}(weight, b, stride, padding, dilation, in_channels, out_channels, kernel_size)
 end
 
-function forward(c::Conv1d, x::AbstractArray)
+function forward(c::Conv1d, x::AbstractTensor)
     # Simplified 1D conv
     # x shape: (N, L, C) or (L, C)
 
     has_batch = ndims(x) == 3
     if !has_batch
-        x = reshape(x, 1, size(x)...)
+        x_data = reshape(x.data, 1, size(x.data)...)
+    else
+        x_data = x.data
     end
 
-    N, L, C_in = size(x)
+    N, L, C_in = size(x_data)
     k = c.kernel_size
     s = c.stride
     p = c.padding
@@ -312,18 +316,18 @@ function forward(c::Conv1d, x::AbstractArray)
 
     # Pad input
     if p > 0
-        x_padded = zeros(eltype(x), N, L + 2*p, C_in)
-        x_padded[:, p+1:p+L, :] = x
-        x = x_padded
+        x_padded = zeros(eltype(x_data), N, L + 2*p, C_in)
+        x_padded[:, p+1:p+L, :] = x_data
+        x_data = x_padded
     end
 
-    y = zeros(eltype(x), N, L_out, c.out_channels)
+    y = zeros(eltype(x_data), N, L_out, c.out_channels)
 
     for n in 1:N
         for oc in 1:c.out_channels
             for i in 1:L_out
                 start = (i - 1) * s + 1
-                patch = x[n, start:start+k-1, :]
+                patch = x_data[n, start:start+k-1, :]
                 kernel = c.weight[:, :, oc]
                 y[n, i, oc] = sum(patch .* kernel)
             end
@@ -336,7 +340,7 @@ function forward(c::Conv1d, x::AbstractArray)
         end
     end
 
-    has_batch ? y : dropdims(y, dims=1)
+    Tensor(has_batch ? y : dropdims(y, dims=1))
 end
 
 function parameters(c::Conv1d)
@@ -384,16 +388,18 @@ function ConvTranspose2d(
     ConvTranspose2d{T}(weight, b, st, pd, op, in_channels, out_channels, ks)
 end
 
-function forward(c::ConvTranspose2d, x::AbstractArray)
+function forward(c::ConvTranspose2d, x::AbstractTensor)
     # Transposed convolution (deconvolution) - pure Julia implementation
     # x shape: (N, H, W, C_in) or (H, W, C_in)
 
     has_batch = ndims(x) == 4
     if !has_batch
-        x = reshape(x, 1, size(x)...)
+        x_data = reshape(x.data, 1, size(x.data)...)
+    else
+        x_data = x.data
     end
 
-    N, H_in, W_in, C_in = size(x)
+    N, H_in, W_in, C_in = size(x_data)
     kH, kW = c.kernel_size
     sH, sW = c.stride
     pH, pW = c.padding
@@ -404,7 +410,7 @@ function forward(c::ConvTranspose2d, x::AbstractArray)
     W_out = (W_in - 1) * sW - 2 * pW + kW + opW
 
     # Allocate output
-    y = zeros(eltype(x), N, H_out, W_out, c.out_channels)
+    y = zeros(eltype(x_data), N, H_out, W_out, c.out_channels)
 
     # Transposed convolution: scatter input values weighted by kernel
     for n in 1:N
@@ -416,7 +422,7 @@ function forward(c::ConvTranspose2d, x::AbstractArray)
                         h_start = (i - 1) * sH + 1 - pH
                         w_start = (j - 1) * sW + 1 - pW
 
-                        input_val = x[n, i, j, ic]
+                        input_val = x_data[n, i, j, ic]
 
                         # Scatter to output with kernel weights
                         for kh in 1:kH
@@ -443,7 +449,7 @@ function forward(c::ConvTranspose2d, x::AbstractArray)
         end
     end
 
-    has_batch ? y : dropdims(y, dims=1)
+    Tensor(has_batch ? y : dropdims(y, dims=1))
 end
 
 function output_shape(c::ConvTranspose2d, input_shape)
@@ -552,16 +558,18 @@ function Conv3d(
     Conv3d{T}(weight, b, st, pd, dl, groups, in_channels, out_channels, ks)
 end
 
-function forward(c::Conv3d, x::AbstractArray)
+function forward(c::Conv3d, x::AbstractTensor)
     # x shape: (N, D, H, W, C) or (D, H, W, C)
     # Pure Julia implementation (naive but correct)
 
     has_batch = ndims(x) == 5
     if !has_batch
-        x = reshape(x, 1, size(x)...)
+        x_data = reshape(x.data, 1, size(x.data)...)
+    else
+        x_data = x.data
     end
 
-    N, D, H, W, C_in = size(x)
+    N, D, H, W, C_in = size(x_data)
     kD, kH, kW = c.kernel_size
     sD, sH, sW = c.stride
     pD, pH, pW = c.padding
@@ -573,13 +581,13 @@ function forward(c::Conv3d, x::AbstractArray)
 
     # Pad input
     if pD > 0 || pH > 0 || pW > 0
-        x_padded = zeros(eltype(x), N, D + 2*pD, H + 2*pH, W + 2*pW, C_in)
-        x_padded[:, pD+1:pD+D, pH+1:pH+H, pW+1:pW+W, :] = x
-        x = x_padded
+        x_padded = zeros(eltype(x_data), N, D + 2*pD, H + 2*pH, W + 2*pW, C_in)
+        x_padded[:, pD+1:pD+D, pH+1:pH+H, pW+1:pW+W, :] = x_data
+        x_data = x_padded
     end
 
     # Allocate output
-    y = zeros(eltype(x), N, D_out, H_out, W_out, c.out_channels)
+    y = zeros(eltype(x_data), N, D_out, H_out, W_out, c.out_channels)
 
     # Convolution (naive implementation)
     for n in 1:N
@@ -591,7 +599,7 @@ function forward(c::Conv3d, x::AbstractArray)
                         h_start = (i - 1) * sH + 1
                         w_start = (j - 1) * sW + 1
 
-                        patch = x[n, d_start:d_start+kD-1, h_start:h_start+kH-1, w_start:w_start+kW-1, :]
+                        patch = x_data[n, d_start:d_start+kD-1, h_start:h_start+kH-1, w_start:w_start+kW-1, :]
                         kernel = c.weight[:, :, :, :, oc]
 
                         y[n, d, i, j, oc] = sum(patch .* kernel)
@@ -608,7 +616,7 @@ function forward(c::Conv3d, x::AbstractArray)
         end
     end
 
-    has_batch ? y : dropdims(y, dims=1)
+    Tensor(has_batch ? y : dropdims(y, dims=1))
 end
 
 function parameters(c::Conv3d)

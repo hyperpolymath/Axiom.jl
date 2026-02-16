@@ -29,13 +29,11 @@ end
 # Alias
 MaxPool(args...; kwargs...) = MaxPool2d(args...; kwargs...)
 
-function forward(mp::MaxPool2d, x::AbstractArray)
+function forward(mp::MaxPool2d, x::AbstractTensor)
     has_batch = ndims(x) == 4
-    if !has_batch
-        x = reshape(x, 1, size(x)...)
-    end
+    x_data = has_batch ? x.data : reshape(x.data, 1, size(x.data)...)
 
-    N, H, W, C = size(x)
+    N, H, W, C = size(x_data)
     kH, kW = mp.kernel_size
     sH, sW = mp.stride
     pH, pW = mp.padding
@@ -45,12 +43,12 @@ function forward(mp::MaxPool2d, x::AbstractArray)
 
     # Pad input
     if pH > 0 || pW > 0
-        x_padded = fill(typemin(eltype(x)), N, H + 2*pH, W + 2*pW, C)
-        x_padded[:, pH+1:pH+H, pW+1:pW+W, :] = x
-        x = x_padded
+        x_padded = fill(typemin(eltype(x_data)), N, H + 2*pH, W + 2*pW, C)
+        x_padded[:, pH+1:pH+H, pW+1:pW+W, :] = x_data
+        x_data = x_padded
     end
 
-    y = zeros(eltype(x), N, H_out, W_out, C)
+    y = zeros(eltype(x_data), N, H_out, W_out, C)
 
     for n in 1:N
         for c in 1:C
@@ -59,14 +57,14 @@ function forward(mp::MaxPool2d, x::AbstractArray)
                     h_start = (i - 1) * sH + 1
                     w_start = (j - 1) * sW + 1
 
-                    patch = x[n, h_start:h_start+kH-1, w_start:w_start+kW-1, c]
+                    patch = x_data[n, h_start:h_start+kH-1, w_start:w_start+kW-1, c]
                     y[n, i, j, c] = maximum(patch)
                 end
             end
         end
     end
 
-    has_batch ? y : dropdims(y, dims=1)
+    Tensor(has_batch ? y : dropdims(y, dims=1))
 end
 
 function output_shape(mp::MaxPool2d, input_shape)
@@ -115,13 +113,11 @@ end
 # Alias
 AvgPool(args...; kwargs...) = AvgPool2d(args...; kwargs...)
 
-function forward(ap::AvgPool2d, x::AbstractArray)
+function forward(ap::AvgPool2d, x::AbstractTensor)
     has_batch = ndims(x) == 4
-    if !has_batch
-        x = reshape(x, 1, size(x)...)
-    end
+    x_data = has_batch ? x.data : reshape(x.data, 1, size(x.data)...)
 
-    N, H, W, C = size(x)
+    N, H, W, C = size(x_data)
     kH, kW = ap.kernel_size
     sH, sW = ap.stride
     pH, pW = ap.padding
@@ -131,12 +127,12 @@ function forward(ap::AvgPool2d, x::AbstractArray)
 
     # Pad input
     if pH > 0 || pW > 0
-        x_padded = zeros(eltype(x), N, H + 2*pH, W + 2*pW, C)
-        x_padded[:, pH+1:pH+H, pW+1:pW+W, :] = x
-        x = x_padded
+        x_padded = zeros(eltype(x_data), N, H + 2*pH, W + 2*pW, C)
+        x_padded[:, pH+1:pH+H, pW+1:pW+W, :] = x_data
+        x_data = x_padded
     end
 
-    y = zeros(eltype(x), N, H_out, W_out, C)
+    y = zeros(eltype(x_data), N, H_out, W_out, C)
 
     for n in 1:N
         for c in 1:C
@@ -145,14 +141,14 @@ function forward(ap::AvgPool2d, x::AbstractArray)
                     h_start = (i - 1) * sH + 1
                     w_start = (j - 1) * sW + 1
 
-                    patch = x[n, h_start:h_start+kH-1, w_start:w_start+kW-1, c]
+                    patch = x_data[n, h_start:h_start+kH-1, w_start:w_start+kW-1, c]
                     y[n, i, j, c] = mean(patch)
                 end
             end
         end
     end
 
-    has_batch ? y : dropdims(y, dims=1)
+    Tensor(has_batch ? y : dropdims(y, dims=1))
 end
 
 output_shape(ap::AvgPool2d, input_shape) = output_shape(MaxPool2d(ap.kernel_size, ap.stride, ap.padding), input_shape)
@@ -164,14 +160,15 @@ Global average pooling - reduces spatial dimensions to 1.
 """
 struct GlobalAvgPool <: StatelessLayer end
 
-function forward(::GlobalAvgPool, x::AbstractArray)
+function forward(::GlobalAvgPool, x::AbstractTensor)
     # x: (N, H, W, C) -> (N, C) or (H, W, C) -> (C,)
-    spatial_dims = collect(2:ndims(x)-1)
+    x_data = x.data
+    spatial_dims = collect(2:ndims(x_data)-1)
     if isempty(spatial_dims)
         # 2D input (N, C) - just return as is
         return x
     end
-    dropdims(mean(x, dims=Tuple(spatial_dims)), dims=Tuple(spatial_dims))
+    Tensor(dropdims(mean(x_data, dims=Tuple(spatial_dims)), dims=Tuple(spatial_dims)))
 end
 
 function output_shape(::GlobalAvgPool, input_shape)
@@ -191,12 +188,13 @@ Global max pooling - reduces spatial dimensions to 1.
 """
 struct GlobalMaxPool <: StatelessLayer end
 
-function forward(::GlobalMaxPool, x::AbstractArray)
-    spatial_dims = collect(2:ndims(x)-1)
+function forward(::GlobalMaxPool, x::AbstractTensor)
+    x_data = x.data
+    spatial_dims = collect(2:ndims(x_data)-1)
     if isempty(spatial_dims)
         return x
     end
-    dropdims(maximum(x, dims=Tuple(spatial_dims)), dims=Tuple(spatial_dims))
+    Tensor(dropdims(maximum(x_data, dims=Tuple(spatial_dims)), dims=Tuple(spatial_dims)))
 end
 
 output_shape(::GlobalMaxPool, input_shape) = output_shape(GlobalAvgPool(), input_shape)
@@ -212,16 +210,14 @@ end
 
 AdaptiveAvgPool2d(size::Int) = AdaptiveAvgPool2d((size, size))
 
-function forward(ap::AdaptiveAvgPool2d, x::AbstractArray)
+function forward(ap::AdaptiveAvgPool2d, x::AbstractTensor)
     has_batch = ndims(x) == 4
-    if !has_batch
-        x = reshape(x, 1, size(x)...)
-    end
+    x_data = has_batch ? x.data : reshape(x.data, 1, size(x.data)...)
 
-    N, H_in, W_in, C = size(x)
+    N, H_in, W_in, C = size(x_data)
     H_out, W_out = ap.output_size
 
-    y = zeros(eltype(x), N, H_out, W_out, C)
+    y = zeros(eltype(x_data), N, H_out, W_out, C)
 
     for i in 1:H_out
         for j in 1:W_out
@@ -231,11 +227,11 @@ function forward(ap::AdaptiveAvgPool2d, x::AbstractArray)
             w_start = floor(Int, (j - 1) * W_in / W_out) + 1
             w_end = ceil(Int, j * W_in / W_out)
 
-            y[:, i, j, :] = mean(x[:, h_start:h_end, w_start:w_end, :], dims=(2, 3))
+            y[:, i, j, :] = mean(x_data[:, h_start:h_end, w_start:w_end, :], dims=(2, 3))
         end
     end
 
-    has_batch ? y : dropdims(y, dims=1)
+    Tensor(has_batch ? y : dropdims(y, dims=1))
 end
 
 function output_shape(ap::AdaptiveAvgPool2d, input_shape)
@@ -259,16 +255,17 @@ end
 Flatten(; start_dim::Int=2) = Flatten(start_dim)
 
 
-function forward(f::Flatten, x::AbstractArray)
+function forward(f::Flatten, x::AbstractTensor)
     if ndims(x) <= 2
         return x
     end
 
     # Keep batch dimension, flatten the rest
-    batch_size = size(x, 1)
-    features = prod(size(x)[f.start_dim:end])
+    x_data = x.data
+    batch_size = size(x_data, 1)
+    features = prod(size(x_data)[f.start_dim:end])
 
-    reshape(x, batch_size, features)
+    Tensor(reshape(x_data, batch_size, features))
 end
 
 function output_shape(f::Flatten, input_shape)
@@ -291,10 +288,11 @@ struct Reshape{S} <: StatelessLayer
     shape::S
 end
 
-function forward(r::Reshape, x::AbstractArray)
-    batch_size = size(x, 1)
+function forward(r::Reshape, x::AbstractTensor)
+    x_data = x.data
+    batch_size = size(x_data, 1)
     new_shape = (-1, r.shape...)
-    reshape(x, batch_size, r.shape...)
+    Tensor(reshape(x_data, batch_size, r.shape...))
 end
 
 function output_shape(r::Reshape, input_shape)
@@ -310,10 +308,11 @@ struct Unsqueeze <: StatelessLayer
     dim::Int
 end
 
-function forward(u::Unsqueeze, x::AbstractArray)
-    shape = collect(size(x))
+function forward(u::Unsqueeze, x::AbstractTensor)
+    x_data = x.data
+    shape = collect(size(x_data))
     insert!(shape, u.dim, 1)
-    reshape(x, shape...)
+    Tensor(reshape(x_data, shape...))
 end
 
 function output_shape(u::Unsqueeze, input_shape)
@@ -333,12 +332,13 @@ end
 
 Squeeze() = Squeeze(nothing)
 
-function forward(s::Squeeze, x::AbstractArray)
+function forward(s::Squeeze, x::AbstractTensor)
+    x_data = x.data
     if s.dim === nothing
-        dropdims(x, dims=Tuple(findall(==(1), size(x))))
+        Tensor(dropdims(x_data, dims=Tuple(findall(==(1), size(x_data)))))
     else
-        if size(x, s.dim) == 1
-            dropdims(x, dims=s.dim)
+        if size(x_data, s.dim) == 1
+            Tensor(dropdims(x_data, dims=s.dim))
         else
             x
         end

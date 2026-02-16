@@ -47,7 +47,7 @@ function Pipeline(layers...)
 end
 
 # Forward through pipeline
-function forward(p::Pipeline, x)
+function forward(p::Pipeline, x::AbstractTensor)
     for layer in p.layers
         x = forward(layer, x)
     end
