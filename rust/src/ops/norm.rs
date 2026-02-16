@@ -35,7 +35,7 @@ pub fn batchnorm(
             let mut sum = 0.0f32;
             for i in 0..batch_size {
                 let idx = i * num_features + c;
-                sum += input.as_slice().unwrap()[idx];
+                sum += input.as_slice().expect("norm: array not contiguous")[idx];
             }
             let mean = sum / batch_size as f32;
 
@@ -43,7 +43,7 @@ pub fn batchnorm(
             let mut var_sum = 0.0f32;
             for i in 0..batch_size {
                 let idx = i * num_features + c;
-                let diff = input.as_slice().unwrap()[idx] - mean;
+                let diff = input.as_slice().expect("norm: array not contiguous")[idx] - mean;
                 var_sum += diff * diff;
             }
             let var = var_sum / batch_size as f32;
@@ -54,7 +54,7 @@ pub fn batchnorm(
 
             // Normalize and scale
             let inv_std = 1.0 / (var + eps).sqrt();
-            let output_slice = output.as_slice_mut().unwrap();
+            let output_slice = output.as_slice_mut().expect("norm: array not contiguous");
             for i in 0..batch_size {
                 let idx = i * num_features + c;
                 let normalized = (output_slice[idx] - mean) * inv_std;
@@ -67,7 +67,7 @@ pub fn batchnorm(
 
         for c in 0..num_features {
             let inv_std = 1.0 / (running_var[c] + eps).sqrt();
-            let output_slice = output.as_slice_mut().unwrap();
+            let output_slice = output.as_slice_mut().expect("norm: array not contiguous");
 
             for i in 0..batch_size {
                 let idx = i * num_features + c;
@@ -100,10 +100,10 @@ pub fn layernorm(
 
     let mut output = input.clone();
 
-    let output_slice = output.as_slice_mut().unwrap();
-    let input_slice = input.as_slice().unwrap();
-    let gamma_slice = gamma.as_slice().unwrap();
-    let beta_slice = beta.as_slice().unwrap();
+    let output_slice = output.as_slice_mut().expect("norm: array not contiguous");
+    let input_slice = input.as_slice().expect("norm: array not contiguous");
+    let gamma_slice = gamma.as_slice().expect("norm: array not contiguous");
+    let beta_slice = beta.as_slice().expect("norm: array not contiguous");
 
     for batch in 0..batch_size {
         let start = batch * norm_size;
@@ -149,8 +149,8 @@ pub fn instancenorm(
 
     let mut output = input.clone();
 
-    let output_slice = output.as_slice_mut().unwrap();
-    let input_slice = input.as_slice().unwrap();
+    let output_slice = output.as_slice_mut().expect("norm: array not contiguous");
+    let input_slice = input.as_slice().expect("norm: array not contiguous");
 
     for n in 0..batch_size {
         for c in 0..num_channels {
@@ -208,8 +208,8 @@ pub fn groupnorm(
 
     let mut output = input.clone();
 
-    let output_slice = output.as_slice_mut().unwrap();
-    let input_slice = input.as_slice().unwrap();
+    let output_slice = output.as_slice_mut().expect("norm: array not contiguous");
+    let input_slice = input.as_slice().expect("norm: array not contiguous");
 
     for n in 0..batch_size {
         for g in 0..num_groups {
@@ -271,8 +271,8 @@ pub fn rmsnorm(
 
     let mut output = input.clone();
 
-    let output_slice = output.as_slice_mut().unwrap();
-    let input_slice = input.as_slice().unwrap();
+    let output_slice = output.as_slice_mut().expect("norm: array not contiguous");
+    let input_slice = input.as_slice().expect("norm: array not contiguous");
 
     for batch in 0..batch_size {
         let start = batch * hidden_size;
@@ -304,7 +304,7 @@ mod tests {
         let input = ArrayD::from_shape_vec(
             IxDyn(&[2, 4]),
             vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
-        ).unwrap();
+        ).expect("test: shape mismatch");
 
         let gamma = ArrayD::from_elem(IxDyn(&[4]), 1.0f32);
         let beta = ArrayD::from_elem(IxDyn(&[4]), 0.0f32);
@@ -322,7 +322,7 @@ mod tests {
         let input = ArrayD::from_shape_vec(
             IxDyn(&[2, 4]),
             vec![1.0, 2.0, 3.0, 4.0, 1.0, 2.0, 3.0, 4.0]
-        ).unwrap();
+        ).expect("test: shape mismatch");
 
         let weight = vec![1.0f32; 4];
 

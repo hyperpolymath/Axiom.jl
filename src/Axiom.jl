@@ -1,15 +1,65 @@
 # SPDX-FileCopyrightText: 2025 Axiom.jl Contributors
 # SPDX-License-Identifier: PMPL-1.0-or-later
 
-# Axiom.jl - Provably Correct Machine Learning
-#
-# A Julia ML framework with:
-# - Compile-time shape verification
-# - Formal property guarantees
-# - Rust/Zig performance backends
-# - PyTorch model import
+"""
+    Axiom
 
+Axiom.jl: Provably Correct Machine Learning
+
+Axiom.jl is a cutting-edge Julia framework designed to bridge the gap between
+high-performance machine learning and rigorous formal verification. In an era
+where AI systems are deployed in safety-critical and high-stakes applications,
+ensuring their correctness, reliability, and trustworthiness is paramount.
+Axiom.jl addresses this challenge by integrating formal methods directly into
+the ML development lifecycle.
+
+Vision & Philosophy:
+--------------------
+The core philosophy of Axiom.jl is "Provably Correct Machine Learning."
+This means moving beyond empirical testing and statistical guarantees to
+provide mathematical assurances about the behavior and properties of ML models.
+By leveraging techniques from formal verification and dependent type theory,
+Axiom.jl enables developers to build AI systems with a higher degree of
+confidence and accountability.
+
+Key Features:
+-------------
+-   **Compile-time Shape Verification**: Catch tensor dimension mismatches and
+    other structural errors at compile-time, significantly reducing runtime
+    bugs and improving development efficiency.
+-   **Formal Property Guarantees**: Define and verify formal properties of
+    ML models (e.g., robustness, safety invariants, fairness criteria) using
+    specialized DSLs and integration with proof assistants.
+-   **Multi-Backend Support**: Seamlessly integrate with high-performance
+    Rust backend via Foreign Function Interface (FFI),
+    allowing for optimized computation without sacrificing verification
+    capabilities. GPU acceleration available through CUDA/ROCm/Metal extensions.
+-   **Model Interoperability**: Facilitate the import and export of models
+    from popular frameworks like PyTorch and ONNX, enabling formal
+    verification workflows for existing models.
+-   **Comprehensive ML Toolkit**: Provides a full suite of ML functionalities,
+    including a flexible tensor type system, a rich library of neural network
+    layers, automatic differentiation, various optimizers and loss functions,
+    and robust training infrastructure.
+-   **Verification Ecosystem**: Offers tools for property specification, checker
+    integration, certificate generation, and serialization, forming a complete
+    workflow for provable ML.
+
+Motivation & Impact:
+--------------------
+Traditional ML development relies heavily on extensive testing, which can only
+demonstrate the presence of bugs, not their absence. Formal methods, in contrast,
+can prove the absence of certain classes of errors. Axiom.jl aims to empower
+researchers and engineers to build ML models that are not only powerful but also
+demonstrably correct, opening new avenues for trustworthy AI in domains such
+as autonomous systems, medical diagnostics, and financial modeling.
+
+This module serves as the main entry point for the Axiom.jl framework,
+orchestrating the loading of various components and providing key exports
+for user convenience.
+"""
 module Axiom
+
 
 using LinearAlgebra
 using Random
@@ -34,7 +84,7 @@ include("layers/pooling.jl")
 include("dsl/axiom_macro.jl")
 include("dsl/ensure.jl")
 # TODO: prove.jl requires SMTLib (weak dependency) - move to extension
-# include("dsl/prove.jl")
+include("dsl/prove.jl")
 include("dsl/pipeline.jl")
 
 # Automatic differentiation
@@ -69,11 +119,10 @@ include("utils/initialization.jl")
 include("utils/data.jl")
 
 # Integrations
-# TODO: Re-enable in v1.1 after adding HTTP dependency
-# include("integrations/huggingface.jl")
+# (HuggingFace integration removed - planned for future development)
 
 # Re-exports for user convenience
-export @axiom, @ensure  # TODO: @prove requires SMTLib extension
+export @axiom, @ensure
 
 # Tensor types and creation
 export Tensor, DynamicTensor, Shape, DynamicShape
@@ -113,7 +162,7 @@ export ProofCertificate, serialize_proof, deserialize_proof
 export export_proof_certificate, import_proof_certificate, verify_proof_certificate
 
 # Interop
-export from_pytorch, to_onnx
+# (from_pytorch, to_onnx planned for future development)
 
 # Model metadata and packaging (issues #15, #16)
 export ModelMetadata, VerificationClaim

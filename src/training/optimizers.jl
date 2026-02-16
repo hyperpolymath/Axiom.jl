@@ -13,7 +13,9 @@ abstract type AbstractOptimizer end
 """
     step!(optimizer, params, grads)
 
-Perform one optimization step.
+Perform a single optimization step, updating `params` in-place based on
+the computed `grads`. Each optimizer implements its own logic for this
+function.
 """
 function step! end
 

@@ -61,7 +61,11 @@ struct AxiomDefinition
 end
 
 """
-Parse the body of an @axiom block.
+    parse_axiom_body(body::Expr) -> AxiomDefinition
+
+Parse the `begin...end` block of an `@axiom` macro call into a structured
+`AxiomDefinition` object. It identifies input/output type annotations,
+layer assignments, and `@ensure`/`@prove` macros.
 """
 function parse_axiom_body(body::Expr)
     @assert body.head == :block "Expected begin...end block"
@@ -79,7 +83,7 @@ function parse_axiom_body(body::Expr)
         if expr isa Expr
             if expr.head == :(::)
                 # Type annotation: input :: Type or output :: Type
-                name, typ = expr.args
+                name, typ = _parse_type_annotation(expr)
                 if name == :input
                     input_type = typ
                 elseif name == :output
@@ -87,15 +91,15 @@ function parse_axiom_body(body::Expr)
                 end
             elseif expr.head == :(=)
                 # Assignment: layer = expr
-                name, value = expr.args
+                name, value = _parse_assignment(expr)
                 push!(layers, name => value)
             elseif expr.head == :macrocall
                 # Macro: @ensure or @prove
-                macro_name = string(expr.args[1])
-                if macro_name == "@ensure"
-                    push!(ensures, expr.args[3])  # Skip macro name and line number
-                elseif macro_name == "@prove"
-                    push!(proves, expr.args[3])
+                macro_type, macro_expr = _parse_macro_call(expr)
+                if macro_type == :ensure
+                    push!(ensures, macro_expr)
+                elseif macro_type == :prove
+                    push!(proves, macro_expr)
                 end
             end
         end
@@ -104,44 +108,41 @@ function parse_axiom_body(body::Expr)
     AxiomDefinition(input_type, output_type, layers, ensures, proves)
 end
 
+function _parse_type_annotation(expr::Expr)
+    @assert expr.head == :(::)
+    name, typ = expr.args
+    return name, typ
+end
+
+function _parse_assignment(expr::Expr)
+    @assert expr.head == :(=)
+    name, value = expr.args
+    return name, value
+end
+
+function _parse_macro_call(expr::Expr)
+    @assert expr.head == :macrocall
+    macro_name = string(expr.args[1])
+    if macro_name == "@ensure"
+        return :ensure, expr.args[3]  # Skip macro name and line number
+    elseif macro_name == "@prove"
+        return :prove, expr.args[3]
+    else
+        error("Unsupported macro in @axiom block: $(macro_name)")
+    end
+end
+
 """
-Generate Julia code from parsed axiom definition.
+    generate_axiom_code(name::Symbol, def::AxiomDefinition) -> Expr
+
+Generate the Julia code for a model struct and its methods based on the
+parsed `AxiomDefinition`. This includes the struct definition, layer
+initialization, the forward pass function, and any `@ensure` checks.
 """
 function generate_axiom_code(name::Symbol, def::AxiomDefinition)
-    # Build layer initialization
-    layer_fields = []
-    layer_inits = []
-
-    for (layer_name, layer_expr) in def.layers
-        # Skip 'output' as it's a computed value
-        layer_name == :output && continue
-
-        push!(layer_fields, :($layer_name::Any))
-        push!(layer_inits, :($layer_name = $(esc(layer_expr))))
-    end
-
-    # Build forward pass
-    forward_body = []
-    for (layer_name, layer_expr) in def.layers
-        if is_pipeline_expr(layer_expr)
-            # Pipeline expression: x |> Layer(...)
-            push!(forward_body, :($layer_name = $(transform_pipeline(layer_expr))))
-        else
-            push!(forward_body, :($layer_name = $(esc(layer_expr))))
-        end
-    end
-
-    # Build ensure checks
-    ensure_checks = []
-    for ensure_expr in def.ensures
-        check_name = gensym("ensure")
-        push!(ensure_checks, quote
-            $check_name = $(esc(ensure_expr))
-            if !$check_name
-                throw(AxiomViolation($(string(ensure_expr)), "Ensure condition failed"))
-            end
-        end)
-    end
+    layer_fields, layer_inits = _generate_layer_fields_and_inits(def)
+    forward_body = _generate_forward_body(def)
+    ensure_checks = _generate_ensure_checks(def)
 
     # Generate the struct and methods
     quote
@@ -165,8 +166,51 @@ function generate_axiom_code(name::Symbol, def::AxiomDefinition)
     end
 end
 
+function _generate_layer_fields_and_inits(def::AxiomDefinition)
+    layer_fields = []
+    layer_inits = []
+
+    for (layer_name, layer_expr) in def.layers
+        # Skip 'output' as it's a computed value
+        layer_name == :output && continue
+
+        push!(layer_fields, :($layer_name::Any))
+        push!(layer_inits, :($layer_name = $(esc(layer_expr))))
+    end
+    return layer_fields, layer_inits
+end
+
+function _generate_forward_body(def::AxiomDefinition)
+    forward_body = []
+    for (layer_name, layer_expr) in def.layers
+        if is_pipeline_expr(layer_expr)
+            # Pipeline expression: x |> Layer(...)
+            push!(forward_body, :($layer_name = $(transform_pipeline(layer_expr))))
+        else
+            push!(forward_body, :($layer_name = $(esc(layer_expr))))
+        end
+    end
+    return forward_body
+end
+
+function _generate_ensure_checks(def::AxiomDefinition)
+    ensure_checks = []
+    for ensure_expr in def.ensures
+        check_name = gensym("ensure")
+        push!(ensure_checks, quote
+            $check_name = $(esc(ensure_expr))
+            if !$check_name
+                throw(AxiomViolation($(string(ensure_expr)), "Ensure condition failed"))
+            end
+        end)
+    end
+    return ensure_checks
+end
+
 """
-Check if expression is a pipeline (uses |> operator).
+    is_pipeline_expr(expr) -> Bool
+
+Check if a given expression is a pipeline expression using the `|>` operator.
 """
 function is_pipeline_expr(expr::Expr)
     expr.head == :call && expr.args[1] == :|>
@@ -174,7 +218,10 @@ end
 is_pipeline_expr(::Any) = false
 
 """
-Transform pipeline expression to function composition.
+    transform_pipeline(expr::Expr) -> Expr
+
+Recursively transform a pipeline expression `a |> b |> c` into nested
+function calls `c(b(a))`.
 """
 function transform_pipeline(expr::Expr)
     if !is_pipeline_expr(expr)

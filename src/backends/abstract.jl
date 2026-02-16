@@ -194,9 +194,6 @@ function compile(
     compile_to_backend(converted, backend)
 end
 
-"""
-Apply model optimizations.
-"""
 function optimize_model(model, target::CompilationTarget)
     optimized = model
 
@@ -222,33 +219,21 @@ function optimize_model(model, target::CompilationTarget)
     optimized
 end
 
-"""
-Fold BatchNorm layers into preceding linear/conv layers.
-"""
 function fold_batchnorm(model)
     # For pipelines, the optimization is already handled in optimize_pipeline
     model
 end
 
-"""
-Fold constant computations.
-"""
 function fold_constants(model)
     # No-op for most models - constants are evaluated at definition time in Julia
     model
 end
 
-"""
-Remove unused/dead code paths.
-"""
 function eliminate_dead_code(model)
     # In Julia, unused code is typically not compiled anyway
     model
 end
 
-"""
-Apply aggressive optimizations for maximum performance.
-"""
 function apply_aggressive_optimizations(model, target::CompilationTarget)
     # Aggressive optimizations that may affect numerical precision
     # - Fuse more operations
@@ -257,26 +242,14 @@ function apply_aggressive_optimizations(model, target::CompilationTarget)
     model
 end
 
-"""
-Convert model to float16.
-"""
 function to_float16(model)
     convert_precision(model, Float16)
 end
 
-"""
-Convert model to mixed precision.
-
-Mixed precision keeps master weights in Float32 but uses Float16 for forward/backward passes.
-This is a simplified implementation that marks the model for mixed precision execution.
-"""
 function to_mixed_precision(model)
     MixedPrecisionWrapper(model)
 end
 
-"""
-Recursively convert model parameters to specified precision.
-"""
 function convert_precision(model::AbstractLayer, ::Type{T}) where T
     params = parameters(model)
     if isempty(params)
@@ -354,9 +327,6 @@ end
 parameters(mp::MixedPrecisionWrapper) = parameters(mp.model)
 output_shape(mp::MixedPrecisionWrapper, input_shape) = output_shape(mp.model, input_shape)
 
-"""
-Compile model to specific backend.
-"""
 function compile_to_backend(model, backend::JuliaBackend)
     # Julia backend - just return the model
     model

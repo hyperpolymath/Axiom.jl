@@ -39,7 +39,7 @@ struct ValidProbabilities <: Property end
 
 function check(::ValidProbabilities, model, data)
     for (x, _) in data
-        output = model(x)
+        output = model(x).data
 
         # Check sum
         sums = sum(output, dims=ndims(output))
@@ -67,7 +67,7 @@ end
 
 function check(prop::BoundedOutput, model, data)
     for (x, _) in data
-        output = model(x)
+        output = model(x).data
         if any(output .< prop.low) || any(output .> prop.high)
             return false
         end
@@ -84,7 +84,7 @@ struct NoNaN <: Property end
 
 function check(::NoNaN, model, data)
     for (x, _) in data
-        output = model(x)
+        output = model(x).data
         if any(isnan, output)
             return false
         end
@@ -101,7 +101,7 @@ struct NoInf <: Property end
 
 function check(::NoInf, model, data)
     for (x, _) in data
-        output = model(x)
+        output = model(x).data
         if any(isinf, output)
             return false
         end
@@ -136,14 +136,14 @@ end
 
 function check(prop::LocalLipschitz, model, data; n_perturbations::Int=10)
     for (x, _) in data
-        base_output = model(x)
+        base_output = model(x).data
 
         for _ in 1:n_perturbations
             # Random perturbation within epsilon ball
-            perturbation = randn(size(x)...) .* prop.epsilon
-            perturbed_x = x .+ perturbation
+            perturbation = randn(size(x.data)...) .* prop.epsilon
+            perturbed_x = x.data .+ perturbation
 
-            perturbed_output = model(perturbed_x)
+            perturbed_output = model(Tensor(perturbed_x)).data
 
             # Check output difference
             diff = maximum(abs.(base_output .- perturbed_output))
@@ -170,13 +170,13 @@ AdversarialRobust(epsilon) = AdversarialRobust(epsilon, :fgsm)
 function check(prop::AdversarialRobust, model, data)
     for (x, y) in data
         # Get original prediction
-        original_pred = argmax(model(x), dims=2)
+        original_pred = argmax(model(x).data, dims=2)
 
         # Generate adversarial example
         adv_x = generate_adversarial(model, x, y, prop.epsilon, prop.attack)
 
         # Check if prediction changed
-        adv_pred = argmax(model(adv_x), dims=2)
+        adv_pred = argmax(model(adv_x).data, dims=2)
 
         if original_pred != adv_pred
             return false
@@ -209,7 +209,7 @@ function fgsm_attack(model, x, y, epsilon)
     sign_grad = sign.(grad)
 
     # Perturb in direction of sign
-    x .+ epsilon .* sign_grad
+    Tensor(x.data .+ epsilon .* sign_grad)
 end
 
 """
@@ -218,11 +218,11 @@ Projected Gradient Descent attack.
 function pgd_attack(model, x, y, epsilon; steps::Int=20, step_size=nothing)
     step_size = step_size === nothing ? epsilon / steps * 2 : step_size
 
-    adv_x = copy(x)
-    original_x = copy(x)
+    adv_x = copy(x.data)
+    original_x = copy(x.data)
 
     for _ in 1:steps
-        grad = compute_input_gradient(model, adv_x, y)
+        grad = compute_input_gradient(model, Tensor(adv_x), y)
         adv_x = adv_x .+ step_size .* sign.(grad)
 
         # Project back to epsilon ball
@@ -231,7 +231,7 @@ function pgd_attack(model, x, y, epsilon; steps::Int=20, step_size=nothing)
         adv_x = original_x .+ perturbation
     end
 
-    adv_x
+    Tensor(adv_x)
 end
 
 """
@@ -240,17 +240,17 @@ Compute gradient of loss with respect to input.
 function compute_input_gradient(model, x, y)
     # Simplified numerical gradient
     eps = Float32(1e-5)
-    grad = similar(x)
+    grad = similar(x.data)
 
-    for i in eachindex(x)
-        x_plus = copy(x)
+    for i in eachindex(x.data)
+        x_plus = copy(x.data)
         x_plus[i] += eps
 
-        x_minus = copy(x)
+        x_minus = copy(x.data)
         x_minus[i] -= eps
 
-        loss_plus = crossentropy(model(x_plus), y)
-        loss_minus = crossentropy(model(x_minus), y)
+        loss_plus = crossentropy(model(Tensor(x_plus)).data, y)
+        loss_minus = crossentropy(model(Tensor(x_minus)).data, y)
 
         grad[i] = (loss_plus - loss_minus) / (2 * eps)
     end

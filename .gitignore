@@ -77,3 +77,13 @@ htmlcov/
 /tmp/
 *.tmp
 *.bak
+
+# KDE directory metadata
+.directory
+
+# Sync reports
+sync_report*.txt
+sync_repos_report*.txt
+
+# Crash recovery artifacts
+ai-cli-crash-capture/

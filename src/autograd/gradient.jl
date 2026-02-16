@@ -1,184 +1,125 @@
 # SPDX-License-Identifier: PMPL-1.0-or-later
 # Axiom.jl Automatic Differentiation
 #
-# Reverse-mode AD for gradient computation.
-# This is a minimal implementation - production would use Zygote.jl or Enzyme.jl
+# Production-grade reverse-mode AD using Zygote.jl backend
 
-"""
-    Gradient
+using Zygote
 
-Wrapper type for tracked tensors in autograd.
-"""
-mutable struct Gradient{T, S}
-    value::S
-    grad::Union{S, Nothing}
-    backward_fn::Union{Function, Nothing}
-    requires_grad::Bool
-    parents::Vector{Gradient}
-end
-
-function Gradient(value; requires_grad::Bool=true)
-    Gradient{eltype(value), typeof(value)}(
-        value, nothing, nothing, requires_grad, Gradient[]
-    )
-end
-
-# Access value
-Base.getindex(g::Gradient) = g.value
-value(g::Gradient) = g.value
-grad(g::Gradient) = g.grad
-
-# Math operations that track gradients
-function Base.:+(a::Gradient, b::Gradient)
-    result = Gradient(a.value + b.value)
-    result.parents = [a, b]
-    result.backward_fn = function(grad)
-        if a.requires_grad
-            a.grad = a.grad === nothing ? grad : a.grad + grad
-        end
-        if b.requires_grad
-            b.grad = b.grad === nothing ? grad : b.grad + grad
-        end
-    end
-    result
-end
-
-function Base.:*(a::Gradient, b::Gradient)
-    result = Gradient(a.value * b.value)
-    result.parents = [a, b]
-    result.backward_fn = function(grad)
-        if a.requires_grad
-            g = grad * b.value'
-            a.grad = a.grad === nothing ? g : a.grad + g
-        end
-        if b.requires_grad
-            g = a.value' * grad
-            b.grad = b.grad === nothing ? g : b.grad + g
-        end
-    end
-    result
-end
-
-function Base.:-(a::Gradient, b::Gradient)
-    result = Gradient(a.value - b.value)
-    result.parents = [a, b]
-    result.backward_fn = function(grad)
-        if a.requires_grad
-            a.grad = a.grad === nothing ? grad : a.grad + grad
-        end
-        if b.requires_grad
-            g = -grad
-            b.grad = b.grad === nothing ? g : b.grad + g
-        end
-    end
-    result
-end
-
-# Broadcast operations
-Base.broadcasted(::typeof(+), a::Gradient, b) = Gradient(a.value .+ b)
-Base.broadcasted(::typeof(*), a::Gradient, b) = Gradient(a.value .* b)
-
-"""
-    backward!(loss::Gradient)
-
-Compute gradients via backpropagation.
-"""
-function backward!(loss::Gradient)
-    # Initialize gradient of loss to 1
-    if loss.grad === nothing
-        loss.grad = ones(eltype(loss.value), size(loss.value))
-    end
-
-    # Topological sort
-    visited = Set{Gradient}()
-    order = Gradient[]
-
-    function visit(node)
-        if node in visited
-            return
-        end
-        push!(visited, node)
-        for parent in node.parents
-            visit(parent)
-        end
-        push!(order, node)
-    end
-
-    visit(loss)
-
-    # Backward pass in reverse topological order
-    for node in reverse(order)
-        if node.backward_fn !== nothing
-            node.backward_fn(node.grad)
-        end
-    end
-end
-
-"""
-    zero_grad!(g::Gradient)
-
-Reset gradient to nothing.
-"""
-function zero_grad!(g::Gradient)
-    g.grad = nothing
-end
-
-# No-grad context
-struct NoGradContext end
-
-"""
-    @no_grad expr
-
-Execute expression without tracking gradients.
-"""
-macro no_grad(expr)
-    quote
-        # In production, this would disable gradient tracking
-        $(esc(expr))
-    end
-end
-
-# Gradient computation utilities
 """
     gradient(f, x...)
 
-Compute gradient of f with respect to x.
+Compute gradient of scalar function f with respect to inputs x.
+Uses Zygote.jl backend for production-grade automatic differentiation.
+
+# Examples
+```julia
+# Scalar gradient
+g = Axiom.gradient(x -> x^2 + 3x, 2.0)
+# g = (7.0,)
+
+# Multiple inputs
+g = Axiom.gradient((x, y) -> x^2 + x*y, 2.0, 3.0)
+# g = (7.0, 2.0)
+```
 """
 function gradient(f, x...)
-    # Wrap inputs
-    wrapped = [Gradient(xi) for xi in x]
-
-    # Forward pass
-    y = f(wrapped...)
-
-    # Backward pass
-    backward!(y)
-
-    # Return gradients
-    [w.grad for w in wrapped]
+    return Zygote.gradient(f, x...)
 end
 
 """
     jacobian(f, x)
 
-Compute Jacobian matrix.
+Compute Jacobian matrix of vector-valued function f at point x.
+Uses Zygote.jl backend.
+
+# Examples
+```julia
+J = Axiom.jacobian(x -> [x[1]^2, x[1]*x[2]], [3.0, 4.0])
+# Returns 2×2 Jacobian matrix
+```
 """
 function jacobian(f, x)
-    n = length(x)
-    y = f(x)
-    m = length(y)
+    return Zygote.jacobian(f, x)[1]
+end
 
-    J = zeros(eltype(x), m, n)
+"""
+    pullback(f, x...)
 
-    for i in 1:m
-        # Compute row i of Jacobian
-        g = Gradient(x)
-        out = f(g)
-        out.grad = zeros(eltype(x), m)
-        out.grad[i] = 1.0
-        backward!(out)
-        J[i, :] = vec(g.grad)
+Compute pullback of function f at inputs x.
+Returns (y, back) where y is the forward pass result and back is the pullback function.
+
+# Examples
+```julia
+y, back = Axiom.pullback(x -> x^2, 3.0)
+# y = 9.0
+# back(1.0) returns gradient
+```
+"""
+function pullback(f, x...)
+    return Zygote.pullback(f, x...)
+end
+
+"""
+    @no_grad expr
+
+Execute expression without tracking gradients.
+Useful for inference or when gradients are not needed.
+
+# Examples
+```julia
+@no_grad begin
+    y = model(x)
+    loss = criterion(y, target)
+end
+```
+"""
+macro no_grad(expr)
+    quote
+        Zygote.@ignore $(esc(expr))
+    end
+end
+
+# Gradient utilities for parameter updates
+"""
+    zero_grad!(params)
+
+Reset gradients for a collection of parameters to nothing.
+"""
+function zero_grad!(params)
+    for p in params
+        if applicable(setfield!, p, :grad, nothing)
+            setfield!(p, :grad, nothing)
+        end
+    end
+end
+
+"""
+    clip_grad_norm!(params, max_norm)
+
+Clip gradients by global norm to prevent exploding gradients.
+"""
+function clip_grad_norm!(params, max_norm)
+    total_norm = 0.0
+    for p in params
+        if hasfield(typeof(p), :grad) && !isnothing(getfield(p, :grad))
+            g = getfield(p, :grad)
+            total_norm += sum(abs2, g)
+        end
+    end
+    total_norm = sqrt(total_norm)
+
+    if total_norm > max_norm
+        clip_coef = max_norm / (total_norm + 1e-6)
+        for p in params
+            if hasfield(typeof(p), :grad) && !isnothing(getfield(p, :grad))
+                g = getfield(p, :grad)
+                setfield!(p, :grad, g * clip_coef)
+            end
+        end
     end
 
-    J
+    return total_norm
 end
+
+# Export main functions
+export gradient, jacobian, pullback, @no_grad, zero_grad!, clip_grad_norm!

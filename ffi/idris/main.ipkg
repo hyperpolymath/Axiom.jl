@@ -1,0 +1,5 @@
+package axiom
+modules = Main
+main = Main
+executable = axiom-ffi
+opts = "--cg C --output axiom.o"

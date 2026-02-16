@@ -22,7 +22,7 @@ using Dates
         @test cert_dict["property"] == "∀x. relu(x) >= 0"
         @test cert_dict["result"]["status"] == "proven"
         @test cert_dict["result"]["confidence"] == 1.0
-        @test cert_dict["result"]["reason"] == "ReLU is non-negative by definition"
+        @test cert_dict["result"]["details"] == "ReLU is non-negative by definition"
         @test cert_dict["artifacts"]["proof_method"] == "pattern"
         @test cert_dict["artifacts"]["execution_time_ms"] == 0.5
         @test haskey(cert_dict["audit"], "hash")
@@ -79,7 +79,7 @@ using Dates
         @test cert.property == "∀x. sum(softmax(x)) == 1.0"
         @test cert.status == :proven
         @test cert.confidence == 1.0
-        @test cert.reason == "Softmax outputs sum to 1"
+        @test cert.details == "Softmax outputs sum to 1"
         @test cert.proof_method == "pattern"
         @test cert.smt_query == "(assert (= (+ ...) 1.0))"
         @test cert.smt_output == "unsat"
@@ -127,7 +127,7 @@ using Dates
             cert.status,
             cert.counterexample,
             cert.confidence,
-            cert.reason,
+            cert.details,
             cert.suggestions,
             cert.timestamp,
             cert.axiom_version,
