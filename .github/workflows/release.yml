@@ -28,7 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
 
-      - uses: julia-actions/setup-julia@824fb972babf1837cf21c49159bf8a8130f26840 # v2
+      - uses: julia-actions/setup-julia@5c9647d97b78a5debe5164e9eec09d653d29bd71 # v2
         with:
           version: ${{ matrix.julia-version }}
 
@@ -55,7 +55,7 @@ jobs:
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
 
-      - uses: julia-actions/setup-julia@824fb972babf1837cf21c49159bf8a8130f26840 # v2
+      - uses: julia-actions/setup-julia@5c9647d97b78a5debe5164e9eec09d653d29bd71 # v2
         with:
           version: ${{ matrix.julia-version }}
 
@@ -74,7 +74,7 @@ jobs:
           tar -czf dist/Axiom.jl-${{ matrix.os }}.tar.gz src/ Project.toml README.adoc LICENSE
 
       - name: Upload Julia artifacts
-        uses: actions/upload-artifact@6d3e1c6c7da08dea67f074b3b34ddf5fd56a1bd7 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: julia-${{ matrix.os }}
           path: dist/
@@ -110,7 +110,7 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Cache Cargo
-        uses: actions/cache@6849a6489940f00c2f30c0fb92c6274307ccb58a # v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.cargo/registry
@@ -128,7 +128,7 @@ jobs:
           cp rust/target/${{ matrix.target }}/release/${{ matrix.artifact_name }} dist/
 
       - name: Upload Rust artifacts
-        uses: actions/upload-artifact@6d3e1c6c7da08dea67f074b3b34ddf5fd56a1bd7 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: rust-${{ matrix.os }}
           path: dist/
@@ -187,7 +187,7 @@ jobs:
           cargo sbom > ../sbom-rust.json
 
       - name: Upload SBOMs
-        uses: actions/upload-artifact@6d3e1c6c7da08dea67f074b3b34ddf5fd56a1bd7 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: sboms
           path: |
@@ -323,7 +323,7 @@ jobs:
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
 
-      - uses: julia-actions/setup-julia@824fb972babf1837cf21c49159bf8a8130f26840 # v2
+      - uses: julia-actions/setup-julia@5c9647d97b78a5debe5164e9eec09d653d29bd71 # v2
         with:
           version: '1.10'
 
