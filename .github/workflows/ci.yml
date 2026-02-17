@@ -386,6 +386,36 @@ jobs:
       - name: Run certificate integrity tests
         run: julia --project=. test/ci/certificate_integrity.jl
 
+  proof-assistant-bundle:
+    name: Proof assistant bundle checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+
+      - uses: julia-actions/setup-julia@824fb972babf1837cf21c49159bf8a8130f26840 # v2
+        with:
+          version: '1.10'
+
+      - uses: julia-actions/cache@e8472695fb3c2028b1118dc399c8440ff497d409 # v2
+
+      - name: Instantiate / Build / Precompile
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile()'
+
+      - name: Run proof bundle reconciliation test
+        run: julia --project=. test/ci/proof_bundle_reconciliation.jl
+
+      - name: Generate proof bundle evidence artifact
+        run: julia --project=. scripts/proof-bundle-evidence.jl
+
+      - name: Upload proof bundle evidence artifact
+        if: always()
+        uses: actions/upload-artifact@6d3e1c6c7da08dea67f074b3b34ddf5fd56a1bd7 # v4
+        with:
+          name: proof-bundle-evidence
+          path: build/proof_bundle_evidence.json
+          if-no-files-found: warn
+
   zig-build:
     name: Zig Backend
     runs-on: ubuntu-latest

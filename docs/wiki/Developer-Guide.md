@@ -133,6 +133,18 @@ When Lean/Coq/Isabelle artifacts are updated, reconcile manifest status:
 julia --project=. -e 'using Axiom; reconcile_proof_bundle("build/proofs/my_model.obligations.json")'
 ```
 
+Run deterministic CI reconciliation coverage:
+
+```bash
+julia --project=. test/ci/proof_bundle_reconciliation.jl
+```
+
+Generate proof bundle evidence for CI artifacts/review:
+
+```bash
+julia --project=. scripts/proof-bundle-evidence.jl
+```
+
 ## Quality Gates
 
 Use these checks to keep production paths clean:

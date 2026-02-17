@@ -28,6 +28,7 @@ RUN_GPU_PERF="${AXIOM_READINESS_RUN_GPU_PERF:-1}"
 RUN_COPROCESSOR="${AXIOM_READINESS_RUN_COPROCESSOR:-1}"
 RUN_INTEROP="${AXIOM_READINESS_RUN_INTEROP:-1}"
 RUN_CERTIFICATE="${AXIOM_READINESS_RUN_CERTIFICATE:-1}"
+RUN_PROOF_BUNDLE="${AXIOM_READINESS_RUN_PROOF_BUNDLE:-1}"
 RUN_DOC_ALIGNMENT="${AXIOM_READINESS_RUN_DOC_ALIGNMENT:-1}"
 RUN_MARKERS="${AXIOM_READINESS_RUN_MARKERS:-1}"
 
@@ -127,6 +128,16 @@ check_doc_alignment() {
 
   if ! rg -Fq "test/ci/coprocessor_strategy.jl" docs/wiki/Developer-Guide.md; then
     echo "docs/wiki/Developer-Guide.md is missing coprocessor strategy test guidance."
+    status=1
+  fi
+
+  if ! rg -Fq "test/ci/proof_bundle_reconciliation.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing proof bundle reconciliation test guidance."
+    status=1
+  fi
+
+  if ! rg -Fq "scripts/proof-bundle-evidence.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing proof bundle evidence guidance."
     status=1
   fi
 
@@ -263,6 +274,14 @@ run() {
     run_check "certificate integrity" "$JULIA_BIN" --project=. test/ci/certificate_integrity.jl
   else
     record_skip "certificate integrity (disabled)"
+  fi
+
+  if [ "$RUN_PROOF_BUNDLE" = "1" ]; then
+    run_check "proof bundle reconciliation" "$JULIA_BIN" --project=. test/ci/proof_bundle_reconciliation.jl
+    run_check "proof bundle evidence" "$JULIA_BIN" --project=. scripts/proof-bundle-evidence.jl
+  else
+    record_skip "proof bundle reconciliation (disabled)"
+    record_skip "proof bundle evidence (disabled)"
   fi
 
   if [ "$RUN_MARKERS" = "1" ]; then

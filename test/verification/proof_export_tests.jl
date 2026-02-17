@@ -84,6 +84,16 @@ using Axiom: ProofResult
     @test report["hash_matches"] == true
     @test report["obligation_matches"] == true
 
+    isabelle_report = proof_assistant_obligation_report(
+        assistant_paths["isabelle"],
+        :isabelle;
+        expected_certificate_hash = cert.hash,
+        expected_obligation_id = expected_id,
+    )
+    @test isabelle_report["status"] == "incomplete"
+    @test isabelle_report["hash_matches"] == true
+    @test isabelle_report["obligation_matches"] == true
+
     completed_bundle_lean = joinpath(bundle_dir, "softmax_norm.lean")
     write(
         completed_bundle_lean,

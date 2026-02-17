@@ -33,7 +33,7 @@ function _assistant_placeholder_regex(assistant::Symbol)
     elseif assistant == :coq
         return r"\bAdmitted\b"
     elseif assistant == :isabelle
-        return r"\boops\b"
+        return r"\boops\b|\bsorry\b"
     end
     throw(ArgumentError("Unsupported proof assistant: $assistant"))
 end
@@ -283,9 +283,8 @@ function export_isabelle(certificate::ProofCertificate, output_path::String)
     println(io, "  \"$isabelle_prop\"")
     println(io, "proof -")
     println(io, "  (* PROOF OBLIGATION: $(_proof_obligation_id(certificate)) *)")
-    println(io, "  (* Use sledgehammer for automated proof search *)")
-    println(io, "  sledgehammer")
-    println(io, "qed")
+    println(io, "  (* Replace placeholder with a complete assistant proof and qed. *)")
+    println(io, "oops")
     println(io)
 
     println(io, "end")
