@@ -85,6 +85,107 @@ end
 # Global current backend
 const _current_backend = Ref{AbstractBackend}(JuliaBackend())
 
+# GPU runtime diagnostics counters (self-healing/fallback observability).
+const _GPU_RUNTIME_DIAGNOSTICS = Dict{String, Dict{String, Int}}(
+    "cuda" => Dict(
+        "compile_fallbacks" => 0,
+        "runtime_errors" => 0,
+        "runtime_fallbacks" => 0,
+        "recoveries" => 0,
+    ),
+    "rocm" => Dict(
+        "compile_fallbacks" => 0,
+        "runtime_errors" => 0,
+        "runtime_fallbacks" => 0,
+        "recoveries" => 0,
+    ),
+    "metal" => Dict(
+        "compile_fallbacks" => 0,
+        "runtime_errors" => 0,
+        "runtime_fallbacks" => 0,
+        "recoveries" => 0,
+    ),
+)
+
+function _gpu_backend_key(backend)
+    name = lowercase(string(nameof(typeof(backend))))
+    if occursin("cuda", name)
+        return "cuda"
+    elseif occursin("rocm", name)
+        return "rocm"
+    elseif occursin("metal", name)
+        return "metal"
+    end
+    "unknown"
+end
+
+function _gpu_record_diagnostic!(backend, key::String)
+    backend_key = _gpu_backend_key(backend)
+    haskey(_GPU_RUNTIME_DIAGNOSTICS, backend_key) || return
+    counters = _GPU_RUNTIME_DIAGNOSTICS[backend_key]
+    counters[key] = get(counters, key, 0) + 1
+end
+
+"""
+    reset_gpu_runtime_diagnostics!()
+
+Reset in-process GPU runtime diagnostics counters.
+"""
+function reset_gpu_runtime_diagnostics!()
+    for counters in values(_GPU_RUNTIME_DIAGNOSTICS)
+        counters["compile_fallbacks"] = 0
+        counters["runtime_errors"] = 0
+        counters["runtime_fallbacks"] = 0
+        counters["recoveries"] = 0
+    end
+    nothing
+end
+
+"""
+    gpu_runtime_diagnostics() -> Dict{String,Any}
+
+Return machine-readable counters for GPU fallback/self-healing behavior.
+"""
+function gpu_runtime_diagnostics()
+    backends = Dict{String, Any}()
+    for key in ("cuda", "rocm", "metal")
+        counters = get(_GPU_RUNTIME_DIAGNOSTICS, key, Dict{String, Int}())
+        backends[key] = Dict(
+            "compile_fallbacks" => get(counters, "compile_fallbacks", 0),
+            "runtime_errors" => get(counters, "runtime_errors", 0),
+            "runtime_fallbacks" => get(counters, "runtime_fallbacks", 0),
+            "recoveries" => get(counters, "recoveries", 0),
+        )
+    end
+
+    Dict(
+        "generated_at" => Dates.format(now(Dates.UTC), "yyyy-mm-ddTHH:MM:SS.sssZ"),
+        "self_healing_enabled" => _gpu_self_healing_enabled(),
+        "backends" => backends,
+    )
+end
+
+function _gpu_self_healing_enabled()
+    forced = _backend_env_available("AXIOM_GPU_SELF_HEAL")
+    forced === nothing ? true : forced
+end
+
+function _gpu_forward_with_recovery(model, x::AbstractTensor, backend)
+    try
+        return _gpu_forward(model, x, backend)
+    catch err
+        _gpu_record_diagnostic!(backend, "runtime_errors")
+        if !_gpu_self_healing_enabled()
+            rethrow()
+        end
+        _gpu_record_diagnostic!(backend, "runtime_fallbacks")
+        @warn "GPU execution failed for $(typeof(backend)); self-healing fallback to Julia backend" exception=(err, catch_backtrace())
+        recovered = forward(model, x)
+        _gpu_record_diagnostic!(backend, "recoveries")
+        return recovered
+    end
+end
+
 """
     current_backend() -> AbstractBackend
 
@@ -535,11 +636,13 @@ function compile_to_backend(model, backend::CUDABackend)
 
     # Check CUDA availability
     if !cuda_available()
+        _gpu_record_diagnostic!(backend, "compile_fallbacks")
         @warn "CUDA not available, falling back to Julia backend"
         return model
     end
     device_count = cuda_device_count()
     if backend.device < 0 || backend.device >= device_count
+        _gpu_record_diagnostic!(backend, "compile_fallbacks")
         @warn "CUDA device $(backend.device) out of range (available: 0:$(max(0, device_count - 1))), falling back to Julia backend"
         return model
     end
@@ -553,11 +656,13 @@ function compile_to_backend(model, backend::MetalBackend)
 
     # Check Metal availability
     if !metal_available()
+        _gpu_record_diagnostic!(backend, "compile_fallbacks")
         @warn "Metal not available, falling back to Julia backend"
         return model
     end
     device_count = metal_device_count()
     if backend.device < 0 || backend.device >= device_count
+        _gpu_record_diagnostic!(backend, "compile_fallbacks")
         @warn "Metal device $(backend.device) out of range (available: 0:$(max(0, device_count - 1))), falling back to Julia backend"
         return model
     end
@@ -975,7 +1080,7 @@ function _gpu_forward(model, x::AbstractTensor, ::AbstractBackend)
 end
 
 function forward(gm::GPUCompiledModel, x::AbstractTensor)
-    _gpu_forward(gm.model, x, gm.backend)
+    _gpu_forward_with_recovery(gm.model, x, gm.backend)
 end
 
 function forward(gm::GPUCompiledModel, x)

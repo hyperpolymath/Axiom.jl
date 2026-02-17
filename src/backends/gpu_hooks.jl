@@ -109,6 +109,59 @@ function metal_device_count()
     metal_available() ? 1 : 0
 end
 
+function _gpu_hook_overrides(backend_type::DataType)
+    hooks = Dict{String, Bool}()
+    for (name, hook) in (
+        ("backend_gpu_matmul", backend_gpu_matmul),
+        ("backend_gpu_conv2d", backend_gpu_conv2d),
+        ("backend_gpu_relu", backend_gpu_relu),
+        ("backend_gpu_softmax", backend_gpu_softmax),
+        ("backend_gpu_batchnorm", backend_gpu_batchnorm),
+    )
+        hooks[name] = _hook_has_backend_override(hook, backend_type)
+    end
+    hooks
+end
+
+"""
+    gpu_capability_report() -> Dict{String,Any}
+
+Return machine-readable GPU capability status, including hook coverage and
+runtime self-healing diagnostics.
+"""
+function gpu_capability_report()
+    selected = detect_gpu()
+    backends = Dict{String, Any}()
+    strategy = [
+        ("CUDA", CUDABackend, cuda_available, cuda_device_count),
+        ("ROCm", ROCmBackend, rocm_available, rocm_device_count),
+        ("Metal", MetalBackend, metal_available, metal_device_count),
+    ]
+
+    for (label, backend_type, available_fn, count_fn) in strategy
+        available = available_fn()
+        count = count_fn()
+        hooks = _gpu_hook_overrides(backend_type)
+        kernel_hooks_loaded = !isempty(hooks) && all(values(hooks))
+        backends[label] = Dict(
+            "available" => available,
+            "device_count" => count,
+            "compilable" => available && count > 0,
+            "kernel_hooks_loaded" => kernel_hooks_loaded,
+            "hook_overrides" => hooks,
+        )
+    end
+
+    Dict(
+        "generated_at" => Dates.format(now(Dates.UTC), "yyyy-mm-ddTHH:MM:SS.sssZ"),
+        "strategy_order" => ["CUDA", "ROCm", "Metal"],
+        "selected_backend" => selected === nothing ? nothing : string(typeof(selected)),
+        "self_healing_enabled" => _gpu_self_healing_enabled(),
+        "runtime_diagnostics" => gpu_runtime_diagnostics(),
+        "backends" => backends,
+    )
+end
+
 """
     select_device!(backend::CUDABackend, device::Int)
 
@@ -290,7 +343,7 @@ function forward(rm::ROCmCompiledModel, x)
 end
 
 function forward(rm::ROCmCompiledModel, x::AbstractTensor)
-    _gpu_forward(rm.model, x, rm.backend)
+    _gpu_forward_with_recovery(rm.model, x, rm.backend)
 end
 
 (rm::ROCmCompiledModel)(x) = forward(rm, x)
@@ -303,11 +356,13 @@ function compile_to_backend(model, backend::ROCmBackend)
 
     # Check ROCm availability
     if !rocm_available()
+        _gpu_record_diagnostic!(backend, "compile_fallbacks")
         @warn "ROCm not available, falling back to Julia backend"
         return model
     end
     device_count = rocm_device_count()
     if backend.device < 0 || backend.device >= device_count
+        _gpu_record_diagnostic!(backend, "compile_fallbacks")
         @warn "ROCm device $(backend.device) out of range (available: 0:$(max(0, device_count - 1))), falling back to Julia backend"
         return model
     end

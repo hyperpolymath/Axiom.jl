@@ -14,10 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `proof_assistant_obligation_report(path, assistant; expected_certificate_hash, expected_obligation_id)` for machine-readable Lean/Coq/Isabelle obligation status.
 - `reconcile_proof_bundle(manifest_path; assistant_paths, persist=true)` to reconcile assistant artifacts into bundle manifests.
 - `coprocessor_capability_report()` for strategy/capability snapshots across `TPUBackend`, `NPUBackend`, `DSPBackend`, and `FPGABackend`.
+- `gpu_capability_report()` for CUDA/ROCm/Metal capability + hook coverage snapshots.
+- `gpu_runtime_diagnostics()` and `reset_gpu_runtime_diagnostics!()` for machine-readable GPU self-healing/fallback counters.
 - `metal_device_count()` exported alongside `cuda_device_count()` / `rocm_device_count()` for explicit GPU device-count introspection.
 
 ==== CI
 - Coprocessor strategy workflow now generates and uploads `build/coprocessor_evidence.json` as a CI artifact (`coprocessor-evidence`).
+- GPU fallback/hardware workflows now generate and upload backend-specific performance evidence artifacts via `scripts/gpu-performance-evidence.jl`.
 
 === Added
 - Zig backend with SIMD-optimized operations

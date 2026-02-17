@@ -37,6 +37,7 @@ Useful toggles:
 
 - `AXIOM_READINESS_RUN_RUST=0` disables Rust parity/smoke checks.
 - `AXIOM_READINESS_RUN_COPROCESSOR=0` disables coprocessor strategy checks.
+- `AXIOM_READINESS_RUN_GPU_PERF=0` disables GPU resilience/performance evidence checks.
 - `AXIOM_READINESS_ALLOW_SKIPS=1` allows skipped checks without failing the run.
 - `JULIA_BIN=/path/to/julia` selects a specific Julia binary.
 
@@ -80,6 +81,27 @@ AXIOM_GPU_BACKEND=cuda AXIOM_GPU_REQUIRED=1 julia --project=. test/ci/gpu_hardwa
 AXIOM_GPU_BACKEND=rocm AXIOM_GPU_REQUIRED=1 julia --project=. test/ci/gpu_hardware_smoke.jl
 AXIOM_GPU_BACKEND=metal AXIOM_GPU_REQUIRED=1 julia --project=. test/ci/gpu_hardware_smoke.jl
 ```
+
+Run GPU resilience diagnostics and generate machine-readable baseline evidence:
+
+```bash
+julia --project=. test/ci/gpu_resilience.jl
+julia --project=. scripts/gpu-performance-evidence.jl
+```
+
+Generate backend-specific evidence on dedicated hardware runners:
+
+```bash
+AXIOM_GPU_BASELINE_BACKEND=cuda AXIOM_GPU_REQUIRED=1 julia --project=. scripts/gpu-performance-evidence.jl
+AXIOM_GPU_BASELINE_BACKEND=rocm AXIOM_GPU_REQUIRED=1 julia --project=. scripts/gpu-performance-evidence.jl
+AXIOM_GPU_BASELINE_BACKEND=metal AXIOM_GPU_REQUIRED=1 julia --project=. scripts/gpu-performance-evidence.jl
+```
+
+`scripts/gpu-performance-evidence.jl` reads optional thresholds from:
+
+- `AXIOM_GPU_BASELINE_PATH` (default: `benchmark/gpu_performance_baseline.json`)
+- `AXIOM_GPU_BASELINE_ENFORCE` (set to `1` to fail on regressions vs baseline)
+- `AXIOM_GPU_MAX_REGRESSION_RATIO` (default: `1.20`)
 
 ## Non-GPU Coprocessor Strategy
 

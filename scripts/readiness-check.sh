@@ -24,6 +24,7 @@ RUN_RUST="${AXIOM_READINESS_RUN_RUST:-auto}"
 RUN_BASELINE="${AXIOM_READINESS_RUN_BASELINE:-1}"
 RUN_RUNTIME="${AXIOM_READINESS_RUN_RUNTIME:-1}"
 RUN_GPU_FALLBACK="${AXIOM_READINESS_RUN_GPU_FALLBACK:-1}"
+RUN_GPU_PERF="${AXIOM_READINESS_RUN_GPU_PERF:-1}"
 RUN_COPROCESSOR="${AXIOM_READINESS_RUN_COPROCESSOR:-1}"
 RUN_INTEROP="${AXIOM_READINESS_RUN_INTEROP:-1}"
 RUN_CERTIFICATE="${AXIOM_READINESS_RUN_CERTIFICATE:-1}"
@@ -116,6 +117,11 @@ check_doc_alignment() {
 
   if ! rg -Fq '`to_onnx(...)` export | Baseline shipped' docs/wiki/Roadmap-Commitments.md; then
     echo "docs/wiki/Roadmap-Commitments.md is missing baseline-shipped status for to_onnx."
+    status=1
+  fi
+
+  if ! rg -Fq 'scripts/gpu-performance-evidence.jl' docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing GPU performance evidence guidance."
     status=1
   fi
 
@@ -231,6 +237,14 @@ run() {
     run_check "GPU fallback behavior" "$JULIA_BIN" --project=. test/ci/gpu_fallback.jl
   else
     record_skip "GPU fallback behavior (disabled)"
+  fi
+
+  if [ "$RUN_GPU_PERF" = "1" ]; then
+    run_check "GPU resilience diagnostics" "$JULIA_BIN" --project=. test/ci/gpu_resilience.jl
+    run_check "GPU performance evidence" "$JULIA_BIN" --project=. scripts/gpu-performance-evidence.jl
+  else
+    record_skip "GPU resilience diagnostics (disabled)"
+    record_skip "GPU performance evidence (disabled)"
   fi
 
   if [ "$RUN_COPROCESSOR" = "1" ]; then

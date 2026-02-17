@@ -64,20 +64,15 @@ Could completion gates:
 
 ## Deferred Commitments (Tracked)
 
-These are intentionally tracked roadmap promises, not removed features:
+These roadmap promises are still tracked explicitly (with current delivery state):
 
-1. `from_pytorch(...)` import API
-2. `to_onnx(...)` export API
-3. Production-hardened GPU paths across CUDA/ROCm/Metal
-4. Non-GPU accelerators (TPU/NPU/DSP/FPGA) backend strategy
-5. Proof-assistant export improvements beyond skeleton artifacts
+- [x] `from_pytorch(...)` import API (baseline shipped: descriptor import + direct `.pt/.pth/.ckpt` bridge + CI interop smoke via `scripts/pytorch_to_axiom_descriptor.py`).
+- [x] `to_onnx(...)` export API (baseline shipped: Dense/Conv/Norm/Pool + common activations for supported `Sequential`/`Pipeline` models).
+- [x] Production-hardened GPU paths across CUDA/ROCm/Metal (baseline shipped: deterministic fallback CI + optional hardware smoke + extension-hook dispatch + device-range guards + runtime self-healing diagnostics + backend-specific performance evidence via `test/ci/gpu_resilience.jl` and `scripts/gpu-performance-evidence.jl`).
+- [ ] Non-GPU accelerators (TPU/NPU/DSP/FPGA) backend strategy (in progress: targets, detection, compiled dispatch, fallback/strategy CI, and capability/evidence reporting shipped via `coprocessor_capability_report` + `scripts/coprocessor-evidence.jl`; production kernels remain).
+- [ ] Proof-assistant export improvements beyond skeleton artifacts (in progress: obligation manifests, bundle export, status metadata, and assistant reconciliation shipped via `proof_obligation_manifest`, `export_proof_bundle`, `proof_assistant_obligation_report`, `reconcile_proof_bundle`; full assistant proof replay remains a Stage 4 track).
 
-Status update (2026-02-17):
-- `from_pytorch(...)`: canonical descriptor import + direct `.pt/.pth/.ckpt` bridge shipped (via `scripts/pytorch_to_axiom_descriptor.py`).
-- `to_onnx(...)`: exporter now covers Dense/Conv/Norm/Pool + common activations for supported `Sequential`/`Pipeline` models.
-- GPU hardening: deterministic fallback CI + optional hardware-smoke CI are in place; compiled GPU wrappers dispatch through extension hooks, and device-range guards are now enforced across CUDA/ROCm/Metal with out-of-range fallback tests.
-- Non-GPU accelerator strategy: target backends, detection, compiled dispatch, fallback/strategy CI, and capability/evidence reporting are in place (`coprocessor_capability_report`, `scripts/coprocessor-evidence.jl`); production kernels remain in progress.
-- Proof-assistant exports: obligation manifest bundles, certificate markers, and automated assistant reconciliation are shipped (`proof_obligation_manifest`, `export_proof_bundle`, `proof_assistant_obligation_report`, `reconcile_proof_bundle`); full assistant proof replay remains a Stage 4 track.
+Readiness verification (2026-02-17): `scripts/readiness-check.sh` => Passed: 12, Failed: 0, Skipped: 0.
 
 See `docs/wiki/Roadmap-Commitments.md` for stage mapping and acceptance criteria.
 

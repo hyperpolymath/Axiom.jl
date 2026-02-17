@@ -186,6 +186,24 @@ jobs:
       - name: Run fallback tests
         run: julia --project=. test/ci/gpu_fallback.jl
 
+      - name: Run resilience diagnostics tests
+        run: julia --project=. test/ci/gpu_resilience.jl
+
+      - name: Generate GPU performance evidence (non-hardware baseline)
+        env:
+          AXIOM_GPU_BASELINE_BACKEND: all
+          AXIOM_GPU_REQUIRED: '0'
+          AXIOM_GPU_EVIDENCE_PATH: build/gpu_performance_evidence_${{ matrix.os }}.json
+        run: julia --project=. scripts/gpu-performance-evidence.jl
+
+      - name: Upload GPU performance evidence artifact
+        if: always()
+        uses: actions/upload-artifact@6d3e1c6c7da08dea67f074b3b34ddf5fd56a1bd7 # v4
+        with:
+          name: gpu-performance-evidence-${{ matrix.os }}
+          path: build/gpu_performance_evidence_${{ matrix.os }}.json
+          if-no-files-found: warn
+
   coprocessor-strategy:
     name: Coprocessor strategy tests
     runs-on: ubuntu-latest
@@ -237,6 +255,23 @@ jobs:
           AXIOM_GPU_REQUIRED: '1'
         run: julia --project=. test/ci/gpu_hardware_smoke.jl
 
+      - name: Generate CUDA performance evidence
+        env:
+          AXIOM_GPU_BACKEND: cuda
+          AXIOM_GPU_BASELINE_BACKEND: cuda
+          AXIOM_GPU_REQUIRED: '1'
+          AXIOM_GPU_BASELINE_ENFORCE: '0'
+          AXIOM_GPU_EVIDENCE_PATH: build/gpu_performance_cuda.json
+        run: julia --project=. scripts/gpu-performance-evidence.jl
+
+      - name: Upload CUDA performance evidence
+        if: always()
+        uses: actions/upload-artifact@6d3e1c6c7da08dea67f074b3b34ddf5fd56a1bd7 # v4
+        with:
+          name: gpu-performance-evidence-cuda
+          path: build/gpu_performance_cuda.json
+          if-no-files-found: warn
+
   gpu-rocm-hardware:
     name: GPU hardware smoke (ROCm)
     if: ${{ vars.AXIOM_ENABLE_GPU_HARDWARE_CI == 'true' }}
@@ -258,6 +293,23 @@ jobs:
           AXIOM_GPU_REQUIRED: '1'
         run: julia --project=. test/ci/gpu_hardware_smoke.jl
 
+      - name: Generate ROCm performance evidence
+        env:
+          AXIOM_GPU_BACKEND: rocm
+          AXIOM_GPU_BASELINE_BACKEND: rocm
+          AXIOM_GPU_REQUIRED: '1'
+          AXIOM_GPU_BASELINE_ENFORCE: '0'
+          AXIOM_GPU_EVIDENCE_PATH: build/gpu_performance_rocm.json
+        run: julia --project=. scripts/gpu-performance-evidence.jl
+
+      - name: Upload ROCm performance evidence
+        if: always()
+        uses: actions/upload-artifact@6d3e1c6c7da08dea67f074b3b34ddf5fd56a1bd7 # v4
+        with:
+          name: gpu-performance-evidence-rocm
+          path: build/gpu_performance_rocm.json
+          if-no-files-found: warn
+
   gpu-metal-hardware:
     name: GPU hardware smoke (Metal)
     if: ${{ vars.AXIOM_ENABLE_GPU_HARDWARE_CI == 'true' }}
@@ -278,6 +330,23 @@ jobs:
           AXIOM_GPU_BACKEND: metal
           AXIOM_GPU_REQUIRED: '1'
         run: julia --project=. test/ci/gpu_hardware_smoke.jl
+
+      - name: Generate Metal performance evidence
+        env:
+          AXIOM_GPU_BACKEND: metal
+          AXIOM_GPU_BASELINE_BACKEND: metal
+          AXIOM_GPU_REQUIRED: '1'
+          AXIOM_GPU_BASELINE_ENFORCE: '0'
+          AXIOM_GPU_EVIDENCE_PATH: build/gpu_performance_metal.json
+        run: julia --project=. scripts/gpu-performance-evidence.jl
+
+      - name: Upload Metal performance evidence
+        if: always()
+        uses: actions/upload-artifact@6d3e1c6c7da08dea67f074b3b34ddf5fd56a1bd7 # v4
+        with:
+          name: gpu-performance-evidence-metal
+          path: build/gpu_performance_metal.json
+          if-no-files-found: warn
 
   runtime-smoke-cpu:
     name: Runtime smoke (CPU)
