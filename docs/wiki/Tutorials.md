@@ -606,7 +606,7 @@ end
 ### Advanced Projects
 7. **Verified Medical AI** - Classifier with formal guarantees
 8. **Autonomous Controller** - RL agent with safety constraints
-9. **Custom Hardware** - Deploy with accelerator fallback strategy (TPU/NPU/DSP/FPGA targets)
+9. **Custom Hardware** - Deploy with accelerator fallback strategy (TPU/NPU/PPU/MATH/CRYPTO/FPGA/DSP targets)
 
 ---
 

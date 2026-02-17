@@ -624,7 +624,7 @@ rust_available()  # Returns Bool
 Non-GPU accelerator targets with fallback-safe compilation strategy.
 
 ```julia
-backend = detect_coprocessor()  # TPU/NPU/DSP/FPGA or nothing
+backend = detect_coprocessor()  # TPU/NPU/PPU/MATH/CRYPTO/FPGA/DSP or nothing
 if backend !== nothing
     model_accel = compile(model, backend=backend, verify=false, optimize=:none)
 end

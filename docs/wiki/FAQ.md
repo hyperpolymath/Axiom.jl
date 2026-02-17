@@ -78,10 +78,10 @@ cargo build --release
 
 Yes! Axiom.jl works on CPU. GPU support (CUDA, ROCm, Metal) is optional.
 
-### Do you support TPU/NPU/DSP/FPGA?
+### Do you support TPU/NPU/PPU/MATH/CRYPTO/FPGA/DSP?
 
 Yes, Axiom now includes first-class backend targets:
-`TPUBackend`, `NPUBackend`, `DSPBackend`, `FPGABackend`.
+`TPUBackend`, `NPUBackend`, `PPUBackend`, `MathBackend`, `CryptoBackend`, `DSPBackend`, `FPGABackend`.
 
 Current status:
 - Detection and backend selection APIs are available now.

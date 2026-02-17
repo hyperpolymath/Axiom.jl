@@ -45,6 +45,9 @@ Useful toggles:
 - `AXIOM_COPROCESSOR_SELF_HEAL=0` disables coprocessor self-healing fallback (useful for failure-path testing).
 - `AXIOM_TPU_REQUIRED=1` enforces strict TPU mode (no compile/runtime fallback).
 - `AXIOM_NPU_REQUIRED=1` enforces strict NPU mode (no compile/runtime fallback).
+- `AXIOM_PPU_REQUIRED=1` enforces strict PPU mode (no compile/runtime fallback).
+- `AXIOM_MATH_REQUIRED=1` enforces strict Math mode (no compile/runtime fallback).
+- `AXIOM_CRYPTO_REQUIRED=1` enforces strict Crypto mode (no compile/runtime fallback).
 - `AXIOM_DSP_REQUIRED=1` enforces strict DSP mode (no compile/runtime fallback).
 - `AXIOM_COPROCESSOR_REQUIRED=1` enforces strict mode for all coprocessor backends unless backend-specific flags override.
 - `JULIA_BIN=/path/to/julia` selects a specific Julia binary.
@@ -113,7 +116,7 @@ AXIOM_GPU_BASELINE_BACKEND=metal AXIOM_GPU_REQUIRED=1 julia --project=. scripts/
 
 ## Non-GPU Coprocessor Strategy
 
-Run deterministic strategy/fallback checks for TPU/NPU/PPU/MATH/FPGA/DSP targets:
+Run deterministic strategy/fallback checks for TPU/NPU/PPU/MATH/CRYPTO/FPGA/DSP targets:
 
 ```bash
 julia --project=. test/ci/coprocessor_strategy.jl
@@ -179,25 +182,31 @@ Generate verification telemetry evidence artifact:
 julia --project=. scripts/verification-telemetry-evidence.jl
 ```
 
-## TPU/NPU/DSP Strict Mode (Production Gate)
+## TPU/NPU/PPU/MATH/CRYPTO/DSP Strict Mode (Production Gate)
 
-Run strict-mode behavior checks for TPU/NPU/DSP fallback blocking and hook requirements:
+Run strict-mode behavior checks for TPU/NPU/PPU/MATH/CRYPTO/DSP fallback blocking and hook requirements:
 
 ```bash
 julia --project=. test/ci/tpu_required_mode.jl
 julia --project=. test/ci/npu_required_mode.jl
+julia --project=. test/ci/ppu_required_mode.jl
+julia --project=. test/ci/math_required_mode.jl
+julia --project=. test/ci/crypto_required_mode.jl
 julia --project=. test/ci/dsp_required_mode.jl
 ```
 
-Generate machine-readable TPU/NPU/DSP strict-mode evidence:
+Generate machine-readable TPU/NPU/PPU/MATH/CRYPTO/DSP strict-mode evidence:
 
 ```bash
 julia --project=. scripts/tpu-strict-evidence.jl
 julia --project=. scripts/npu-strict-evidence.jl
+julia --project=. scripts/ppu-strict-evidence.jl
+julia --project=. scripts/math-strict-evidence.jl
+julia --project=. scripts/crypto-strict-evidence.jl
 julia --project=. scripts/dsp-strict-evidence.jl
 ```
 
-Use `templates/AxiomTPUExtSkeleton.jl`, `templates/AxiomNPUExtSkeleton.jl`, and `templates/AxiomDSPExtSkeleton.jl` as starters for extension hook overrides.
+Use `templates/AxiomTPUExtSkeleton.jl`, `templates/AxiomNPUExtSkeleton.jl`, `templates/AxiomPPUExtSkeleton.jl`, `templates/AxiomMathExtSkeleton.jl`, `templates/AxiomCryptoExtSkeleton.jl`, and `templates/AxiomDSPExtSkeleton.jl` as starters for extension hook overrides.
 
 ## Certificate Integrity Checks
 

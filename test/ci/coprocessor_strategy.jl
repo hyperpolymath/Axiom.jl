@@ -65,8 +65,9 @@ with_env(f::Function, overrides::Dict{String, String}) = with_env(overrides, f)
         ("NPU", NPUBackend(0), "AXIOM_NPU_AVAILABLE", "AXIOM_NPU_DEVICE_COUNT"),
         ("PPU", PPUBackend(0), "AXIOM_PPU_AVAILABLE", "AXIOM_PPU_DEVICE_COUNT"),
         ("MATH", MathBackend(0), "AXIOM_MATH_AVAILABLE", "AXIOM_MATH_DEVICE_COUNT"),
-        ("DSP", DSPBackend(0), "AXIOM_DSP_AVAILABLE", "AXIOM_DSP_DEVICE_COUNT"),
+        ("CRYPTO", CryptoBackend(0), "AXIOM_CRYPTO_AVAILABLE", "AXIOM_CRYPTO_DEVICE_COUNT"),
         ("FPGA", FPGABackend(0), "AXIOM_FPGA_AVAILABLE", "AXIOM_FPGA_DEVICE_COUNT"),
+        ("DSP", DSPBackend(0), "AXIOM_DSP_AVAILABLE", "AXIOM_DSP_DEVICE_COUNT"),
     ]
 
     for (label, backend, available_key, count_key) in backends
@@ -118,12 +119,14 @@ with_env(f::Function, overrides::Dict{String, String}) = with_env(overrides, f)
         "AXIOM_NPU_AVAILABLE" => "1",
         "AXIOM_PPU_AVAILABLE" => "1",
         "AXIOM_MATH_AVAILABLE" => "1",
+        "AXIOM_CRYPTO_AVAILABLE" => "1",
         "AXIOM_DSP_AVAILABLE" => "1",
         "AXIOM_FPGA_AVAILABLE" => "1",
         "AXIOM_TPU_DEVICE_COUNT" => "1",
         "AXIOM_NPU_DEVICE_COUNT" => "1",
         "AXIOM_PPU_DEVICE_COUNT" => "1",
         "AXIOM_MATH_DEVICE_COUNT" => "1",
+        "AXIOM_CRYPTO_DEVICE_COUNT" => "1",
         "AXIOM_DSP_DEVICE_COUNT" => "1",
         "AXIOM_FPGA_DEVICE_COUNT" => "1",
         "AXIOM_CUDA_AVAILABLE" => "0",
@@ -141,12 +144,14 @@ with_env(f::Function, overrides::Dict{String, String}) = with_env(overrides, f)
         "AXIOM_NPU_AVAILABLE" => "1",
         "AXIOM_PPU_AVAILABLE" => "1",
         "AXIOM_MATH_AVAILABLE" => "1",
+        "AXIOM_CRYPTO_AVAILABLE" => "1",
         "AXIOM_DSP_AVAILABLE" => "1",
         "AXIOM_FPGA_AVAILABLE" => "1",
         "AXIOM_TPU_DEVICE_COUNT" => "0",
         "AXIOM_NPU_DEVICE_COUNT" => "1",
         "AXIOM_PPU_DEVICE_COUNT" => "1",
         "AXIOM_MATH_DEVICE_COUNT" => "1",
+        "AXIOM_CRYPTO_DEVICE_COUNT" => "1",
         "AXIOM_DSP_DEVICE_COUNT" => "1",
         "AXIOM_FPGA_DEVICE_COUNT" => "1",
     )) do
@@ -158,12 +163,14 @@ with_env(f::Function, overrides::Dict{String, String}) = with_env(overrides, f)
         "AXIOM_NPU_AVAILABLE" => "0",
         "AXIOM_PPU_AVAILABLE" => "1",
         "AXIOM_MATH_AVAILABLE" => "1",
+        "AXIOM_CRYPTO_AVAILABLE" => "1",
         "AXIOM_DSP_AVAILABLE" => "1",
         "AXIOM_FPGA_AVAILABLE" => "1",
         "AXIOM_TPU_DEVICE_COUNT" => "0",
         "AXIOM_NPU_DEVICE_COUNT" => "0",
         "AXIOM_PPU_DEVICE_COUNT" => "1",
         "AXIOM_MATH_DEVICE_COUNT" => "1",
+        "AXIOM_CRYPTO_DEVICE_COUNT" => "1",
         "AXIOM_DSP_DEVICE_COUNT" => "1",
         "AXIOM_FPGA_DEVICE_COUNT" => "1",
     )) do
@@ -175,12 +182,14 @@ with_env(f::Function, overrides::Dict{String, String}) = with_env(overrides, f)
         "AXIOM_NPU_AVAILABLE" => "0",
         "AXIOM_PPU_AVAILABLE" => "0",
         "AXIOM_MATH_AVAILABLE" => "1",
+        "AXIOM_CRYPTO_AVAILABLE" => "1",
         "AXIOM_DSP_AVAILABLE" => "1",
         "AXIOM_FPGA_AVAILABLE" => "1",
         "AXIOM_TPU_DEVICE_COUNT" => "0",
         "AXIOM_NPU_DEVICE_COUNT" => "0",
         "AXIOM_PPU_DEVICE_COUNT" => "0",
         "AXIOM_MATH_DEVICE_COUNT" => "1",
+        "AXIOM_CRYPTO_DEVICE_COUNT" => "1",
         "AXIOM_DSP_DEVICE_COUNT" => "1",
         "AXIOM_FPGA_DEVICE_COUNT" => "1",
     )) do
@@ -192,12 +201,33 @@ with_env(f::Function, overrides::Dict{String, String}) = with_env(overrides, f)
         "AXIOM_NPU_AVAILABLE" => "0",
         "AXIOM_PPU_AVAILABLE" => "0",
         "AXIOM_MATH_AVAILABLE" => "0",
+        "AXIOM_CRYPTO_AVAILABLE" => "1",
         "AXIOM_DSP_AVAILABLE" => "1",
         "AXIOM_FPGA_AVAILABLE" => "1",
         "AXIOM_TPU_DEVICE_COUNT" => "0",
         "AXIOM_NPU_DEVICE_COUNT" => "0",
         "AXIOM_PPU_DEVICE_COUNT" => "0",
         "AXIOM_MATH_DEVICE_COUNT" => "0",
+        "AXIOM_CRYPTO_DEVICE_COUNT" => "1",
+        "AXIOM_DSP_DEVICE_COUNT" => "1",
+        "AXIOM_FPGA_DEVICE_COUNT" => "1",
+    )) do
+        @test detect_coprocessor() isa CryptoBackend
+    end
+
+    with_env(Dict(
+        "AXIOM_TPU_AVAILABLE" => "0",
+        "AXIOM_NPU_AVAILABLE" => "0",
+        "AXIOM_PPU_AVAILABLE" => "0",
+        "AXIOM_MATH_AVAILABLE" => "0",
+        "AXIOM_CRYPTO_AVAILABLE" => "0",
+        "AXIOM_DSP_AVAILABLE" => "1",
+        "AXIOM_FPGA_AVAILABLE" => "1",
+        "AXIOM_TPU_DEVICE_COUNT" => "0",
+        "AXIOM_NPU_DEVICE_COUNT" => "0",
+        "AXIOM_PPU_DEVICE_COUNT" => "0",
+        "AXIOM_MATH_DEVICE_COUNT" => "0",
+        "AXIOM_CRYPTO_DEVICE_COUNT" => "0",
         "AXIOM_DSP_DEVICE_COUNT" => "1",
         "AXIOM_FPGA_DEVICE_COUNT" => "1",
     )) do
@@ -209,12 +239,14 @@ with_env(f::Function, overrides::Dict{String, String}) = with_env(overrides, f)
         "AXIOM_NPU_AVAILABLE" => "0",
         "AXIOM_PPU_AVAILABLE" => "0",
         "AXIOM_MATH_AVAILABLE" => "0",
+        "AXIOM_CRYPTO_AVAILABLE" => "0",
         "AXIOM_DSP_AVAILABLE" => "1",
         "AXIOM_FPGA_AVAILABLE" => "0",
         "AXIOM_TPU_DEVICE_COUNT" => "0",
         "AXIOM_NPU_DEVICE_COUNT" => "0",
         "AXIOM_PPU_DEVICE_COUNT" => "0",
         "AXIOM_MATH_DEVICE_COUNT" => "0",
+        "AXIOM_CRYPTO_DEVICE_COUNT" => "0",
         "AXIOM_DSP_DEVICE_COUNT" => "1",
         "AXIOM_FPGA_DEVICE_COUNT" => "0",
     )) do
@@ -227,17 +259,19 @@ with_env(f::Function, overrides::Dict{String, String}) = with_env(overrides, f)
             "AXIOM_NPU_AVAILABLE" => "0",
             "AXIOM_PPU_AVAILABLE" => "0",
             "AXIOM_MATH_AVAILABLE" => "0",
+            "AXIOM_CRYPTO_AVAILABLE" => "0",
             "AXIOM_DSP_AVAILABLE" => "0",
             "AXIOM_FPGA_AVAILABLE" => "0",
             "AXIOM_TPU_DEVICE_COUNT" => "2",
             "AXIOM_NPU_DEVICE_COUNT" => "0",
             "AXIOM_PPU_DEVICE_COUNT" => "0",
             "AXIOM_MATH_DEVICE_COUNT" => "0",
+            "AXIOM_CRYPTO_DEVICE_COUNT" => "0",
             "AXIOM_DSP_DEVICE_COUNT" => "0",
             "AXIOM_FPGA_DEVICE_COUNT" => "0",
         )) do
             report = coprocessor_capability_report()
-            @test report["strategy_order"] == ["TPU", "NPU", "PPU", "MATH", "FPGA", "DSP"]
+            @test report["strategy_order"] == ["TPU", "NPU", "PPU", "MATH", "CRYPTO", "FPGA", "DSP"]
             @test occursin("TPUBackend", report["selected_backend"])
             @test haskey(report, "runtime_diagnostics")
             @test report["runtime_diagnostics"]["self_healing_enabled"] == true
@@ -254,6 +288,8 @@ with_env(f::Function, overrides::Dict{String, String}) = with_env(overrides, f)
             @test ppu["required"] == false
             math = report["backends"]["MATH"]
             @test math["required"] == false
+            crypto = report["backends"]["CRYPTO"]
+            @test crypto["required"] == false
             dsp = report["backends"]["DSP"]
             @test dsp["required"] == false
         end

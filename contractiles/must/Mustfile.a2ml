@@ -51,7 +51,7 @@ This file is intended as a reusable layout for new repositories.
 - run: julia --project=. scripts/gpu-performance-evidence.jl
 
 ### coprocessor-strategy
-- description: TPU/NPU/DSP/FPGA strategy/fallback and capability reporting must pass
+- description: TPU/NPU/PPU/MATH/CRYPTO/DSP/FPGA strategy/fallback and capability reporting must pass
 - run: julia --project=. test/ci/coprocessor_strategy.jl
 
 ### coprocessor-evidence

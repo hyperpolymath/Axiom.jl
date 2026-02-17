@@ -36,6 +36,7 @@ const COPROCESSOR_FAILURE_MODE = Dict{DataType, Bool}(
     Axiom.DSPBackend => false,
     Axiom.PPUBackend => false,
     Axiom.MathBackend => false,
+    Axiom.CryptoBackend => false,
     Axiom.FPGABackend => false,
 )
 
@@ -50,6 +51,8 @@ function backend_key(backend)
         return "ppu"
     elseif backend isa MathBackend
         return "math"
+    elseif backend isa CryptoBackend
+        return "crypto"
     elseif backend isa FPGABackend
         return "fpga"
     end
@@ -57,7 +60,7 @@ function backend_key(backend)
 end
 
 function Axiom.backend_coprocessor_matmul(
-    backend::Union{Axiom.TPUBackend, Axiom.NPUBackend, Axiom.DSPBackend, Axiom.PPUBackend, Axiom.MathBackend, Axiom.FPGABackend},
+    backend::Union{Axiom.TPUBackend, Axiom.NPUBackend, Axiom.DSPBackend, Axiom.PPUBackend, Axiom.MathBackend, Axiom.CryptoBackend, Axiom.FPGABackend},
     A::AbstractMatrix{Float32},
     B::AbstractMatrix{Float32},
 )
@@ -68,14 +71,14 @@ function Axiom.backend_coprocessor_matmul(
 end
 
 function Axiom.backend_coprocessor_relu(
-    backend::Union{Axiom.TPUBackend, Axiom.NPUBackend, Axiom.DSPBackend, Axiom.PPUBackend, Axiom.MathBackend, Axiom.FPGABackend},
+    backend::Union{Axiom.TPUBackend, Axiom.NPUBackend, Axiom.DSPBackend, Axiom.PPUBackend, Axiom.MathBackend, Axiom.CryptoBackend, Axiom.FPGABackend},
     x::AbstractArray{Float32},
 )
     max.(x, 0f0)
 end
 
 function Axiom.backend_coprocessor_softmax(
-    backend::Union{Axiom.TPUBackend, Axiom.NPUBackend, Axiom.DSPBackend, Axiom.PPUBackend, Axiom.MathBackend, Axiom.FPGABackend},
+    backend::Union{Axiom.TPUBackend, Axiom.NPUBackend, Axiom.DSPBackend, Axiom.PPUBackend, Axiom.MathBackend, Axiom.CryptoBackend, Axiom.FPGABackend},
     x::AbstractArray{Float32},
     dim::Int,
 )
@@ -103,16 +106,18 @@ end
         "AXIOM_DSP_AVAILABLE" => "1",
         "AXIOM_PPU_AVAILABLE" => "1",
         "AXIOM_MATH_AVAILABLE" => "1",
+        "AXIOM_CRYPTO_AVAILABLE" => "1",
         "AXIOM_FPGA_AVAILABLE" => "1",
         "AXIOM_TPU_DEVICE_COUNT" => "1",
         "AXIOM_NPU_DEVICE_COUNT" => "1",
         "AXIOM_DSP_DEVICE_COUNT" => "1",
         "AXIOM_PPU_DEVICE_COUNT" => "1",
         "AXIOM_MATH_DEVICE_COUNT" => "1",
+        "AXIOM_CRYPTO_DEVICE_COUNT" => "1",
         "AXIOM_FPGA_DEVICE_COUNT" => "1",
         "AXIOM_COPROCESSOR_SELF_HEAL" => "1",
     )) do
-        for backend in (TPUBackend(0), NPUBackend(0), DSPBackend(0), PPUBackend(0), MathBackend(0), FPGABackend(0))
+        for backend in (TPUBackend(0), NPUBackend(0), DSPBackend(0), PPUBackend(0), MathBackend(0), CryptoBackend(0), FPGABackend(0))
             reset_coprocessor_runtime_diagnostics!()
             reset_coprocessor_failure_mode!()
             COPROCESSOR_FAILURE_MODE[typeof(backend)] = true
@@ -171,12 +176,14 @@ end
         "AXIOM_DSP_AVAILABLE" => "0",
         "AXIOM_PPU_AVAILABLE" => "0",
         "AXIOM_MATH_AVAILABLE" => "0",
+        "AXIOM_CRYPTO_AVAILABLE" => "0",
         "AXIOM_FPGA_AVAILABLE" => "0",
         "AXIOM_TPU_DEVICE_COUNT" => "0",
         "AXIOM_NPU_DEVICE_COUNT" => "0",
         "AXIOM_DSP_DEVICE_COUNT" => "0",
         "AXIOM_PPU_DEVICE_COUNT" => "0",
         "AXIOM_MATH_DEVICE_COUNT" => "0",
+        "AXIOM_CRYPTO_DEVICE_COUNT" => "0",
         "AXIOM_FPGA_DEVICE_COUNT" => "0",
     )) do
         reset_coprocessor_runtime_diagnostics!()
@@ -186,6 +193,7 @@ end
         @test compile(model, backend=DSPBackend(0), verify=false, optimize=:none) === model
         @test compile(model, backend=PPUBackend(0), verify=false, optimize=:none) === model
         @test compile(model, backend=MathBackend(0), verify=false, optimize=:none) === model
+        @test compile(model, backend=CryptoBackend(0), verify=false, optimize=:none) === model
         @test compile(model, backend=FPGABackend(0), verify=false, optimize=:none) === model
 
         diag = coprocessor_runtime_diagnostics()["backends"]
@@ -194,6 +202,7 @@ end
         @test diag["dsp"]["compile_fallbacks"] == 1
         @test diag["ppu"]["compile_fallbacks"] == 1
         @test diag["math"]["compile_fallbacks"] == 1
+        @test diag["crypto"]["compile_fallbacks"] == 1
         @test diag["fpga"]["compile_fallbacks"] == 1
     end
 
@@ -208,6 +217,8 @@ end
         "AXIOM_PPU_DEVICE_COUNT" => "1",
         "AXIOM_MATH_AVAILABLE" => "1",
         "AXIOM_MATH_DEVICE_COUNT" => "1",
+        "AXIOM_CRYPTO_AVAILABLE" => "1",
+        "AXIOM_CRYPTO_DEVICE_COUNT" => "1",
         "AXIOM_FPGA_AVAILABLE" => "1",
         "AXIOM_FPGA_DEVICE_COUNT" => "1",
     )) do
@@ -218,6 +229,7 @@ end
         @test compile(model, backend=DSPBackend(8), verify=false, optimize=:none) === model
         @test compile(model, backend=PPUBackend(8), verify=false, optimize=:none) === model
         @test compile(model, backend=MathBackend(8), verify=false, optimize=:none) === model
+        @test compile(model, backend=CryptoBackend(8), verify=false, optimize=:none) === model
         @test compile(model, backend=FPGABackend(8), verify=false, optimize=:none) === model
 
         diag = coprocessor_runtime_diagnostics()["backends"]
@@ -226,6 +238,7 @@ end
         @test diag["dsp"]["compile_fallbacks"] == 1
         @test diag["ppu"]["compile_fallbacks"] == 1
         @test diag["math"]["compile_fallbacks"] == 1
+        @test diag["crypto"]["compile_fallbacks"] == 1
         @test diag["fpga"]["compile_fallbacks"] == 1
     end
 end

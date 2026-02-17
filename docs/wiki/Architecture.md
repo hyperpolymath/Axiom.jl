@@ -24,7 +24,7 @@ Axiom.jl is built on a multi-runtime architecture that combines Julia ergonomics
 │                      Computation Backends                            │
 │  ┌─────────────────┐ ┌──────────────────┐ ┌───────────────────────┐│
 │  │  Julia Backend  │ │   Rust Backend   │ │   Accelerator Targets ││
-│  │  Pure Julia     │ │   FFI via ccall  │ │   TPU/NPU/DSP/FPGA    ││
+│  │  Pure Julia     │ │   FFI via ccall  │ │ TPU/NPU/PPU/MATH/CRYPTO/FPGA/DSP ││
 │  │  Portable       │ │   Rayon parallel │ │   Fallback-first flow ││
 │  └─────────────────┘ └──────────────────┘ └───────────────────────┘│
 ├─────────────────────────────────────────────────────────────────────┤
@@ -221,13 +221,13 @@ pub extern "C" fn rust_dense_forward(
 }
 ```
 
-### Coprocessor Targets (TPU/NPU/DSP/FPGA)
+### Coprocessor Targets (TPU/NPU/PPU/MATH/CRYPTO/FPGA/DSP)
 
 Axiom exposes non-GPU accelerator targets through backend handles and
 fallback-safe dispatch:
 
 ```julia
-cop = detect_coprocessor()  # TPU/NPU/DSP/FPGA or nothing
+cop = detect_coprocessor()  # TPU/NPU/PPU/MATH/CRYPTO/FPGA/DSP or nothing
 if cop !== nothing
     compiled = compile(model, backend=cop, verify=false, optimize=:none)
 end

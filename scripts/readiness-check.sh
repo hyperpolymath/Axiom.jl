@@ -174,6 +174,36 @@ check_doc_alignment() {
     status=1
   fi
 
+  if ! rg -Fq "test/ci/ppu_required_mode.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing PPU strict-mode test guidance."
+    status=1
+  fi
+
+  if ! rg -Fq "scripts/ppu-strict-evidence.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing PPU strict evidence guidance."
+    status=1
+  fi
+
+  if ! rg -Fq "test/ci/math_required_mode.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing Math strict-mode test guidance."
+    status=1
+  fi
+
+  if ! rg -Fq "scripts/math-strict-evidence.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing Math strict evidence guidance."
+    status=1
+  fi
+
+  if ! rg -Fq "test/ci/crypto_required_mode.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing Crypto strict-mode test guidance."
+    status=1
+  fi
+
+  if ! rg -Fq "scripts/crypto-strict-evidence.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing Crypto strict evidence guidance."
+    status=1
+  fi
+
   if ! rg -Fq "test/ci/proof_bundle_reconciliation.jl" docs/wiki/Developer-Guide.md; then
     echo "docs/wiki/Developer-Guide.md is missing proof bundle reconciliation test guidance."
     status=1
@@ -340,6 +370,12 @@ run() {
     run_check "TPU strict mode evidence" "$JULIA_BIN" --project=. scripts/tpu-strict-evidence.jl
     run_check "NPU strict mode behavior" "$JULIA_BIN" --project=. test/ci/npu_required_mode.jl
     run_check "NPU strict mode evidence" "$JULIA_BIN" --project=. scripts/npu-strict-evidence.jl
+    run_check "PPU strict mode behavior" "$JULIA_BIN" --project=. test/ci/ppu_required_mode.jl
+    run_check "PPU strict mode evidence" "$JULIA_BIN" --project=. scripts/ppu-strict-evidence.jl
+    run_check "Math strict mode behavior" "$JULIA_BIN" --project=. test/ci/math_required_mode.jl
+    run_check "Math strict mode evidence" "$JULIA_BIN" --project=. scripts/math-strict-evidence.jl
+    run_check "Crypto strict mode behavior" "$JULIA_BIN" --project=. test/ci/crypto_required_mode.jl
+    run_check "Crypto strict mode evidence" "$JULIA_BIN" --project=. scripts/crypto-strict-evidence.jl
     run_check "DSP strict mode behavior" "$JULIA_BIN" --project=. test/ci/dsp_required_mode.jl
     run_check "DSP strict mode evidence" "$JULIA_BIN" --project=. scripts/dsp-strict-evidence.jl
   else
@@ -351,6 +387,12 @@ run() {
     record_skip "TPU strict mode evidence (disabled)"
     record_skip "NPU strict mode behavior (disabled)"
     record_skip "NPU strict mode evidence (disabled)"
+    record_skip "PPU strict mode behavior (disabled)"
+    record_skip "PPU strict mode evidence (disabled)"
+    record_skip "Math strict mode behavior (disabled)"
+    record_skip "Math strict mode evidence (disabled)"
+    record_skip "Crypto strict mode behavior (disabled)"
+    record_skip "Crypto strict mode evidence (disabled)"
     record_skip "DSP strict mode behavior (disabled)"
     record_skip "DSP strict mode evidence (disabled)"
   fi

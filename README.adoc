@@ -108,7 +108,7 @@ prod_model = compile(model, backend=RustBackend("/path/to/libaxiom_core.so"), op
 [source,julia]
 ----
 # Non-GPU accelerator targets with safe fallback
-cop = detect_coprocessor()  # TPU/NPU/PPU/MATH/FPGA/DSP or nothing
+cop = detect_coprocessor()  # TPU/NPU/PPU/MATH/CRYPTO/FPGA/DSP or nothing
 if cop !== nothing
     model_accel = compile(model, backend=cop, verify=false)
 end

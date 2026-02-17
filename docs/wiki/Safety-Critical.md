@@ -227,7 +227,7 @@ Axiom.config[:fast_math] = false
 |---------|-------------------------|-------|
 | Julia | Yes | Single-threaded |
 | Rust | Configurable | Rayon can be non-deterministic |
-| Coprocessor targets (TPU/NPU/DSP/FPGA) | Strategy-level | Fallback-first; production kernels are backend-specific roadmap work |
+| Coprocessor targets (TPU/NPU/PPU/MATH/CRYPTO/FPGA/DSP) | Strategy-level | Fallback-first; production kernels are backend-specific roadmap work |
 
 ## Redundancy Patterns
 

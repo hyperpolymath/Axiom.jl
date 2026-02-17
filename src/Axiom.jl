@@ -160,13 +160,13 @@ export train!, compile, verify
 # Backends
 export AbstractBackend, JuliaBackend, RustBackend
 export CUDABackend, ROCmBackend, MetalBackend
-export TPUBackend, NPUBackend, DSPBackend, PPUBackend, MathBackend, FPGABackend
+export TPUBackend, NPUBackend, DSPBackend, PPUBackend, MathBackend, CryptoBackend, FPGABackend
 export current_backend, set_backend!, @with_backend
 export detect_gpu, detect_coprocessor, detect_accelerator
 export cuda_available, rocm_available, metal_available
 export cuda_device_count, rocm_device_count, metal_device_count
-export tpu_available, npu_available, dsp_available, ppu_available, math_available, fpga_available
-export tpu_device_count, npu_device_count, dsp_device_count, ppu_device_count, math_device_count, fpga_device_count
+export tpu_available, npu_available, dsp_available, ppu_available, math_available, crypto_available, fpga_available
+export tpu_device_count, npu_device_count, dsp_device_count, ppu_device_count, math_device_count, crypto_device_count, fpga_device_count
 export select_device!, gpu_capability_report, coprocessor_capability_report
 export gpu_runtime_diagnostics, reset_gpu_runtime_diagnostics!
 export coprocessor_runtime_diagnostics, reset_coprocessor_runtime_diagnostics!

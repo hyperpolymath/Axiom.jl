@@ -58,7 +58,7 @@ Example starter thresholds:
 
 Tune thresholds after collecting baseline data.
 
-## 7) Does this need to be done per backend (CUDA/ROCm/Metal/TPU/NPU/DSP/FPGA)?
+## 7) Does this need to be done per backend (CUDA/ROCm/Metal/TPU/NPU/PPU/MATH/CRYPTO/DSP/FPGA)?
 
 Yes, per backend family, because failure modes differ.
 

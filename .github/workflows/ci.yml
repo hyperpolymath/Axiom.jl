@@ -265,7 +265,7 @@ jobs:
           if-no-files-found: warn
 
   coprocessor-strategy:
-    name: Coprocessor strategy, resilience, and TPU/NPU/DSP strict tests
+    name: Coprocessor strategy, resilience, and strict tests (TPU/NPU/PPU/MATH/CRYPTO/DSP)
     runs-on: ubuntu-latest
 
     steps:
@@ -304,6 +304,24 @@ jobs:
       - name: Generate NPU strict mode evidence artifact
         run: julia --project=. scripts/npu-strict-evidence.jl
 
+      - name: Run PPU strict mode tests
+        run: julia --project=. test/ci/ppu_required_mode.jl
+
+      - name: Generate PPU strict mode evidence artifact
+        run: julia --project=. scripts/ppu-strict-evidence.jl
+
+      - name: Run Math strict mode tests
+        run: julia --project=. test/ci/math_required_mode.jl
+
+      - name: Generate Math strict mode evidence artifact
+        run: julia --project=. scripts/math-strict-evidence.jl
+
+      - name: Run Crypto strict mode tests
+        run: julia --project=. test/ci/crypto_required_mode.jl
+
+      - name: Generate Crypto strict mode evidence artifact
+        run: julia --project=. scripts/crypto-strict-evidence.jl
+
       - name: Run DSP strict mode tests
         run: julia --project=. test/ci/dsp_required_mode.jl
 
@@ -340,6 +358,30 @@ jobs:
         with:
           name: npu-strict-evidence
           path: build/npu_strict_evidence.json
+          if-no-files-found: warn
+
+      - name: Upload PPU strict mode evidence artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ppu-strict-evidence
+          path: build/ppu_strict_evidence.json
+          if-no-files-found: warn
+
+      - name: Upload Math strict mode evidence artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: math-strict-evidence
+          path: build/math_strict_evidence.json
+          if-no-files-found: warn
+
+      - name: Upload Crypto strict mode evidence artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: crypto-strict-evidence
+          path: build/crypto_strict_evidence.json
           if-no-files-found: warn
 
       - name: Upload DSP strict mode evidence artifact

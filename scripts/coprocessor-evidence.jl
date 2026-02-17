@@ -41,7 +41,7 @@ function main()
     report = coprocessor_capability_report()
 
     probes = Any[]
-    for backend in (TPUBackend(0), NPUBackend(0), DSPBackend(0), PPUBackend(0), MathBackend(0), FPGABackend(0))
+    for backend in (TPUBackend(0), NPUBackend(0), PPUBackend(0), MathBackend(0), CryptoBackend(0), FPGABackend(0), DSPBackend(0))
         push!(probes, backend_probe_entry(model, x, cpu, backend))
     end
 
