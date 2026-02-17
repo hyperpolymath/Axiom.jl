@@ -206,7 +206,7 @@ export proof_assistant_obligation_report, reconcile_proof_bundle
 export import_lean_certificate, import_coq_certificate, import_isabelle_certificate
 
 # Version info
-const VERSION = v"1.0.0"
+const VERSION = v"1.0.2"
 
 function __init__()
     # Check for Rust backend availability
