@@ -44,7 +44,7 @@ jobs:
 
       - name: Process coverage
         if: matrix.julia-version == '1.10' && matrix.os == 'ubuntu-latest'
-        uses: julia-actions/julia-processcoverage@1a56f1d0e334f89f2dc12a9c77b59eb8a1a5a055 # v1
+        uses: julia-actions/julia-processcoverage@03114f09f119417c3242a9fb6e0b722676aedf38 # v1
 
       - name: Upload coverage
         if: matrix.julia-version == '1.10' && matrix.os == 'ubuntu-latest'
