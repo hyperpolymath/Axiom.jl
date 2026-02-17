@@ -163,6 +163,66 @@ jobs:
       - name: Run interop smoke tests
         run: julia --project=. test/ci/interop_smoke.jl
 
+  roadmap-could:
+    name: Roadmap could-baselines (packaging + optimization + telemetry)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+
+      - uses: julia-actions/setup-julia@824fb972babf1837cf21c49159bf8a8130f26840 # v2
+        with:
+          version: '1.10'
+
+      - uses: julia-actions/cache@e8472695fb3c2028b1118dc399c8440ff497d409 # v2
+
+      - name: Instantiate / Build / Precompile
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile()'
+
+      - name: Run model package + registry tests
+        run: julia --project=. test/ci/model_package_registry.jl
+
+      - name: Run optimization pass tests
+        run: julia --project=. test/ci/optimization_passes.jl
+
+      - name: Run verification telemetry tests
+        run: julia --project=. test/ci/verification_telemetry.jl
+
+      - name: Generate model package evidence
+        run: julia --project=. scripts/model-package-evidence.jl
+
+      - name: Generate optimization evidence
+        run: julia --project=. scripts/optimization-evidence.jl
+
+      - name: Generate verification telemetry evidence
+        run: julia --project=. scripts/verification-telemetry-evidence.jl
+
+      - name: Upload model package evidence artifact
+        if: always()
+        uses: actions/upload-artifact@6d3e1c6c7da08dea67f074b3b34ddf5fd56a1bd7 # v4
+        with:
+          name: model-package-evidence
+          path: |
+            build/model_package_evidence.json
+            build/model_package
+          if-no-files-found: warn
+
+      - name: Upload optimization evidence artifact
+        if: always()
+        uses: actions/upload-artifact@6d3e1c6c7da08dea67f074b3b34ddf5fd56a1bd7 # v4
+        with:
+          name: optimization-evidence
+          path: build/optimization_evidence.json
+          if-no-files-found: warn
+
+      - name: Upload verification telemetry evidence artifact
+        if: always()
+        uses: actions/upload-artifact@6d3e1c6c7da08dea67f074b3b34ddf5fd56a1bd7 # v4
+        with:
+          name: verification-telemetry-evidence
+          path: build/verification_telemetry_evidence.json
+          if-no-files-found: warn
+
   gpu-fallback:
     name: GPU fallback tests - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -205,7 +265,7 @@ jobs:
           if-no-files-found: warn
 
   coprocessor-strategy:
-    name: Coprocessor strategy and resilience tests
+    name: Coprocessor strategy, resilience, and TPU/NPU/DSP strict tests
     runs-on: ubuntu-latest
 
     steps:
@@ -232,6 +292,24 @@ jobs:
       - name: Generate coprocessor resilience evidence artifact
         run: julia --project=. scripts/coprocessor-resilience-evidence.jl
 
+      - name: Run TPU strict mode tests
+        run: julia --project=. test/ci/tpu_required_mode.jl
+
+      - name: Generate TPU strict mode evidence artifact
+        run: julia --project=. scripts/tpu-strict-evidence.jl
+
+      - name: Run NPU strict mode tests
+        run: julia --project=. test/ci/npu_required_mode.jl
+
+      - name: Generate NPU strict mode evidence artifact
+        run: julia --project=. scripts/npu-strict-evidence.jl
+
+      - name: Run DSP strict mode tests
+        run: julia --project=. test/ci/dsp_required_mode.jl
+
+      - name: Generate DSP strict mode evidence artifact
+        run: julia --project=. scripts/dsp-strict-evidence.jl
+
       - name: Upload coprocessor evidence artifact
         if: always()
         uses: actions/upload-artifact@6d3e1c6c7da08dea67f074b3b34ddf5fd56a1bd7 # v4
@@ -246,6 +324,30 @@ jobs:
         with:
           name: coprocessor-resilience-evidence
           path: build/coprocessor_resilience_evidence.json
+          if-no-files-found: warn
+
+      - name: Upload TPU strict mode evidence artifact
+        if: always()
+        uses: actions/upload-artifact@6d3e1c6c7da08dea67f074b3b34ddf5fd56a1bd7 # v4
+        with:
+          name: tpu-strict-evidence
+          path: build/tpu_strict_evidence.json
+          if-no-files-found: warn
+
+      - name: Upload NPU strict mode evidence artifact
+        if: always()
+        uses: actions/upload-artifact@6d3e1c6c7da08dea67f074b3b34ddf5fd56a1bd7 # v4
+        with:
+          name: npu-strict-evidence
+          path: build/npu_strict_evidence.json
+          if-no-files-found: warn
+
+      - name: Upload DSP strict mode evidence artifact
+        if: always()
+        uses: actions/upload-artifact@6d3e1c6c7da08dea67f074b3b34ddf5fd56a1bd7 # v4
+        with:
+          name: dsp-strict-evidence
+          path: build/dsp_strict_evidence.json
           if-no-files-found: warn
 
   gpu-cuda-hardware:

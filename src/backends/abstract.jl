@@ -74,6 +74,24 @@ struct DSPBackend <: AbstractBackend
 end
 
 """
+    PPUBackend
+
+Physics Processing Unit backend target.
+"""
+struct PPUBackend <: AbstractBackend
+    device::Int
+end
+
+"""
+    MathBackend
+
+Math coprocessor backend target.
+"""
+struct MathBackend <: AbstractBackend
+    device::Int
+end
+
+"""
     FPGABackend
 
 FPGA accelerator backend target.
@@ -292,7 +310,7 @@ backend_matmul(::JuliaBackend, A, B) = A * B
 backend_relu(::JuliaBackend, x) = relu(x)
 backend_softmax(::JuliaBackend, x, dim) = softmax(x, dims=dim)
 
-const CoprocessorBackend = Union{TPUBackend, NPUBackend, DSPBackend, FPGABackend}
+const CoprocessorBackend = Union{TPUBackend, NPUBackend, DSPBackend, PPUBackend, MathBackend, FPGABackend}
 
 function _coprocessor_label(backend::CoprocessorBackend)
     if backend isa TPUBackend
@@ -301,10 +319,40 @@ function _coprocessor_label(backend::CoprocessorBackend)
         return "NPU"
     elseif backend isa DSPBackend
         return "DSP"
+    elseif backend isa PPUBackend
+        return "PPU"
+    elseif backend isa MathBackend
+        return "MATH"
     elseif backend isa FPGABackend
         return "FPGA"
     end
     string(typeof(backend))
+end
+
+function _coprocessor_required_env_key(backend::CoprocessorBackend)
+    if backend isa TPUBackend
+        return "AXIOM_TPU_REQUIRED"
+    elseif backend isa NPUBackend
+        return "AXIOM_NPU_REQUIRED"
+    elseif backend isa DSPBackend
+        return "AXIOM_DSP_REQUIRED"
+    elseif backend isa PPUBackend
+        return "AXIOM_PPU_REQUIRED"
+    elseif backend isa MathBackend
+        return "AXIOM_MATH_REQUIRED"
+    elseif backend isa FPGABackend
+        return "AXIOM_FPGA_REQUIRED"
+    end
+    "AXIOM_COPROCESSOR_REQUIRED"
+end
+
+function _coprocessor_required(backend::CoprocessorBackend)
+    specific = _backend_env_available(_coprocessor_required_env_key(backend))
+    if specific !== nothing
+        return specific
+    end
+    global_required = _backend_env_available("AXIOM_COPROCESSOR_REQUIRED")
+    global_required === nothing ? false : global_required
 end
 
 # Coprocessor runtime diagnostics counters (self-healing/fallback observability).
@@ -327,6 +375,18 @@ const _COPROCESSOR_RUNTIME_DIAGNOSTICS = Dict{String, Dict{String, Int}}(
         "runtime_fallbacks" => 0,
         "recoveries" => 0,
     ),
+    "ppu" => Dict(
+        "compile_fallbacks" => 0,
+        "runtime_errors" => 0,
+        "runtime_fallbacks" => 0,
+        "recoveries" => 0,
+    ),
+    "math" => Dict(
+        "compile_fallbacks" => 0,
+        "runtime_errors" => 0,
+        "runtime_fallbacks" => 0,
+        "recoveries" => 0,
+    ),
     "fpga" => Dict(
         "compile_fallbacks" => 0,
         "runtime_errors" => 0,
@@ -342,6 +402,10 @@ function _coprocessor_backend_key(backend::CoprocessorBackend)
         return "npu"
     elseif backend isa DSPBackend
         return "dsp"
+    elseif backend isa PPUBackend
+        return "ppu"
+    elseif backend isa MathBackend
+        return "math"
     elseif backend isa FPGABackend
         return "fpga"
     end
@@ -377,7 +441,7 @@ Return machine-readable counters for coprocessor fallback/self-healing behavior.
 """
 function coprocessor_runtime_diagnostics()
     backends = Dict{String, Any}()
-    for key in ("tpu", "npu", "dsp", "fpga")
+    for key in ("tpu", "npu", "dsp", "ppu", "math", "fpga")
         counters = get(_COPROCESSOR_RUNTIME_DIAGNOSTICS, key, Dict{String, Int}())
         backends[key] = Dict(
             "compile_fallbacks" => get(counters, "compile_fallbacks", 0),
@@ -423,6 +487,16 @@ for (hook, cpu_op) in (
 )
     hook_name = String(hook)
     @eval function $hook(backend::CoprocessorBackend, args...)
+        if _coprocessor_required(backend)
+            throw(ErrorException(string(
+                _coprocessor_label(backend),
+                " extension hook not loaded for `",
+                $hook_name,
+                "` while strict mode is enabled (set ",
+                _coprocessor_required_env_key(backend),
+                "=0 or AXIOM_COPROCESSOR_REQUIRED=0 to allow fallback)."
+            )))
+        end
         @warn string(
             _coprocessor_label(backend),
             " extension hook not loaded for `",
@@ -679,8 +753,12 @@ function MixedPrecisionWrapper(model)
 end
 
 function forward(mp::MixedPrecisionWrapper, x)
-    # Convert input to Float16 for forward pass
-    x_f16 = Float16.(x)
+    # Convert input to Float16 for forward pass.
+    x_f16 = if x isa AbstractTensor
+        Tensor(Float16.(x.data))
+    else
+        Float16.(x)
+    end
 
     # Temporarily convert model weights to Float16
     params = parameters(mp.model)
@@ -698,9 +776,14 @@ function forward(mp::MixedPrecisionWrapper, x)
         setfield!(mp.model, name, master_param)
     end
 
-    # Return result as Float32
+    # Return result as Float32, preserving tensor wrappers when available.
+    if y isa AbstractTensor
+        return Tensor(Float32.(y.data))
+    end
     Float32.(y)
 end
+
+(mp::MixedPrecisionWrapper)(x) = forward(mp, x)
 
 parameters(mp::MixedPrecisionWrapper) = parameters(mp.model)
 output_shape(mp::MixedPrecisionWrapper, input_shape) = output_shape(mp.model, input_shape)
@@ -775,19 +858,36 @@ function compile_to_backend(model, backend::DSPBackend)
     _compile_coprocessor(model, backend, dsp_available(), dsp_device_count(), "DSP")
 end
 
+function compile_to_backend(model, backend::PPUBackend)
+    _compile_coprocessor(model, backend, ppu_available(), ppu_device_count(), "PPU")
+end
+
+function compile_to_backend(model, backend::MathBackend)
+    _compile_coprocessor(model, backend, math_available(), math_device_count(), "MATH")
+end
+
 function compile_to_backend(model, backend::FPGABackend)
     _compile_coprocessor(model, backend, fpga_available(), fpga_device_count(), "FPGA")
 end
 
 function _compile_coprocessor(model, backend, available::Bool, device_count::Int, label::String)
     @info "Compiling to $(label) backend on device $(backend.device)..."
+    required = _coprocessor_required(backend)
+    required_key = _coprocessor_required_env_key(backend)
+
     if !available
         _coprocessor_record_diagnostic!(backend, "compile_fallbacks")
+        if required
+            error("$(label) backend not available and strict mode is enabled (set $(required_key)=0 or AXIOM_COPROCESSOR_REQUIRED=0 to allow fallback)")
+        end
         @warn "$(label) backend not available, falling back to Julia backend"
         return model
     end
     if backend.device < 0 || backend.device >= device_count
         _coprocessor_record_diagnostic!(backend, "compile_fallbacks")
+        if required
+            error("$(label) device $(backend.device) out of range (available: 0:$(max(0, device_count - 1))) and strict mode is enabled (set $(required_key)=0 or AXIOM_COPROCESSOR_REQUIRED=0 to allow fallback)")
+        end
         @warn "$(label) device $(backend.device) out of range (available: 0:$(max(0, device_count - 1))), falling back to Julia backend"
         return model
     end
@@ -887,6 +987,20 @@ Check if FPGA backend is available.
 fpga_available() = _accelerator_env_flag("AXIOM_FPGA_AVAILABLE")
 
 """
+    ppu_available() -> Bool
+
+Check if PPU backend is available.
+"""
+ppu_available() = _accelerator_env_flag("AXIOM_PPU_AVAILABLE")
+
+"""
+    math_available() -> Bool
+
+Check if Math backend is available.
+"""
+math_available() = _accelerator_env_flag("AXIOM_MATH_AVAILABLE")
+
+"""
     tpu_device_count() -> Int
 
 Get number of available TPU devices.
@@ -915,6 +1029,20 @@ Get number of available FPGA devices.
 fpga_device_count() = _accelerator_env_count("AXIOM_FPGA_AVAILABLE", "AXIOM_FPGA_DEVICE_COUNT")
 
 """
+    ppu_device_count() -> Int
+
+Get number of available PPU devices.
+"""
+ppu_device_count() = _accelerator_env_count("AXIOM_PPU_AVAILABLE", "AXIOM_PPU_DEVICE_COUNT")
+
+"""
+    math_device_count() -> Int
+
+Get number of available Math coprocessor devices.
+"""
+math_device_count() = _accelerator_env_count("AXIOM_MATH_AVAILABLE", "AXIOM_MATH_DEVICE_COUNT")
+
+"""
     detect_coprocessor() -> Union{AbstractBackend, Nothing}
 
 Auto-detect available non-GPU coprocessor backend.
@@ -925,6 +1053,12 @@ function detect_coprocessor()
     end
     if npu_available() && npu_device_count() > 0
         return NPUBackend(0)
+    end
+    if ppu_available() && ppu_device_count() > 0
+        return PPUBackend(0)
+    end
+    if math_available() && math_device_count() > 0
+        return MathBackend(0)
     end
     if fpga_available() && fpga_device_count() > 0
         return FPGABackend(0)
@@ -991,6 +1125,8 @@ function coprocessor_capability_report()
     strategy = [
         ("TPU", TPUBackend, tpu_available, tpu_device_count),
         ("NPU", NPUBackend, npu_available, npu_device_count),
+        ("PPU", PPUBackend, ppu_available, ppu_device_count),
+        ("MATH", MathBackend, math_available, math_device_count),
         ("FPGA", FPGABackend, fpga_available, fpga_device_count),
         ("DSP", DSPBackend, dsp_available, dsp_device_count),
     ]
@@ -998,11 +1134,13 @@ function coprocessor_capability_report()
     for (label, backend_type, available_fn, count_fn) in strategy
         available = available_fn()
         count = count_fn()
+        required = _coprocessor_required(backend_type(0))
         hooks = _coprocessor_hook_overrides(backend_type)
         kernel_hooks_loaded = !isempty(hooks) && all(values(hooks))
         backends[label] = Dict(
             "available" => available,
             "device_count" => count,
+            "required" => required,
             "compilable" => available && count > 0,
             "kernel_hooks_loaded" => kernel_hooks_loaded,
             "hook_overrides" => hooks,
@@ -1011,7 +1149,7 @@ function coprocessor_capability_report()
 
     Dict(
         "generated_at" => Dates.format(now(Dates.UTC), "yyyy-mm-ddTHH:MM:SS.sssZ"),
-        "strategy_order" => ["TPU", "NPU", "FPGA", "DSP"],
+        "strategy_order" => ["TPU", "NPU", "PPU", "MATH", "FPGA", "DSP"],
         "selected_backend" => selected === nothing ? nothing : string(typeof(selected)),
         "runtime_diagnostics" => coprocessor_runtime_diagnostics(),
         "backends" => backends,
@@ -1019,13 +1157,15 @@ function coprocessor_capability_report()
 end
 
 """
-    select_device!(backend::Union{TPUBackend,NPUBackend,DSPBackend,FPGABackend}, device::Int)
+    select_device!(backend::Union{TPUBackend,NPUBackend,DSPBackend,PPUBackend,MathBackend,FPGABackend}, device::Int)
 
 Return a backend handle for the selected coprocessor device.
 """
 select_device!(::TPUBackend, device::Int) = TPUBackend(device)
 select_device!(::NPUBackend, device::Int) = NPUBackend(device)
 select_device!(::DSPBackend, device::Int) = DSPBackend(device)
+select_device!(::PPUBackend, device::Int) = PPUBackend(device)
+select_device!(::MathBackend, device::Int) = MathBackend(device)
 select_device!(::FPGABackend, device::Int) = FPGABackend(device)
 
 """
@@ -1331,6 +1471,17 @@ function _coprocessor_forward_with_recovery(model, x::AbstractTensor, backend::C
         return _coprocessor_forward(model, x, backend)
     catch err
         _coprocessor_record_diagnostic!(backend, "runtime_errors")
+        if _coprocessor_required(backend)
+            message = string(
+                _coprocessor_label(backend),
+                " execution failed with strict mode enabled (set ",
+                _coprocessor_required_env_key(backend),
+                "=0 or AXIOM_COPROCESSOR_REQUIRED=0 to allow fallback). ",
+                "Original error: ",
+                sprint(showerror, err),
+            )
+            throw(ErrorException(message))
+        end
         if !_coprocessor_self_healing_enabled()
             message = string(
                 _coprocessor_label(backend),
@@ -1365,4 +1516,6 @@ output_shape(cm::CoprocessorCompiledModel, input_shape) = output_shape(cm.model,
 const TPUCompiledModel = CoprocessorCompiledModel{M, TPUBackend} where M
 const NPUCompiledModel = CoprocessorCompiledModel{M, NPUBackend} where M
 const DSPCompiledModel = CoprocessorCompiledModel{M, DSPBackend} where M
+const PPUCompiledModel = CoprocessorCompiledModel{M, PPUBackend} where M
+const MathCompiledModel = CoprocessorCompiledModel{M, MathBackend} where M
 const FPGACompiledModel = CoprocessorCompiledModel{M, FPGABackend} where M

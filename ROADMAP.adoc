@@ -62,15 +62,15 @@ Should completion gates:
 
 === Could
 
-* [ ] Add richer model packaging and registry workflows.
-* [ ] Expand advanced optimization passes (fusion, mixed precision).
-* [ ] Add deeper runtime observability for verification paths.
+* [x] Add richer model packaging and registry workflows (baseline shipped via `model_package_manifest`, `export_model_package`, `build_registry_entry`, `export_registry_entry`, plus CI/evidence coverage).
+* [x] Expand advanced optimization passes (fusion, mixed precision) with explicit CI/benchmark evidence coverage (`test/ci/optimization_passes.jl`, `scripts/optimization-evidence.jl`).
+* [x] Add deeper runtime observability for verification paths (structured telemetry APIs + CI/evidence coverage).
 
 Could completion gates:
 
-* [ ] Packaging format includes model metadata, verification claims, and reproducible hashes.
-* [ ] Optional optimization passes are benchmarked and guarded behind explicit flags.
-* [ ] Verification runtime emits structured telemetry suitable for dashboards/incident analysis.
+* [x] Packaging format includes model metadata, verification claims, and reproducible hashes (`MODEL_PACKAGE_FORMAT`, `test/ci/model_package_registry.jl`).
+* [x] Optional optimization passes are benchmarked and guarded behind explicit flags (`compile(...; optimize, precision)`, `scripts/optimization-evidence.jl`).
+* [x] Verification runtime emits structured telemetry suitable for dashboards/incident analysis (`verification_result_telemetry`, `verification_telemetry_report`, `scripts/verification-telemetry-evidence.jl`).
 
 == Deferred Commitments (Tracked)
 
@@ -79,10 +79,11 @@ These roadmap promises are still tracked explicitly (with current delivery state
 * [x] `from_pytorch(...)` import API (baseline shipped: descriptor import + direct `.pt/.pth/.ckpt` bridge + CI interop smoke via `scripts/pytorch_to_axiom_descriptor.py`).
 * [x] `to_onnx(...)` export API (baseline shipped: Dense/Conv/Norm/Pool + common activations for supported `Sequential`/`Pipeline` models).
 * [x] Production-hardened GPU paths across CUDA/ROCm/Metal (baseline shipped: deterministic fallback CI + optional hardware smoke + extension-hook dispatch + device-range guards + runtime self-healing diagnostics + backend-specific performance evidence via `test/ci/gpu_resilience.jl` and `scripts/gpu-performance-evidence.jl`).
-* [ ] Non-GPU accelerators (TPU/NPU/DSP/FPGA) backend strategy (in progress: targets, detection, compiled dispatch, fallback/strategy CI, capability/evidence reporting, runtime self-healing diagnostics, and resilience CI/evidence shipped via `coprocessor_capability_report`, `coprocessor_runtime_diagnostics`, `scripts/coprocessor-evidence.jl`, `test/ci/coprocessor_resilience.jl`, and `scripts/coprocessor-resilience-evidence.jl`; production kernels remain).
+* [ ] Non-GPU accelerators (TPU/NPU/PPU/MATH/FPGA/DSP) backend strategy (in progress: targets, detection, compiled dispatch, fallback/strategy CI, capability/evidence reporting, runtime self-healing diagnostics, resilience CI/evidence, and TPU/NPU/DSP strict-mode gating shipped via `coprocessor_capability_report`, `coprocessor_runtime_diagnostics`, `scripts/coprocessor-evidence.jl`, `test/ci/coprocessor_resilience.jl`, `scripts/coprocessor-resilience-evidence.jl`, `test/ci/tpu_required_mode.jl`, `scripts/tpu-strict-evidence.jl`, `test/ci/npu_required_mode.jl`, `scripts/npu-strict-evidence.jl`, `test/ci/dsp_required_mode.jl`, and `scripts/dsp-strict-evidence.jl`; production kernels remain).
+* [ ] Accelerator rollout sequence (2026-02-17): Maths/Physics basics shipped first; cryptographic coprocessor + FPGA production-ready next; VPU + QPU basics after; remaining accelerator production hardening targeted for v2.
 * [ ] Proof-assistant export beyond skeleton artifacts (in progress: obligation manifests, bundle export, status metadata, assistant reconciliation, deterministic reconciliation CI, and evidence artifacts shipped via `proof_obligation_manifest`, `export_proof_bundle`, `proof_assistant_obligation_report`, `reconcile_proof_bundle`, `test/ci/proof_bundle_reconciliation.jl`, and `scripts/proof-bundle-evidence.jl`; full assistant proof replay remains a Stage 4 track).
 
-Readiness verification (2026-02-17): `scripts/readiness-check.sh` => Passed: 17, Failed: 0, Skipped: 0.
+Readiness verification (2026-02-17): `scripts/readiness-check.sh` => Passed: 29, Failed: 0, Skipped: 0.
 
 See link:docs/wiki/Roadmap-Commitments.md[docs/wiki/Roadmap-Commitments.md] for staged targets and acceptance criteria.
 

@@ -29,6 +29,9 @@ RUN_COPROCESSOR="${AXIOM_READINESS_RUN_COPROCESSOR:-1}"
 RUN_INTEROP="${AXIOM_READINESS_RUN_INTEROP:-1}"
 RUN_CERTIFICATE="${AXIOM_READINESS_RUN_CERTIFICATE:-1}"
 RUN_PROOF_BUNDLE="${AXIOM_READINESS_RUN_PROOF_BUNDLE:-1}"
+RUN_COULD_PACKAGING="${AXIOM_READINESS_RUN_COULD_PACKAGING:-1}"
+RUN_COULD_OPTIMIZATION="${AXIOM_READINESS_RUN_COULD_OPTIMIZATION:-1}"
+RUN_COULD_TELEMETRY="${AXIOM_READINESS_RUN_COULD_TELEMETRY:-1}"
 RUN_DOC_ALIGNMENT="${AXIOM_READINESS_RUN_DOC_ALIGNMENT:-1}"
 RUN_MARKERS="${AXIOM_READINESS_RUN_MARKERS:-1}"
 
@@ -141,6 +144,36 @@ check_doc_alignment() {
     status=1
   fi
 
+  if ! rg -Fq "test/ci/tpu_required_mode.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing TPU strict-mode test guidance."
+    status=1
+  fi
+
+  if ! rg -Fq "scripts/tpu-strict-evidence.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing TPU strict evidence guidance."
+    status=1
+  fi
+
+  if ! rg -Fq "test/ci/npu_required_mode.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing NPU strict-mode test guidance."
+    status=1
+  fi
+
+  if ! rg -Fq "scripts/npu-strict-evidence.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing NPU strict evidence guidance."
+    status=1
+  fi
+
+  if ! rg -Fq "test/ci/dsp_required_mode.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing DSP strict-mode test guidance."
+    status=1
+  fi
+
+  if ! rg -Fq "scripts/dsp-strict-evidence.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing DSP strict evidence guidance."
+    status=1
+  fi
+
   if ! rg -Fq "test/ci/proof_bundle_reconciliation.jl" docs/wiki/Developer-Guide.md; then
     echo "docs/wiki/Developer-Guide.md is missing proof bundle reconciliation test guidance."
     status=1
@@ -148,6 +181,36 @@ check_doc_alignment() {
 
   if ! rg -Fq "scripts/proof-bundle-evidence.jl" docs/wiki/Developer-Guide.md; then
     echo "docs/wiki/Developer-Guide.md is missing proof bundle evidence guidance."
+    status=1
+  fi
+
+  if ! rg -Fq "test/ci/model_package_registry.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing model package/registry test guidance."
+    status=1
+  fi
+
+  if ! rg -Fq "scripts/model-package-evidence.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing model package evidence guidance."
+    status=1
+  fi
+
+  if ! rg -Fq "test/ci/optimization_passes.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing optimization-pass test guidance."
+    status=1
+  fi
+
+  if ! rg -Fq "scripts/optimization-evidence.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing optimization evidence guidance."
+    status=1
+  fi
+
+  if ! rg -Fq "test/ci/verification_telemetry.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing verification telemetry test guidance."
+    status=1
+  fi
+
+  if ! rg -Fq "scripts/verification-telemetry-evidence.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing verification telemetry evidence guidance."
     status=1
   fi
 
@@ -273,11 +336,23 @@ run() {
     run_check "coprocessor capability evidence" "$JULIA_BIN" --project=. scripts/coprocessor-evidence.jl
     run_check "coprocessor resilience diagnostics" "$JULIA_BIN" --project=. test/ci/coprocessor_resilience.jl
     run_check "coprocessor resilience evidence" "$JULIA_BIN" --project=. scripts/coprocessor-resilience-evidence.jl
+    run_check "TPU strict mode behavior" "$JULIA_BIN" --project=. test/ci/tpu_required_mode.jl
+    run_check "TPU strict mode evidence" "$JULIA_BIN" --project=. scripts/tpu-strict-evidence.jl
+    run_check "NPU strict mode behavior" "$JULIA_BIN" --project=. test/ci/npu_required_mode.jl
+    run_check "NPU strict mode evidence" "$JULIA_BIN" --project=. scripts/npu-strict-evidence.jl
+    run_check "DSP strict mode behavior" "$JULIA_BIN" --project=. test/ci/dsp_required_mode.jl
+    run_check "DSP strict mode evidence" "$JULIA_BIN" --project=. scripts/dsp-strict-evidence.jl
   else
     record_skip "coprocessor strategy behavior (disabled)"
     record_skip "coprocessor capability evidence (disabled)"
     record_skip "coprocessor resilience diagnostics (disabled)"
     record_skip "coprocessor resilience evidence (disabled)"
+    record_skip "TPU strict mode behavior (disabled)"
+    record_skip "TPU strict mode evidence (disabled)"
+    record_skip "NPU strict mode behavior (disabled)"
+    record_skip "NPU strict mode evidence (disabled)"
+    record_skip "DSP strict mode behavior (disabled)"
+    record_skip "DSP strict mode evidence (disabled)"
   fi
 
   if [ "$RUN_INTEROP" = "1" ]; then
@@ -298,6 +373,30 @@ run() {
   else
     record_skip "proof bundle reconciliation (disabled)"
     record_skip "proof bundle evidence (disabled)"
+  fi
+
+  if [ "$RUN_COULD_PACKAGING" = "1" ]; then
+    run_check "model package + registry CI" "$JULIA_BIN" --project=. test/ci/model_package_registry.jl
+    run_check "model package evidence" "$JULIA_BIN" --project=. scripts/model-package-evidence.jl
+  else
+    record_skip "model package + registry CI (disabled)"
+    record_skip "model package evidence (disabled)"
+  fi
+
+  if [ "$RUN_COULD_OPTIMIZATION" = "1" ]; then
+    run_check "optimization pass CI" "$JULIA_BIN" --project=. test/ci/optimization_passes.jl
+    run_check "optimization evidence" "$JULIA_BIN" --project=. scripts/optimization-evidence.jl
+  else
+    record_skip "optimization pass CI (disabled)"
+    record_skip "optimization evidence (disabled)"
+  fi
+
+  if [ "$RUN_COULD_TELEMETRY" = "1" ]; then
+    run_check "verification telemetry CI" "$JULIA_BIN" --project=. test/ci/verification_telemetry.jl
+    run_check "verification telemetry evidence" "$JULIA_BIN" --project=. scripts/verification-telemetry-evidence.jl
+  else
+    record_skip "verification telemetry CI (disabled)"
+    record_skip "verification telemetry evidence (disabled)"
   fi
 
   if [ "$RUN_MARKERS" = "1" ]; then

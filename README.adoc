@@ -108,10 +108,37 @@ prod_model = compile(model, backend=RustBackend("/path/to/libaxiom_core.so"), op
 [source,julia]
 ----
 # Non-GPU accelerator targets with safe fallback
-cop = detect_coprocessor()  # TPU/NPU/DSP/FPGA or nothing
+cop = detect_coprocessor()  # TPU/NPU/PPU/MATH/FPGA/DSP or nothing
 if cop !== nothing
     model_accel = compile(model, backend=cop, verify=false)
 end
+----
+
+=== Model Packaging + Registry Manifests
+
+[source,julia]
+----
+metadata = create_metadata(
+    model;
+    name="my-model",
+    architecture="Sequential",
+    version="1.0.0",
+)
+verify_and_claim!(metadata, "FiniteOutput", "verified=true; source=ci")
+
+bundle = export_model_package(model, metadata, "build/model_package")
+entry = build_registry_entry(bundle["manifest"]; channel="stable")
+export_registry_entry(entry, "build/model_package/registry-entry.json")
+----
+
+=== Verification Telemetry
+
+[source,julia]
+----
+reset_verification_telemetry!()
+result = verify(model, properties=[FiniteOutput()], data=[(x, nothing)])
+run_payload = verification_result_telemetry(result; source="inference-gate")
+summary = verification_telemetry_report()
 ----
 
 === Serving APIs

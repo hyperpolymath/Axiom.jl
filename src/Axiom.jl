@@ -114,6 +114,7 @@ include("backends/rust_ffi.jl")
 
 # Model metadata and packaging
 include("model_metadata.jl")
+include("model_packaging.jl")
 
 # Utilities
 include("utils/initialization.jl")
@@ -159,13 +160,13 @@ export train!, compile, verify
 # Backends
 export AbstractBackend, JuliaBackend, RustBackend
 export CUDABackend, ROCmBackend, MetalBackend
-export TPUBackend, NPUBackend, DSPBackend, FPGABackend
+export TPUBackend, NPUBackend, DSPBackend, PPUBackend, MathBackend, FPGABackend
 export current_backend, set_backend!, @with_backend
 export detect_gpu, detect_coprocessor, detect_accelerator
 export cuda_available, rocm_available, metal_available
 export cuda_device_count, rocm_device_count, metal_device_count
-export tpu_available, npu_available, dsp_available, fpga_available
-export tpu_device_count, npu_device_count, dsp_device_count, fpga_device_count
+export tpu_available, npu_available, dsp_available, ppu_available, math_available, fpga_available
+export tpu_device_count, npu_device_count, dsp_device_count, ppu_device_count, math_device_count, fpga_device_count
 export select_device!, gpu_capability_report, coprocessor_capability_report
 export gpu_runtime_diagnostics, reset_gpu_runtime_diagnostics!
 export coprocessor_runtime_diagnostics, reset_coprocessor_runtime_diagnostics!
@@ -184,6 +185,7 @@ export EnsureViolation
 export ProofCertificate, serialize_proof, deserialize_proof
 export export_proof_certificate, import_proof_certificate, verify_proof_certificate
 export VerificationResult, generate_certificate, save_certificate, load_certificate, verify_certificate
+export verification_result_telemetry, verification_telemetry_report, reset_verification_telemetry!
 
 # Interop
 export from_pytorch, to_onnx
@@ -193,6 +195,9 @@ export load_pytorch, export_onnx
 export ModelMetadata, VerificationClaim
 export create_metadata, save_metadata, load_metadata, validate_metadata
 export add_verification_claim!, verify_and_claim!
+export MODEL_PACKAGE_FORMAT, MODEL_REGISTRY_ENTRY_FORMAT
+export model_package_manifest, export_model_package, load_model_package_manifest
+export build_registry_entry, export_registry_entry
 
 # Proof assistant integration (issue #19)
 export export_lean, export_coq, export_isabelle

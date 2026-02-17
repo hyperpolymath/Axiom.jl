@@ -372,10 +372,17 @@ end
 # Helper Functions
 # ============================================================================
 
-function compute_model_checksum(params::Dict)
+function _parameter_pairs(params)
+    if params isa AbstractDict
+        return collect(params)
+    end
+    collect(pairs(params))
+end
+
+function compute_model_checksum(params)
     # Concatenate all parameter arrays and hash
     hasher = SHA.SHA256_CTX()
-    for (name, param) in sort(collect(params))  # Sort for determinism
+    for (name, param) in sort(_parameter_pairs(params); by = entry -> string(entry[1]))
         if param isa AbstractArray
             SHA.update!(hasher, reinterpret(UInt8, vec(param)))
         end
@@ -413,9 +420,9 @@ function output_shape_from_model(model)
     return ()
 end
 
-function detect_precision(params::Dict)
+function detect_precision(params)
     # Check parameter types
-    for (_, param) in params
+    for (_, param) in pairs(params)
         if param isa AbstractArray
             T = eltype(param)
             if T <: Float16

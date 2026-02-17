@@ -38,8 +38,15 @@ Useful toggles:
 - `AXIOM_READINESS_RUN_RUST=0` disables Rust parity/smoke checks.
 - `AXIOM_READINESS_RUN_COPROCESSOR=0` disables coprocessor strategy/resilience checks.
 - `AXIOM_READINESS_RUN_GPU_PERF=0` disables GPU resilience/performance evidence checks.
+- `AXIOM_READINESS_RUN_COULD_PACKAGING=0` disables model package/registry could-item checks.
+- `AXIOM_READINESS_RUN_COULD_OPTIMIZATION=0` disables optimization-pass could-item checks.
+- `AXIOM_READINESS_RUN_COULD_TELEMETRY=0` disables verification-telemetry could-item checks.
 - `AXIOM_READINESS_ALLOW_SKIPS=1` allows skipped checks without failing the run.
 - `AXIOM_COPROCESSOR_SELF_HEAL=0` disables coprocessor self-healing fallback (useful for failure-path testing).
+- `AXIOM_TPU_REQUIRED=1` enforces strict TPU mode (no compile/runtime fallback).
+- `AXIOM_NPU_REQUIRED=1` enforces strict NPU mode (no compile/runtime fallback).
+- `AXIOM_DSP_REQUIRED=1` enforces strict DSP mode (no compile/runtime fallback).
+- `AXIOM_COPROCESSOR_REQUIRED=1` enforces strict mode for all coprocessor backends unless backend-specific flags override.
 - `JULIA_BIN=/path/to/julia` selects a specific Julia binary.
 
 ## Runtime Smoke Tests
@@ -106,7 +113,7 @@ AXIOM_GPU_BASELINE_BACKEND=metal AXIOM_GPU_REQUIRED=1 julia --project=. scripts/
 
 ## Non-GPU Coprocessor Strategy
 
-Run deterministic strategy/fallback checks for TPU/NPU/DSP/FPGA targets:
+Run deterministic strategy/fallback checks for TPU/NPU/PPU/MATH/FPGA/DSP targets:
 
 ```bash
 julia --project=. test/ci/coprocessor_strategy.jl
@@ -129,6 +136,68 @@ Generate coprocessor resilience evidence artifact:
 ```bash
 julia --project=. scripts/coprocessor-resilience-evidence.jl
 ```
+
+## Could: Model Packaging + Registry
+
+Run packaging/registry workflow checks:
+
+```bash
+julia --project=. test/ci/model_package_registry.jl
+```
+
+Generate machine-readable package/registry evidence artifacts:
+
+```bash
+julia --project=. scripts/model-package-evidence.jl
+```
+
+## Could: Optimization Pass Evidence
+
+Run optimization pass behavior checks:
+
+```bash
+julia --project=. test/ci/optimization_passes.jl
+```
+
+Generate optimization benchmark/drift evidence:
+
+```bash
+julia --project=. scripts/optimization-evidence.jl
+```
+
+## Could: Verification Telemetry
+
+Run structured telemetry coverage checks:
+
+```bash
+julia --project=. test/ci/verification_telemetry.jl
+```
+
+Generate verification telemetry evidence artifact:
+
+```bash
+julia --project=. scripts/verification-telemetry-evidence.jl
+```
+
+## TPU/NPU/DSP Strict Mode (Production Gate)
+
+Run strict-mode behavior checks for TPU/NPU/DSP fallback blocking and hook requirements:
+
+```bash
+julia --project=. test/ci/tpu_required_mode.jl
+julia --project=. test/ci/npu_required_mode.jl
+julia --project=. test/ci/dsp_required_mode.jl
+```
+
+Generate machine-readable TPU/NPU/DSP strict-mode evidence:
+
+```bash
+julia --project=. scripts/tpu-strict-evidence.jl
+julia --project=. scripts/npu-strict-evidence.jl
+julia --project=. scripts/dsp-strict-evidence.jl
+```
+
+Use `templates/AxiomTPUExtSkeleton.jl`, `templates/AxiomNPUExtSkeleton.jl`, and `templates/AxiomDSPExtSkeleton.jl` as starters for extension hook overrides.
 
 ## Certificate Integrity Checks
 

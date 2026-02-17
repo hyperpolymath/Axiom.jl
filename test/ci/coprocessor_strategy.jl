@@ -63,6 +63,8 @@ with_env(f::Function, overrides::Dict{String, String}) = with_env(overrides, f)
     backends = [
         ("TPU", TPUBackend(0), "AXIOM_TPU_AVAILABLE", "AXIOM_TPU_DEVICE_COUNT"),
         ("NPU", NPUBackend(0), "AXIOM_NPU_AVAILABLE", "AXIOM_NPU_DEVICE_COUNT"),
+        ("PPU", PPUBackend(0), "AXIOM_PPU_AVAILABLE", "AXIOM_PPU_DEVICE_COUNT"),
+        ("MATH", MathBackend(0), "AXIOM_MATH_AVAILABLE", "AXIOM_MATH_DEVICE_COUNT"),
         ("DSP", DSPBackend(0), "AXIOM_DSP_AVAILABLE", "AXIOM_DSP_DEVICE_COUNT"),
         ("FPGA", FPGABackend(0), "AXIOM_FPGA_AVAILABLE", "AXIOM_FPGA_DEVICE_COUNT"),
     ]
@@ -114,10 +116,14 @@ with_env(f::Function, overrides::Dict{String, String}) = with_env(overrides, f)
     with_env(Dict(
         "AXIOM_TPU_AVAILABLE" => "1",
         "AXIOM_NPU_AVAILABLE" => "1",
+        "AXIOM_PPU_AVAILABLE" => "1",
+        "AXIOM_MATH_AVAILABLE" => "1",
         "AXIOM_DSP_AVAILABLE" => "1",
         "AXIOM_FPGA_AVAILABLE" => "1",
         "AXIOM_TPU_DEVICE_COUNT" => "1",
         "AXIOM_NPU_DEVICE_COUNT" => "1",
+        "AXIOM_PPU_DEVICE_COUNT" => "1",
+        "AXIOM_MATH_DEVICE_COUNT" => "1",
         "AXIOM_DSP_DEVICE_COUNT" => "1",
         "AXIOM_FPGA_DEVICE_COUNT" => "1",
         "AXIOM_CUDA_AVAILABLE" => "0",
@@ -133,10 +139,14 @@ with_env(f::Function, overrides::Dict{String, String}) = with_env(overrides, f)
     with_env(Dict(
         "AXIOM_TPU_AVAILABLE" => "0",
         "AXIOM_NPU_AVAILABLE" => "1",
+        "AXIOM_PPU_AVAILABLE" => "1",
+        "AXIOM_MATH_AVAILABLE" => "1",
         "AXIOM_DSP_AVAILABLE" => "1",
         "AXIOM_FPGA_AVAILABLE" => "1",
         "AXIOM_TPU_DEVICE_COUNT" => "0",
         "AXIOM_NPU_DEVICE_COUNT" => "1",
+        "AXIOM_PPU_DEVICE_COUNT" => "1",
+        "AXIOM_MATH_DEVICE_COUNT" => "1",
         "AXIOM_DSP_DEVICE_COUNT" => "1",
         "AXIOM_FPGA_DEVICE_COUNT" => "1",
     )) do
@@ -146,10 +156,48 @@ with_env(f::Function, overrides::Dict{String, String}) = with_env(overrides, f)
     with_env(Dict(
         "AXIOM_TPU_AVAILABLE" => "0",
         "AXIOM_NPU_AVAILABLE" => "0",
+        "AXIOM_PPU_AVAILABLE" => "1",
+        "AXIOM_MATH_AVAILABLE" => "1",
         "AXIOM_DSP_AVAILABLE" => "1",
         "AXIOM_FPGA_AVAILABLE" => "1",
         "AXIOM_TPU_DEVICE_COUNT" => "0",
         "AXIOM_NPU_DEVICE_COUNT" => "0",
+        "AXIOM_PPU_DEVICE_COUNT" => "1",
+        "AXIOM_MATH_DEVICE_COUNT" => "1",
+        "AXIOM_DSP_DEVICE_COUNT" => "1",
+        "AXIOM_FPGA_DEVICE_COUNT" => "1",
+    )) do
+        @test detect_coprocessor() isa PPUBackend
+    end
+
+    with_env(Dict(
+        "AXIOM_TPU_AVAILABLE" => "0",
+        "AXIOM_NPU_AVAILABLE" => "0",
+        "AXIOM_PPU_AVAILABLE" => "0",
+        "AXIOM_MATH_AVAILABLE" => "1",
+        "AXIOM_DSP_AVAILABLE" => "1",
+        "AXIOM_FPGA_AVAILABLE" => "1",
+        "AXIOM_TPU_DEVICE_COUNT" => "0",
+        "AXIOM_NPU_DEVICE_COUNT" => "0",
+        "AXIOM_PPU_DEVICE_COUNT" => "0",
+        "AXIOM_MATH_DEVICE_COUNT" => "1",
+        "AXIOM_DSP_DEVICE_COUNT" => "1",
+        "AXIOM_FPGA_DEVICE_COUNT" => "1",
+    )) do
+        @test detect_coprocessor() isa MathBackend
+    end
+
+    with_env(Dict(
+        "AXIOM_TPU_AVAILABLE" => "0",
+        "AXIOM_NPU_AVAILABLE" => "0",
+        "AXIOM_PPU_AVAILABLE" => "0",
+        "AXIOM_MATH_AVAILABLE" => "0",
+        "AXIOM_DSP_AVAILABLE" => "1",
+        "AXIOM_FPGA_AVAILABLE" => "1",
+        "AXIOM_TPU_DEVICE_COUNT" => "0",
+        "AXIOM_NPU_DEVICE_COUNT" => "0",
+        "AXIOM_PPU_DEVICE_COUNT" => "0",
+        "AXIOM_MATH_DEVICE_COUNT" => "0",
         "AXIOM_DSP_DEVICE_COUNT" => "1",
         "AXIOM_FPGA_DEVICE_COUNT" => "1",
     )) do
@@ -159,10 +207,14 @@ with_env(f::Function, overrides::Dict{String, String}) = with_env(overrides, f)
     with_env(Dict(
         "AXIOM_TPU_AVAILABLE" => "0",
         "AXIOM_NPU_AVAILABLE" => "0",
+        "AXIOM_PPU_AVAILABLE" => "0",
+        "AXIOM_MATH_AVAILABLE" => "0",
         "AXIOM_DSP_AVAILABLE" => "1",
         "AXIOM_FPGA_AVAILABLE" => "0",
         "AXIOM_TPU_DEVICE_COUNT" => "0",
         "AXIOM_NPU_DEVICE_COUNT" => "0",
+        "AXIOM_PPU_DEVICE_COUNT" => "0",
+        "AXIOM_MATH_DEVICE_COUNT" => "0",
         "AXIOM_DSP_DEVICE_COUNT" => "1",
         "AXIOM_FPGA_DEVICE_COUNT" => "0",
     )) do
@@ -173,24 +225,37 @@ with_env(f::Function, overrides::Dict{String, String}) = with_env(overrides, f)
         with_env(Dict(
             "AXIOM_TPU_AVAILABLE" => "1",
             "AXIOM_NPU_AVAILABLE" => "0",
+            "AXIOM_PPU_AVAILABLE" => "0",
+            "AXIOM_MATH_AVAILABLE" => "0",
             "AXIOM_DSP_AVAILABLE" => "0",
             "AXIOM_FPGA_AVAILABLE" => "0",
             "AXIOM_TPU_DEVICE_COUNT" => "2",
             "AXIOM_NPU_DEVICE_COUNT" => "0",
+            "AXIOM_PPU_DEVICE_COUNT" => "0",
+            "AXIOM_MATH_DEVICE_COUNT" => "0",
             "AXIOM_DSP_DEVICE_COUNT" => "0",
             "AXIOM_FPGA_DEVICE_COUNT" => "0",
         )) do
             report = coprocessor_capability_report()
-            @test report["strategy_order"] == ["TPU", "NPU", "FPGA", "DSP"]
+            @test report["strategy_order"] == ["TPU", "NPU", "PPU", "MATH", "FPGA", "DSP"]
             @test occursin("TPUBackend", report["selected_backend"])
             @test haskey(report, "runtime_diagnostics")
             @test report["runtime_diagnostics"]["self_healing_enabled"] == true
             tpu = report["backends"]["TPU"]
             @test tpu["available"] == true
             @test tpu["device_count"] == 2
+            @test tpu["required"] == false
             @test tpu["compilable"] == true
             @test haskey(tpu["hook_overrides"], "backend_coprocessor_matmul")
             @test tpu["hook_overrides"]["backend_coprocessor_matmul"] == false
+            npu = report["backends"]["NPU"]
+            @test npu["required"] == false
+            ppu = report["backends"]["PPU"]
+            @test ppu["required"] == false
+            math = report["backends"]["MATH"]
+            @test math["required"] == false
+            dsp = report["backends"]["DSP"]
+            @test dsp["required"] == false
         end
     end
 end

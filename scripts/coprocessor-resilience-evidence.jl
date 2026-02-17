@@ -36,6 +36,8 @@ const COPROCESSOR_FAILURE_MODE = Dict{DataType, Bool}(
     Axiom.TPUBackend => false,
     Axiom.NPUBackend => false,
     Axiom.DSPBackend => false,
+    Axiom.PPUBackend => false,
+    Axiom.MathBackend => false,
     Axiom.FPGABackend => false,
 )
 
@@ -46,6 +48,10 @@ function backend_key(backend)
         return "npu"
     elseif backend isa DSPBackend
         return "dsp"
+    elseif backend isa PPUBackend
+        return "ppu"
+    elseif backend isa MathBackend
+        return "math"
     elseif backend isa FPGABackend
         return "fpga"
     end
@@ -53,7 +59,7 @@ function backend_key(backend)
 end
 
 function Axiom.backend_coprocessor_matmul(
-    backend::Union{Axiom.TPUBackend, Axiom.NPUBackend, Axiom.DSPBackend, Axiom.FPGABackend},
+    backend::Union{Axiom.TPUBackend, Axiom.NPUBackend, Axiom.DSPBackend, Axiom.PPUBackend, Axiom.MathBackend, Axiom.FPGABackend},
     A::AbstractMatrix{Float32},
     B::AbstractMatrix{Float32},
 )
@@ -64,14 +70,14 @@ function Axiom.backend_coprocessor_matmul(
 end
 
 function Axiom.backend_coprocessor_relu(
-    backend::Union{Axiom.TPUBackend, Axiom.NPUBackend, Axiom.DSPBackend, Axiom.FPGABackend},
+    backend::Union{Axiom.TPUBackend, Axiom.NPUBackend, Axiom.DSPBackend, Axiom.PPUBackend, Axiom.MathBackend, Axiom.FPGABackend},
     x::AbstractArray{Float32},
 )
     max.(x, 0f0)
 end
 
 function Axiom.backend_coprocessor_softmax(
-    backend::Union{Axiom.TPUBackend, Axiom.NPUBackend, Axiom.DSPBackend, Axiom.FPGABackend},
+    backend::Union{Axiom.TPUBackend, Axiom.NPUBackend, Axiom.DSPBackend, Axiom.PPUBackend, Axiom.MathBackend, Axiom.FPGABackend},
     x::AbstractArray{Float32},
     dim::Int,
 )
@@ -143,14 +149,18 @@ function main()
         "AXIOM_TPU_AVAILABLE" => "1",
         "AXIOM_NPU_AVAILABLE" => "1",
         "AXIOM_DSP_AVAILABLE" => "1",
+        "AXIOM_PPU_AVAILABLE" => "1",
+        "AXIOM_MATH_AVAILABLE" => "1",
         "AXIOM_FPGA_AVAILABLE" => "1",
         "AXIOM_TPU_DEVICE_COUNT" => "1",
         "AXIOM_NPU_DEVICE_COUNT" => "1",
         "AXIOM_DSP_DEVICE_COUNT" => "1",
+        "AXIOM_PPU_DEVICE_COUNT" => "1",
+        "AXIOM_MATH_DEVICE_COUNT" => "1",
         "AXIOM_FPGA_DEVICE_COUNT" => "1",
         "AXIOM_COPROCESSOR_SELF_HEAL" => "1",
     )) do
-        for backend in (TPUBackend(0), NPUBackend(0), DSPBackend(0), FPGABackend(0))
+        for backend in (TPUBackend(0), NPUBackend(0), DSPBackend(0), PPUBackend(0), MathBackend(0), FPGABackend(0))
             result = recovery_probe(model, x, cpu, backend)
             push!(recovery_results, result)
 

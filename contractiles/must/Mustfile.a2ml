@@ -1,0 +1,71 @@
+# Mustfile (A2ML Layout for Universal Repo Baseline)
+
+@abstract:
+Declarative MUST-state contract for dependability, security, accessibility,
+interoperability, functionality, performance, and data/information governance.
+This file is intended as a reusable layout for new repositories.
+@end
+
+@requires:
+- section: Parameters
+- section: Checks
+@end
+
+## Parameters
+
+- readiness_script: ./scripts/readiness-check.sh
+- gpu_evidence_script: julia --project=. scripts/gpu-performance-evidence.jl
+- coprocessor_evidence_script: julia --project=. scripts/coprocessor-evidence.jl
+- marker_scan_paths: src ext test
+- max_gpu_regression_ratio: 1.20
+- min_readiness_passed_checks: 12
+
+## Checks
+
+### baseline-readiness-gate
+- description: full readiness gate must pass without failures or skipped critical checks
+- run: ./scripts/readiness-check.sh
+
+### no-critical-work-markers
+- description: production code paths must not contain unresolved critical markers
+- run: rg -n "TO[D]O|FIXM[E]|TB[D]|OPEN_ITEM|FIX_ITEM|XXX|HACK" src ext test && exit 1 || exit 0
+
+### docs-claims-alignment
+- description: README/wiki/roadmap claims must match shipped and tested behavior
+- run: ./scripts/readiness-check.sh
+
+### interop-smoke
+- description: import/export interoperability promises must have executable smoke evidence
+- run: julia --project=. test/ci/interop_smoke.jl
+
+### gpu-fallback-behavior
+- description: CUDA/ROCm/Metal fallback behavior must remain deterministic
+- run: julia --project=. test/ci/gpu_fallback.jl
+
+### gpu-resilience-diagnostics
+- description: GPU runtime self-healing diagnostics and fallback counters must remain valid
+- run: julia --project=. test/ci/gpu_resilience.jl
+
+### gpu-performance-evidence
+- description: GPU performance/capability evidence artifact must be generated
+- run: julia --project=. scripts/gpu-performance-evidence.jl
+
+### coprocessor-strategy
+- description: TPU/NPU/DSP/FPGA strategy/fallback and capability reporting must pass
+- run: julia --project=. test/ci/coprocessor_strategy.jl
+
+### coprocessor-evidence
+- description: non-GPU accelerator evidence artifact must be generated
+- run: julia --project=. scripts/coprocessor-evidence.jl
+
+### certificate-integrity
+- description: proof/model certificate reproducibility and tamper detection must pass
+- run: julia --project=. test/ci/certificate_integrity.jl
+
+### rust-parity-and-accelerated-smoke
+- description: Rust path must preserve backend parity and runtime smoke behavior
+- run: AXIOM_READINESS_RUN_RUST=1 ./scripts/readiness-check.sh
+
+### security-no-hardcoded-secrets
+- description: repository must not contain obvious hardcoded secret patterns
+- run: rg -n "(AKIA[0-9A-Z]{16}|BEGIN (RSA|OPENSSH|EC|DSA) PRIVATE KEY|api[_-]?key\\s*=|secret\\s*=|token\\s*=)" . && exit 1 || exit 0

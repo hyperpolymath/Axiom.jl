@@ -16,6 +16,161 @@ struct VerificationResult
     warnings::Vector{String}
 end
 
+# Structured verification telemetry counters for dashboard/incident workflows.
+const _VERIFICATION_TELEMETRY = Dict{String, Any}(
+    "runs" => 0,
+    "passed" => 0,
+    "failed" => 0,
+    "warnings" => 0,
+    "properties_checked" => 0,
+    "property_failures" => 0,
+    "counterexamples" => 0,
+    "by_property" => Dict{String, Dict{String, Int}}(),
+    "last_run" => nothing,
+)
+
+_property_name(prop::Property) = string(nameof(typeof(prop)))
+
+function _ensure_property_telemetry_bucket!(name::String)
+    buckets = _VERIFICATION_TELEMETRY["by_property"]
+    if !haskey(buckets, name)
+        buckets[name] = Dict("checked" => 0, "passed" => 0, "failed" => 0)
+    end
+    buckets[name]
+end
+
+"""
+    verification_result_telemetry(result::VerificationResult; mode=nothing, source="verify", tags=Dict())
+
+Build a structured telemetry payload for a single verification run.
+"""
+function verification_result_telemetry(
+    result::VerificationResult;
+    mode = nothing,
+    source::String = "verify",
+    tags::Dict{String, Any} = Dict{String, Any}(),
+)
+    property_results = Vector{Dict{String, Any}}()
+    passed_properties = 0
+    failed_properties = 0
+    for (prop, passed) in result.properties_checked
+        name = _property_name(prop)
+        push!(property_results, Dict("property" => name, "passed" => passed))
+        if passed
+            passed_properties += 1
+        else
+            failed_properties += 1
+        end
+    end
+
+    counterexample_properties = [_property_name(prop) for prop in keys(result.counterexamples)]
+
+    Dict{String, Any}(
+        "format" => "axiom-verification-telemetry.v1",
+        "generated_at" => Dates.format(now(Dates.UTC), "yyyy-mm-ddTHH:MM:SS.sssZ"),
+        "source" => source,
+        "mode" => mode,
+        "passed" => result.passed,
+        "runtime_seconds" => result.runtime_seconds,
+        "properties_total" => length(result.properties_checked),
+        "properties_passed" => passed_properties,
+        "properties_failed" => failed_properties,
+        "warnings_count" => length(result.warnings),
+        "counterexamples_count" => length(result.counterexamples),
+        "counterexample_properties" => counterexample_properties,
+        "property_results" => property_results,
+        "warnings" => copy(result.warnings),
+        "tags" => Dict(tags),
+    )
+end
+
+function _record_verification_telemetry!(
+    result::VerificationResult;
+    mode = nothing,
+    source::String = "verify",
+)
+    snapshot = verification_result_telemetry(result; mode = mode, source = source)
+
+    _VERIFICATION_TELEMETRY["runs"] += 1
+    if result.passed
+        _VERIFICATION_TELEMETRY["passed"] += 1
+    else
+        _VERIFICATION_TELEMETRY["failed"] += 1
+    end
+
+    _VERIFICATION_TELEMETRY["warnings"] += length(result.warnings)
+    _VERIFICATION_TELEMETRY["properties_checked"] += length(result.properties_checked)
+    _VERIFICATION_TELEMETRY["property_failures"] += count(!last(pair) for pair in result.properties_checked)
+    _VERIFICATION_TELEMETRY["counterexamples"] += length(result.counterexamples)
+
+    for (prop, passed) in result.properties_checked
+        bucket = _ensure_property_telemetry_bucket!(_property_name(prop))
+        bucket["checked"] += 1
+        if passed
+            bucket["passed"] += 1
+        else
+            bucket["failed"] += 1
+        end
+    end
+
+    _VERIFICATION_TELEMETRY["last_run"] = snapshot
+    snapshot
+end
+
+"""
+    reset_verification_telemetry!()
+
+Reset in-process verification telemetry counters.
+"""
+function reset_verification_telemetry!()
+    _VERIFICATION_TELEMETRY["runs"] = 0
+    _VERIFICATION_TELEMETRY["passed"] = 0
+    _VERIFICATION_TELEMETRY["failed"] = 0
+    _VERIFICATION_TELEMETRY["warnings"] = 0
+    _VERIFICATION_TELEMETRY["properties_checked"] = 0
+    _VERIFICATION_TELEMETRY["property_failures"] = 0
+    _VERIFICATION_TELEMETRY["counterexamples"] = 0
+    _VERIFICATION_TELEMETRY["by_property"] = Dict{String, Dict{String, Int}}()
+    _VERIFICATION_TELEMETRY["last_run"] = nothing
+    nothing
+end
+
+"""
+    verification_telemetry_report() -> Dict{String,Any}
+
+Return aggregate structured verification telemetry counters for dashboards.
+"""
+function verification_telemetry_report()
+    runs = _VERIFICATION_TELEMETRY["runs"]
+    by_property = Dict{String, Any}()
+    for (name, stats) in _VERIFICATION_TELEMETRY["by_property"]
+        checked = get(stats, "checked", 0)
+        passed = get(stats, "passed", 0)
+        failed = get(stats, "failed", 0)
+        by_property[name] = Dict(
+            "checked" => checked,
+            "passed" => passed,
+            "failed" => failed,
+            "pass_rate" => checked == 0 ? 0.0 : passed / checked,
+        )
+    end
+
+    Dict(
+        "format" => "axiom-verification-telemetry-summary.v1",
+        "generated_at" => Dates.format(now(Dates.UTC), "yyyy-mm-ddTHH:MM:SS.sssZ"),
+        "runs" => runs,
+        "passed" => _VERIFICATION_TELEMETRY["passed"],
+        "failed" => _VERIFICATION_TELEMETRY["failed"],
+        "warnings" => _VERIFICATION_TELEMETRY["warnings"],
+        "properties_checked" => _VERIFICATION_TELEMETRY["properties_checked"],
+        "property_failures" => _VERIFICATION_TELEMETRY["property_failures"],
+        "counterexamples" => _VERIFICATION_TELEMETRY["counterexamples"],
+        "overall_pass_rate" => runs == 0 ? 0.0 : _VERIFICATION_TELEMETRY["passed"] / runs,
+        "by_property" => by_property,
+        "last_run" => _VERIFICATION_TELEMETRY["last_run"],
+    )
+end
+
 function Base.show(io::IO, r::VerificationResult)
     status = r.passed ? "✓ PASSED" : "✗ FAILED"
     println(io, "Verification Result: $status")
@@ -59,7 +214,9 @@ VerificationResult
 function verify(
     model::Union{AbstractLayer, AxiomModel};
     properties::Vector{<:Property} = Property[FiniteOutput()],
-    data = nothing
+    data = nothing,
+    telemetry_mode = nothing,
+    telemetry_source::String = "verify",
 )
     start_time = time()
     results = Pair{Property, Bool}[]
@@ -93,7 +250,9 @@ function verify(
     runtime = time() - start_time
     passed = all(last.(results))
 
-    VerificationResult(passed, results, runtime, counterexamples, warnings)
+    result = VerificationResult(passed, results, runtime, counterexamples, warnings)
+    _record_verification_telemetry!(result; mode = telemetry_mode, source = telemetry_source)
+    result
 end
 
 """
@@ -224,5 +383,5 @@ function verify(model, mode::VerificationMode; kwargs...)
         ]
     end
 
-    verify(model; properties=properties, kwargs...)
+    verify(model; properties = properties, telemetry_mode = string(mode), kwargs...)
 end

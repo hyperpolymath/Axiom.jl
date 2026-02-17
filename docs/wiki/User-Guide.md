@@ -90,9 +90,27 @@ set_backend!(CUDABackend(0))
 - Implemented today:
   - CPU + Rust backend
   - GPU backends via extensions (CUDA/ROCm/Metal)
-  - Coprocessor backend targets (`TPUBackend`, `NPUBackend`, `DSPBackend`, `FPGABackend`) with detection and CPU fallback
+  - Coprocessor backend targets (`TPUBackend`, `NPUBackend`, `PPUBackend`, `MathBackend`, `FPGABackend`, `DSPBackend`) with detection and CPU fallback
 - Still in progress:
   - Production-grade runtime kernels for non-GPU coprocessors
+
+## Packaging + Registry Baseline
+
+```julia
+metadata = create_metadata(model; name="demo", architecture="Sequential", version="1.0.0")
+verify_and_claim!(metadata, "FiniteOutput", "verified=true; source=manual")
+bundle = export_model_package(model, metadata, "build/model_package")
+entry = build_registry_entry(bundle["manifest"]; channel="stable")
+```
+
+## Verification Telemetry Baseline
+
+```julia
+reset_verification_telemetry!()
+result = verify(model, properties=[FiniteOutput()], data=[(x, nothing)])
+verification_result_telemetry(result; source="manual-check")
+verification_telemetry_report()
+```
 
 ## Serving APIs (REST, GraphQL, gRPC)
 
