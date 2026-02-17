@@ -538,6 +538,11 @@ function compile_to_backend(model, backend::CUDABackend)
         @warn "CUDA not available, falling back to Julia backend"
         return model
     end
+    device_count = cuda_device_count()
+    if backend.device < 0 || backend.device >= device_count
+        @warn "CUDA device $(backend.device) out of range (available: 0:$(max(0, device_count - 1))), falling back to Julia backend"
+        return model
+    end
 
     # Wrap model for CUDA execution
     GPUCompiledModel(model, backend)
@@ -549,6 +554,11 @@ function compile_to_backend(model, backend::MetalBackend)
     # Check Metal availability
     if !metal_available()
         @warn "Metal not available, falling back to Julia backend"
+        return model
+    end
+    device_count = metal_device_count()
+    if backend.device < 0 || backend.device >= device_count
+        @warn "Metal device $(backend.device) out of range (available: 0:$(max(0, device_count - 1))), falling back to Julia backend"
         return model
     end
 
@@ -737,6 +747,75 @@ function detect_accelerator()
         gpu_backend !== nothing && return gpu_backend
     end
     detect_coprocessor()
+end
+
+function _hook_has_backend_override(hook::Function, backend_type::DataType)
+    for method in methods(hook)
+        sig = Base.unwrap_unionall(method.sig)
+        params = sig.parameters
+        length(params) >= 2 || continue
+        first_arg = params[2]
+        if first_arg == backend_type && method.module !== @__MODULE__
+            return true
+        end
+    end
+    false
+end
+
+function _coprocessor_hook_overrides(backend_type::DataType)
+    hooks = Dict{String, Bool}()
+    for (name, hook) in (
+        ("backend_coprocessor_matmul", backend_coprocessor_matmul),
+        ("backend_coprocessor_conv2d", backend_coprocessor_conv2d),
+        ("backend_coprocessor_relu", backend_coprocessor_relu),
+        ("backend_coprocessor_softmax", backend_coprocessor_softmax),
+        ("backend_coprocessor_batchnorm", backend_coprocessor_batchnorm),
+        ("backend_coprocessor_layernorm", backend_coprocessor_layernorm),
+        ("backend_coprocessor_maxpool2d", backend_coprocessor_maxpool2d),
+        ("backend_coprocessor_avgpool2d", backend_coprocessor_avgpool2d),
+        ("backend_coprocessor_global_avgpool2d", backend_coprocessor_global_avgpool2d),
+    )
+        hooks[name] = _hook_has_backend_override(hook, backend_type)
+    end
+    hooks
+end
+
+"""
+    coprocessor_capability_report() -> Dict{String,Any}
+
+Return a machine-readable snapshot of non-GPU accelerator strategy state,
+including environment-based availability, device counts, and extension hook status.
+"""
+function coprocessor_capability_report()
+    selected = detect_coprocessor()
+    backends = Dict{String, Any}()
+    strategy = [
+        ("TPU", TPUBackend, tpu_available, tpu_device_count),
+        ("NPU", NPUBackend, npu_available, npu_device_count),
+        ("FPGA", FPGABackend, fpga_available, fpga_device_count),
+        ("DSP", DSPBackend, dsp_available, dsp_device_count),
+    ]
+
+    for (label, backend_type, available_fn, count_fn) in strategy
+        available = available_fn()
+        count = count_fn()
+        hooks = _coprocessor_hook_overrides(backend_type)
+        kernel_hooks_loaded = !isempty(hooks) && all(values(hooks))
+        backends[label] = Dict(
+            "available" => available,
+            "device_count" => count,
+            "compilable" => available && count > 0,
+            "kernel_hooks_loaded" => kernel_hooks_loaded,
+            "hook_overrides" => hooks,
+        )
+    end
+
+    Dict(
+        "generated_at" => Dates.format(now(Dates.UTC), "yyyy-mm-ddTHH:MM:SS.sssZ"),
+        "strategy_order" => ["TPU", "NPU", "FPGA", "DSP"],
+        "selected_backend" => selected === nothing ? nothing : string(typeof(selected)),
+        "backends" => backends,
+    )
 end
 
 """

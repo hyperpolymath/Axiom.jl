@@ -113,7 +113,7 @@ This document compiles compliance requirements across regulatory frameworks and 
 - [ ] Generate formal proof certificates
 - [ ] Document verification coverage metrics
 - [ ] Independent verification (tool qualification)
-- [ ] Back-to-back testing (Julia ↔ Rust ↔ Zig backends)
+- [ ] Back-to-back testing (Julia ↔ Rust ↔ GPU/coprocessor target paths)
 
 #### Production Phase
 
@@ -243,7 +243,7 @@ This document compiles compliance requirements across regulatory frameworks and 
 |---------|---------------|-------------|-------|
 | Julia | Yes (single-threaded) | Partial | Needs tool qualification |
 | Rust | Configurable | High | Memory safety by design |
-| Zig | Yes | High | Minimal runtime |
+| Coprocessor targets | Strategy-level | Partial | Capability/fallback checks shipped; production kernels depend on backend runtime qualification |
 
 ---
 

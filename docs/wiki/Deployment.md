@@ -10,7 +10,7 @@
 ├──────────────┬──────────────┬──────────────┬───────────────────────┤
 │    Server    │    Edge      │   Browser    │      Mobile           │
 ├──────────────┼──────────────┼──────────────┼───────────────────────┤
-│  REST/gRPC   │  Zig Binary  │  WASM*       │  JNI/Swift*           │
+│  REST/gRPC   │  Rust/Julia  │  WASM*       │  JNI/Swift*           │
 │  Docker      │  Embedded    │              │                       │
 │  Kubernetes  │  RTOS*       │              │                       │
 └──────────────┴──────────────┴──────────────┴───────────────────────┘
@@ -114,26 +114,17 @@ FROM julia:1.9-bullseye
 # Create app directory
 WORKDIR /app
 
-# Install system dependencies for Zig backend
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     curl \
-    xz-utils \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-
-# Install Zig
-RUN curl -L https://ziglang.org/download/0.11.0/zig-linux-x86_64-0.11.0.tar.xz | tar -xJ \
-    && mv zig-linux-x86_64-0.11.0 /usr/local/zig
-ENV PATH="/usr/local/zig:${PATH}"
 
 # Copy project files
 COPY Project.toml Manifest.toml ./
 
 # Install Julia packages
 RUN julia --project -e 'using Pkg; Pkg.instantiate()'
-
-# Build Zig backend
-COPY zig/ ./zig/
-RUN cd zig && zig build -Doptimize=ReleaseFast
 
 # Copy source code
 COPY src/ ./src/
@@ -254,39 +245,26 @@ kubectl apply -f deployment.yaml
 
 ## Edge Deployment
 
-### Zig Binary Export
+### Edge Runtime Path
 
-Create standalone executable for edge devices.
+Current supported path for edge is Julia + optional Rust backend library.
 
 ```julia
-# export_zig.jl
 using Axiom
 
-# Load model
 model = load_model("model.axiom")
 
-# Export to Zig-compatible format
-export_zig_model(model, "edge_model",
-    optimize=true,
-    quantize=:int8,  # Optional quantization
-    target_arch="arm64"  # For ARM devices
+# Optional: compile against Rust backend when lib is available
+model_runtime = compile(
+    model,
+    backend = RustBackend("/path/to/libaxiom_core.so"),
+    verify = false,
+    optimize = :none,
 )
 ```
 
-This generates:
-- `edge_model.bin` - Serialized weights
-- `edge_model.zig` - Inference code
-
-**Build standalone binary:**
-```bash
-cd zig
-zig build-exe src/inference.zig \
-    -target aarch64-linux \
-    -O ReleaseFast \
-    -femit-bin=axiom_inference
-
-# Binary size: ~200KB!
-```
+For constrained targets, package the runtime with precompiled artifacts and
+use CPU fallback if accelerator/runtime dependencies are unavailable.
 
 ### Embedded C Interface
 
@@ -350,13 +328,10 @@ int main() {
 Step-by-step for Raspberry Pi 4:
 
 ```bash
-# On development machine: cross-compile
-cd zig
-zig build -Doptimize=ReleaseFast -Dtarget=aarch64-linux-gnu
-
-# Copy to Pi
-scp zig-out/lib/libaxiom_zig.so pi@raspberrypi:~/
+# On development machine: prepare model/runtime artifacts
 scp model.bin pi@raspberrypi:~/
+# Optional Rust backend shared library for ARM target:
+# scp libaxiom_core.so pi@raspberrypi:~/
 
 # On Raspberry Pi
 ssh pi@raspberrypi

@@ -6,7 +6,6 @@
 
 [![Julia](https://img.shields.io/badge/Julia-1.9+-purple.svg)](https://julialang.org/)
 [![Rust](https://img.shields.io/badge/Rust-Backend-orange.svg)](https://www.rust-lang.org/)
-[![Zig](https://img.shields.io/badge/Zig-Backend-yellow.svg)](https://ziglang.org/)
 [![License](https://img.shields.io/badge/License-PMPL--1.0-blue.svg)](../../LICENSE)
 
 **The ML framework where bugs are caught before runtime, not after deployment.**

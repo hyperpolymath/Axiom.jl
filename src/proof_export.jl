@@ -46,6 +46,88 @@ function _assistant_obligation_summary(content::String, assistant::Symbol)
     )
 end
 
+function _assistant_metadata_markers(content::String)
+    cert_hash_match = match(r"AXIOM_CERTIFICATE_HASH:\s*([0-9a-fA-F]+)", content)
+    obligation_match = match(r"AXIOM_OBLIGATION_ID:\s*([0-9a-fA-F]+)", content)
+    status_match = match(r"AXIOM_PROOF_STATUS:\s*([A-Za-z_]+)", content)
+    method_match = match(r"AXIOM_PROOF_METHOD:\s*([A-Za-z0-9_\-]+)", content)
+
+    (
+        certificate_hash = cert_hash_match === nothing ? nothing : cert_hash_match.captures[1],
+        obligation_id = obligation_match === nothing ? nothing : obligation_match.captures[1],
+        proof_status = status_match === nothing ? nothing : lowercase(status_match.captures[1]),
+        proof_method = method_match === nothing ? nothing : method_match.captures[1],
+    )
+end
+
+function _assistant_status_label(
+    summary;
+    hash_present::Bool,
+    obligation_present::Bool,
+    hash_matches::Bool,
+    obligation_matches::Bool,
+)
+    if !hash_present || !obligation_present
+        return "missing_metadata"
+    end
+    if !hash_matches || !obligation_matches
+        return "metadata_mismatch"
+    end
+    summary.complete ? "complete" : "incomplete"
+end
+
+"""
+    proof_assistant_obligation_report(path::String, assistant::Symbol;
+                                      expected_certificate_hash=nothing,
+                                      expected_obligation_id=nothing) -> Dict
+
+Inspect a Lean/Coq/Isabelle artifact and return machine-readable obligation status.
+"""
+function proof_assistant_obligation_report(
+    path::String,
+    assistant::Symbol;
+    expected_certificate_hash::Union{String, Nothing} = nothing,
+    expected_obligation_id::Union{String, Nothing} = nothing,
+)
+    _assistant_extension(assistant)  # validates assistant symbol
+    isfile(path) || error("File not found: $path")
+
+    content = read(path, String)
+    summary = _assistant_obligation_summary(content, assistant)
+    markers = _assistant_metadata_markers(content)
+
+    hash_present = markers.certificate_hash !== nothing
+    obligation_present = markers.obligation_id !== nothing
+    hash_matches = expected_certificate_hash === nothing ?
+        hash_present : markers.certificate_hash == expected_certificate_hash
+    obligation_matches = expected_obligation_id === nothing ?
+        obligation_present : markers.obligation_id == expected_obligation_id
+
+    status = _assistant_status_label(
+        summary;
+        hash_present=hash_present,
+        obligation_present=obligation_present,
+        hash_matches=hash_matches,
+        obligation_matches=obligation_matches,
+    )
+
+    Dict(
+        "assistant" => string(assistant),
+        "path" => path,
+        "status" => status,
+        "unresolved" => summary.unresolved,
+        "complete" => status == "complete",
+        "certificate_hash" => markers.certificate_hash,
+        "obligation_id" => markers.obligation_id,
+        "proof_status" => markers.proof_status,
+        "proof_method" => markers.proof_method,
+        "hash_present" => hash_present,
+        "obligation_present" => obligation_present,
+        "hash_matches" => hash_matches,
+        "obligation_matches" => obligation_matches,
+    )
+end
+
 function _emit_certificate_metadata(io::IO, certificate::ProofCertificate, assistant::Symbol)
     obligation_id = _proof_obligation_id(certificate)
     status = lowercase(string(certificate.status))
@@ -406,6 +488,97 @@ function export_proof_bundle(
     )
 end
 
+function _default_bundle_assistant_paths(manifest_path::String)
+    suffix = ".obligations.json"
+    if endswith(manifest_path, suffix)
+        base = manifest_path[1:end-length(suffix)]
+    else
+        base = splitext(manifest_path)[1]
+    end
+
+    Dict(
+        "lean" => base * ".lean",
+        "coq" => base * ".v",
+        "isabelle" => base * ".thy",
+    )
+end
+
+"""
+    reconcile_proof_bundle(manifest_path::String;
+                           assistant_paths=nothing,
+                           persist=true) -> Dict
+
+Reconcile a proof-assistant bundle manifest with actual Lean/Coq/Isabelle files.
+Updates per-assistant status and obligation status in a machine-readable form.
+"""
+function reconcile_proof_bundle(
+    manifest_path::String;
+    assistant_paths::Union{Nothing, AbstractDict{String, String}} = nothing,
+    persist::Bool = true,
+)
+    isfile(manifest_path) || error("Manifest not found: $manifest_path")
+    manifest = JSON.parsefile(manifest_path)
+    obligations = get(manifest, "obligations", Any[])
+    isempty(obligations) && error("Manifest contains no obligations: $manifest_path")
+
+    obligation = obligations[1]
+    expected_hash = get(obligation, "certificate_hash", get(manifest, "certificate_hash", nothing))
+    expected_id = get(obligation, "id", nothing)
+    status_map = get(obligation, "assistant_status", Dict{String, Any}())
+
+    assistant_paths = assistant_paths === nothing ?
+        _default_bundle_assistant_paths(manifest_path) : Dict(assistant_paths)
+
+    reports = Dict{String, Any}()
+    total_unresolved = 0
+    mismatch = false
+    missing_metadata = false
+    complete_count = 0
+
+    for (assistant_name, path) in assistant_paths
+        isfile(path) || continue
+        assistant = Symbol(assistant_name)
+        report = proof_assistant_obligation_report(
+            path,
+            assistant;
+            expected_certificate_hash=expected_hash,
+            expected_obligation_id=expected_id,
+        )
+        reports[assistant_name] = report
+        status_map[assistant_name] = report["status"]
+        total_unresolved += Int(report["unresolved"])
+        if report["status"] == "complete"
+            complete_count += 1
+        elseif report["status"] == "metadata_mismatch"
+            mismatch = true
+        elseif report["status"] == "missing_metadata"
+            missing_metadata = true
+        end
+    end
+
+    obligation["assistant_status"] = status_map
+    obligation["assistant_reports"] = reports
+    obligation["assistant_unresolved_total"] = total_unresolved
+
+    if mismatch || missing_metadata
+        obligation["status"] = "assistant_metadata_invalid"
+    elseif !isempty(reports) && complete_count == length(reports)
+        obligation["status"] = "assistant_completed"
+    elseif !isempty(reports)
+        obligation["status"] = "interactive_required"
+    end
+
+    manifest["last_reconciled_at"] = Dates.format(now(Dates.UTC), "yyyy-mm-ddTHH:MM:SS.sssZ")
+
+    if persist
+        open(manifest_path, "w") do io
+            JSON.print(io, manifest, 2)
+        end
+    end
+
+    manifest
+end
+
 # Overloaded exports that return strings (for verification tests)
 """
     export_lean(model, properties::Vector{Symbol}) -> String
@@ -546,31 +719,39 @@ end
 # ============================================================================
 
 """
-    import_lean_certificate(lean_file::String) -> ProofCertificate
+    import_lean_certificate(lean_file::String; expected_certificate_hash=nothing, expected_obligation_id=nothing) -> ProofCertificate
 
 Import a completed Lean proof file and check for sorry-free status.
 """
-function import_lean_certificate(lean_file::String)
+function import_lean_certificate(
+    lean_file::String;
+    expected_certificate_hash::Union{String, Nothing} = nothing,
+    expected_obligation_id::Union{String, Nothing} = nothing,
+)
     if !isfile(lean_file)
         error("File not found: $lean_file")
     end
 
     content = read(lean_file, String)
-
-    summary = _assistant_obligation_summary(content, :lean)
-    verified = summary.complete
+    report = proof_assistant_obligation_report(
+        lean_file,
+        :lean;
+        expected_certificate_hash=expected_certificate_hash,
+        expected_obligation_id=expected_obligation_id,
+    )
+    verified = report["status"] == "complete"
 
     # Extract theorem names
     theorem_matches = eachmatch(r"theorem\s+(\w+)", content)
     theorems = [m.captures[1] for m in theorem_matches]
-    cert_hash_match = match(r"AXIOM_CERTIFICATE_HASH:\s*([0-9a-fA-F]+)", content)
-    cert_hash = cert_hash_match === nothing ? "none" : cert_hash_match.captures[1]
 
     details = "Imported from Lean file: $lean_file\n"
     details *= "Theorems: $(join(theorems, ", "))\n"
-    details *= "Unresolved obligations: $(summary.unresolved)\n"
+    details *= "Unresolved obligations: $(report["unresolved"])\n"
     details *= "Sorry-free: $verified\n"
-    details *= "Certificate hash marker: $cert_hash"
+    details *= "Certificate hash marker: $(report["certificate_hash"])\n"
+    details *= "Obligation marker: $(report["obligation_id"])\n"
+    details *= "Status: $(report["status"])"
 
     return ProofCertificate(
         "imported_from_lean",
@@ -593,31 +774,39 @@ function import_lean_certificate(lean_file::String)
 end
 
 """
-    import_coq_certificate(coq_file::String) -> ProofCertificate
+    import_coq_certificate(coq_file::String; expected_certificate_hash=nothing, expected_obligation_id=nothing) -> ProofCertificate
 
 Import a completed Coq proof file and check for Admitted-free status.
 """
-function import_coq_certificate(coq_file::String)
+function import_coq_certificate(
+    coq_file::String;
+    expected_certificate_hash::Union{String, Nothing} = nothing,
+    expected_obligation_id::Union{String, Nothing} = nothing,
+)
     if !isfile(coq_file)
         error("File not found: $coq_file")
     end
 
     content = read(coq_file, String)
-
-    summary = _assistant_obligation_summary(content, :coq)
-    verified = summary.complete
+    report = proof_assistant_obligation_report(
+        coq_file,
+        :coq;
+        expected_certificate_hash=expected_certificate_hash,
+        expected_obligation_id=expected_obligation_id,
+    )
+    verified = report["status"] == "complete"
 
     # Extract theorem names
     theorem_matches = eachmatch(r"Theorem\s+(\w+)", content)
     theorems = [m.captures[1] for m in theorem_matches]
-    cert_hash_match = match(r"AXIOM_CERTIFICATE_HASH:\s*([0-9a-fA-F]+)", content)
-    cert_hash = cert_hash_match === nothing ? "none" : cert_hash_match.captures[1]
 
     details = "Imported from Coq file: $coq_file\n"
     details *= "Theorems: $(join(theorems, ", "))\n"
-    details *= "Unresolved obligations: $(summary.unresolved)\n"
+    details *= "Unresolved obligations: $(report["unresolved"])\n"
     details *= "Admitted-free: $verified\n"
-    details *= "Certificate hash marker: $cert_hash"
+    details *= "Certificate hash marker: $(report["certificate_hash"])\n"
+    details *= "Obligation marker: $(report["obligation_id"])\n"
+    details *= "Status: $(report["status"])"
 
     return ProofCertificate(
         "imported_from_coq",
@@ -640,31 +829,39 @@ function import_coq_certificate(coq_file::String)
 end
 
 """
-    import_isabelle_certificate(thy_file::String) -> ProofCertificate
+    import_isabelle_certificate(thy_file::String; expected_certificate_hash=nothing, expected_obligation_id=nothing) -> ProofCertificate
 
 Import a completed Isabelle/HOL proof file and check for oops-free status.
 """
-function import_isabelle_certificate(thy_file::String)
+function import_isabelle_certificate(
+    thy_file::String;
+    expected_certificate_hash::Union{String, Nothing} = nothing,
+    expected_obligation_id::Union{String, Nothing} = nothing,
+)
     if !isfile(thy_file)
         error("File not found: $thy_file")
     end
 
     content = read(thy_file, String)
-
-    summary = _assistant_obligation_summary(content, :isabelle)
-    verified = summary.complete
+    report = proof_assistant_obligation_report(
+        thy_file,
+        :isabelle;
+        expected_certificate_hash=expected_certificate_hash,
+        expected_obligation_id=expected_obligation_id,
+    )
+    verified = report["status"] == "complete"
 
     # Extract lemma names
     lemma_matches = eachmatch(r"lemma\s+(\w+)", content)
     lemmas = [m.captures[1] for m in lemma_matches]
-    cert_hash_match = match(r"AXIOM_CERTIFICATE_HASH:\s*([0-9a-fA-F]+)", content)
-    cert_hash = cert_hash_match === nothing ? "none" : cert_hash_match.captures[1]
 
     details = "Imported from Isabelle file: $thy_file\n"
     details *= "Lemmas: $(join(lemmas, ", "))\n"
-    details *= "Unresolved obligations: $(summary.unresolved)\n"
+    details *= "Unresolved obligations: $(report["unresolved"])\n"
     details *= "Oops-free: $verified\n"
-    details *= "Certificate hash marker: $cert_hash"
+    details *= "Certificate hash marker: $(report["certificate_hash"])\n"
+    details *= "Obligation marker: $(report["obligation_id"])\n"
+    details *= "Status: $(report["status"])"
 
     return ProofCertificate(
         "imported_from_isabelle",

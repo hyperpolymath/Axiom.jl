@@ -4,7 +4,7 @@
 
 ## Overview
 
-Axiom.jl is built on a revolutionary multi-language architecture that combines the expressiveness of Julia with the raw performance of systems languages. This design achieves something no other ML framework has: **mathematical elegance without sacrificing speed**.
+Axiom.jl is built on a multi-runtime architecture that combines Julia ergonomics with optional Rust acceleration and extension-based GPU/coprocessor targets. The goal is **mathematical elegance without sacrificing speed**.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -23,9 +23,9 @@ Axiom.jl is built on a revolutionary multi-language architecture that combines t
 ├─────────────────────────────────────────────────────────────────────┤
 │                      Computation Backends                            │
 │  ┌─────────────────┐ ┌──────────────────┐ ┌───────────────────────┐│
-│  │  Julia Backend  │ │   Rust Backend   │ │    Zig Backend        ││
-│  │  Pure Julia     │ │   FFI via ccall  │ │   FFI via ccall       ││
-│  │  Portable       │ │   Rayon parallel │ │   SIMD optimized      ││
+│  │  Julia Backend  │ │   Rust Backend   │ │   Accelerator Targets ││
+│  │  Pure Julia     │ │   FFI via ccall  │ │   TPU/NPU/DSP/FPGA    ││
+│  │  Portable       │ │   Rayon parallel │ │   Fallback-first flow ││
 │  └─────────────────┘ └──────────────────┘ └───────────────────────┘│
 ├─────────────────────────────────────────────────────────────────────┤
 │                        Hardware Layer                                │
@@ -71,9 +71,9 @@ No hidden magic. Every operation is transparent:
 
 ```julia
 # You always know what backend you're using
-using Axiom: ZigBackend, RustBackend, JuliaBackend
+using Axiom: RustBackend, JuliaBackend
 
-model = @axiom backend=ZigBackend() begin
+model = @axiom backend=RustBackend() begin
     Dense(784 => 256, activation=relu)
 end
 
@@ -143,9 +143,7 @@ Axiom.jl automatically selects the best backend:
 
 ```julia
 function select_backend()
-    if zig_available()
-        return ZigBackend()  # Fastest compilation, smallest binary
-    elseif rust_available()
+    if rust_available()
         return RustBackend()  # Parallel by default
     else
         return JuliaBackend()  # Always available
@@ -223,46 +221,22 @@ pub extern "C" fn rust_dense_forward(
 }
 ```
 
-### Zig Backend
+### Coprocessor Targets (TPU/NPU/DSP/FPGA)
 
-The newest and fastest backend:
+Axiom exposes non-GPU accelerator targets through backend handles and
+fallback-safe dispatch:
 
 ```julia
-struct ZigBackend <: AbstractBackend end
-
-function forward(::ZigBackend, layer::Dense, x::AbstractArray)
-    ccall((:axiom_matmul, ZIG_LIB), Cvoid,
-          (Ptr{Float32}, Ptr{Float32}, Ptr{Float32}, Csize_t, Csize_t, Csize_t),
-          x, layer.weight', output, batch_size, in_features, out_features)
+cop = detect_coprocessor()  # TPU/NPU/DSP/FPGA or nothing
+if cop !== nothing
+    compiled = compile(model, backend=cop, verify=false, optimize=:none)
 end
 ```
 
-**Zig Implementation:**
-```zig
-pub fn matmul_tiled(
-    a: []const f32,
-    b: []const f32,
-    c: []f32,
-    m: usize,
-    k: usize,
-    n: usize,
-) void {
-    // SIMD vector type
-    const Vec = @Vector(8, f32);
-
-    // Tiled for cache efficiency
-    var i_tile: usize = 0;
-    while (i_tile < m) : (i_tile += TILE_SIZE) {
-        // ... tiled multiplication with SIMD inner loop
-    }
-}
-```
-
-**Why Zig?**
-- 10x faster compilation than Rust
-- Smaller binaries (~100KB vs ~2MB)
-- First-class SIMD vectors
-- No runtime overhead
+Current state:
+- Strategy and fallback behavior are implemented and CI-covered.
+- Extension hooks are available for backend-specific kernel overrides.
+- Production kernels for specific coprocessors remain roadmap work.
 
 ## Memory Management
 
@@ -371,7 +345,7 @@ Source Code (@axiom)
        │
        ▼
 ┌──────────────────┐
-│ Backend Lowering │  Dispatch to Rust/Zig/Julia
+│ Backend Lowering │  Dispatch to Rust/Julia/accelerator targets
 └──────────────────┘
        │
        ▼
@@ -418,15 +392,15 @@ end
 
 ## Performance Characteristics
 
-| Operation | Julia | Rust | Zig | Notes |
-|-----------|-------|------|-----|-------|
-| MatMul 256×256 | 1.0× | 2.1× | 2.3× | Zig wins on small matrices |
-| MatMul 1024×1024 | 1.0× | 2.8× | 2.9× | Both use tiled algorithms |
-| Conv2D 3×3 | 1.0× | 1.8× | 2.0× | Zig SIMD shines |
-| LayerNorm | 1.0× | 1.5× | 1.7× | Memory-bound |
-| Softmax | 1.0× | 1.2× | 1.3× | Limited by exp() |
-| Compile Time | 0s | 30s | 3s | Zig is 10× faster |
-| Binary Size | 0 | 2MB | 100KB | Zig is 20× smaller |
+| Operation | Julia | Rust | Notes |
+|-----------|-------|------|-------|
+| MatMul 256×256 | 1.0× | 2.1× | Rust backend parity tracked in CI |
+| MatMul 1024×1024 | 1.0× | 2.8× | Representative CPU/Rust scaling |
+| Conv2D 3×3 | 1.0× | 1.8× | Kernel parity and tolerance-tested |
+| LayerNorm | 1.0× | 1.5× | Memory-bound behavior |
+| Softmax | 1.0× | 1.2× | Limited by exp() |
+| Compile Time | 0s | ~30s | Rust toolchain build cost |
+| Binary Size | 0 | ~2MB | Shared-library footprint depends on build |
 
 ## Thread Safety
 
@@ -450,7 +424,7 @@ y .= x .+ 1  # Modifies y in-place
 
 - **Julia**: Single-threaded, safe
 - **Rust**: Thread-safe via Rayon, uses work-stealing
-- **Zig**: Thread-safe, manual SIMD parallelism
+- **Accelerator targets**: fallback-safe strategy; runtime kernels are backend-specific roadmap work
 
 ## Future Architecture
 

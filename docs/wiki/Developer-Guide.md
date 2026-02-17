@@ -89,12 +89,26 @@ Run deterministic strategy/fallback checks for TPU/NPU/DSP/FPGA targets:
 julia --project=. test/ci/coprocessor_strategy.jl
 ```
 
+Generate a machine-readable capability/evidence artifact:
+
+```bash
+julia --project=. scripts/coprocessor-evidence.jl
+```
+
 ## Certificate Integrity Checks
 
 Run certificate reproducibility and tamper-detection checks:
 
 ```bash
 julia --project=. test/ci/certificate_integrity.jl
+```
+
+## Proof-Assistant Bundle Reconciliation
+
+When Lean/Coq/Isabelle artifacts are updated, reconcile manifest status:
+
+```bash
+julia --project=. -e 'using Axiom; reconcile_proof_bundle("build/proofs/my_model.obligations.json")'
 ```
 
 ## Quality Gates

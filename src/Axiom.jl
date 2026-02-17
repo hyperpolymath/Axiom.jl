@@ -163,9 +163,10 @@ export TPUBackend, NPUBackend, DSPBackend, FPGABackend
 export current_backend, set_backend!, @with_backend
 export detect_gpu, detect_coprocessor, detect_accelerator
 export cuda_available, rocm_available, metal_available
+export cuda_device_count, rocm_device_count, metal_device_count
 export tpu_available, npu_available, dsp_available, fpga_available
 export tpu_device_count, npu_device_count, dsp_device_count, fpga_device_count
-export select_device!
+export select_device!, coprocessor_capability_report
 
 # Data utilities
 export DataLoader, train_test_split, one_hot
@@ -194,6 +195,7 @@ export add_verification_claim!, verify_and_claim!
 # Proof assistant integration (issue #19)
 export export_lean, export_coq, export_isabelle
 export proof_obligation_manifest, export_proof_bundle
+export proof_assistant_obligation_report, reconcile_proof_bundle
 export import_lean_certificate, import_coq_certificate, import_isabelle_certificate
 
 # Version info

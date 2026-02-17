@@ -350,11 +350,18 @@ model = from_pytorch("resnet50.pytorch.json")
 Direct `.pt/.pth/.ckpt` loading is supported through the built-in bridge script
 (`scripts/pytorch_to_axiom_descriptor.py`) and requires `python3` + `torch`.
 
-### From Hugging Face
+### From Hugging Face (Roadmap)
+
+Direct `from_huggingface(...)` import is not currently shipped.
+Use one of the current interop paths:
 
 ```julia
-# Coming soon!
-model = from_huggingface("bert-base-uncased")
+# 1) Export or bridge to a PyTorch checkpoint/descriptor
+model = from_pytorch("model.pt")
+model = from_pytorch("model.pytorch.json")
+
+# 2) Export to ONNX from external tooling, then import via your ONNX flow
+to_onnx(model, "model.onnx", input_shape=(1, 3, 224, 224))
 ```
 
 ### From ONNX

@@ -1,6 +1,6 @@
 # Performance Tuning and Benchmarking
 
-Axiom.jl provides comprehensive benchmarking infrastructure to track performance across Julia, Rust, and Zig backends.
+Axiom.jl provides comprehensive benchmarking infrastructure to track performance across Julia and Rust backends (plus optional accelerator paths where available).
 
 ## Running Benchmarks
 

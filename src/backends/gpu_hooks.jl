@@ -55,7 +55,10 @@ function detect_gpu()
 
     # Try Metal (Apple Silicon)
     if metal_available()
-        return MetalBackend(0)  # macOS manages device selection
+        device = metal_device_count() > 0 ? 0 : -1
+        if device >= 0
+            return MetalBackend(device)
+        end
     end
 
     # No GPU found
@@ -93,6 +96,17 @@ function rocm_device_count()
     forced = _backend_env_count("AXIOM_ROCM_AVAILABLE", "AXIOM_ROCM_DEVICE_COUNT")
     forced !== nothing && return forced
     0
+end
+
+"""
+    metal_device_count() -> Int
+
+Get number of available Metal devices.
+"""
+function metal_device_count()
+    forced = _backend_env_count("AXIOM_METAL_AVAILABLE", "AXIOM_METAL_DEVICE_COUNT")
+    forced !== nothing && return forced
+    metal_available() ? 1 : 0
 end
 
 """
@@ -290,6 +304,11 @@ function compile_to_backend(model, backend::ROCmBackend)
     # Check ROCm availability
     if !rocm_available()
         @warn "ROCm not available, falling back to Julia backend"
+        return model
+    end
+    device_count = rocm_device_count()
+    if backend.device < 0 || backend.device >= device_count
+        @warn "ROCm device $(backend.device) out of range (available: 0:$(max(0, device_count - 1))), falling back to Julia backend"
         return model
     end
 

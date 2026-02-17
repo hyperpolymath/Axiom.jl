@@ -476,13 +476,13 @@ end
 ```
 
 **Options:**
-- `backend=ZigBackend()`: Backend selection
+- `backend=RustBackend("/path/to/libaxiom_core.so")`: Backend selection
 - `verified=true`: Enable verification
 - `name="MyModel"`: Model name
 
 **Example:**
 ```julia
-model = @axiom backend=ZigBackend() verified=true begin
+model = @axiom backend=JuliaBackend() verified=true begin
     @ensure size(x, 2) == 784 "Input must be 784-dim"
     Dense(784 => 256, activation=relu)
     Dropout(0.5)
@@ -619,15 +619,15 @@ rust_available()  # Returns Bool
 
 ---
 
-### ZigBackend
+### Coprocessor Targets
 
-Ultra-fast Zig implementation.
+Non-GPU accelerator targets with fallback-safe compilation strategy.
 
 ```julia
-backend = ZigBackend()
-
-# Check availability
-zig_available()  # Returns Bool
+backend = detect_coprocessor()  # TPU/NPU/DSP/FPGA or nothing
+if backend !== nothing
+    model_accel = compile(model, backend=backend, verify=false, optimize=:none)
+end
 ```
 
 ---

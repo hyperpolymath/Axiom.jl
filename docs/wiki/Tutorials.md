@@ -388,19 +388,16 @@ end
 # Julia: Maximum compatibility
 model_julia = @axiom backend=JuliaBackend() $architecture
 
-# Zig: Fastest inference, smallest binary
-model_zig = @axiom backend=ZigBackend() $architecture
-
 # Rust: Best for parallel workloads
 model_rust = @axiom backend=RustBackend() $architecture
 
 # Train once (use fastest available)
-best_backend = zig_available() ? ZigBackend() : JuliaBackend()
+best_backend = rust_available() ? RustBackend() : JuliaBackend()
 model = @axiom backend=best_backend $architecture
 train!(model, train_loader, epochs=10)
 
 # Copy weights to all versions
-for target_model in [model_julia, model_zig, model_rust]
+for target_model in [model_julia, model_rust]
     copy_weights!(target_model, model)
 end
 
@@ -410,11 +407,6 @@ x = rand(Float32, 100, 784)
 using BenchmarkTools
 println("Julia backend:")
 @btime forward($model_julia, $x)
-
-if zig_available()
-    println("Zig backend:")
-    @btime forward($model_zig, $x)
-end
 
 if rust_available()
     println("Rust backend:")
@@ -614,7 +606,7 @@ end
 ### Advanced Projects
 7. **Verified Medical AI** - Classifier with formal guarantees
 8. **Autonomous Controller** - RL agent with safety constraints
-9. **Custom Hardware** - Deploy to edge with Zig backend
+9. **Custom Hardware** - Deploy with accelerator fallback strategy (TPU/NPU/DSP/FPGA targets)
 
 ---
 

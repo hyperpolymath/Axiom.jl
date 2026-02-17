@@ -168,4 +168,27 @@ with_env(f::Function, overrides::Dict{String, String}) = with_env(overrides, f)
     )) do
         @test detect_coprocessor() isa DSPBackend
     end
+
+    @testset "Coprocessor capability report" begin
+        with_env(Dict(
+            "AXIOM_TPU_AVAILABLE" => "1",
+            "AXIOM_NPU_AVAILABLE" => "0",
+            "AXIOM_DSP_AVAILABLE" => "0",
+            "AXIOM_FPGA_AVAILABLE" => "0",
+            "AXIOM_TPU_DEVICE_COUNT" => "2",
+            "AXIOM_NPU_DEVICE_COUNT" => "0",
+            "AXIOM_DSP_DEVICE_COUNT" => "0",
+            "AXIOM_FPGA_DEVICE_COUNT" => "0",
+        )) do
+            report = coprocessor_capability_report()
+            @test report["strategy_order"] == ["TPU", "NPU", "FPGA", "DSP"]
+            @test occursin("TPUBackend", report["selected_backend"])
+            tpu = report["backends"]["TPU"]
+            @test tpu["available"] == true
+            @test tpu["device_count"] == 2
+            @test tpu["compilable"] == true
+            @test haskey(tpu["hook_overrides"], "backend_coprocessor_matmul")
+            @test tpu["hook_overrides"]["backend_coprocessor_matmul"] == false
+        end
+    end
 end

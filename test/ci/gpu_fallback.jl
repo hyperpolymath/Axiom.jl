@@ -76,7 +76,8 @@ end
         "AXIOM_ROCM_AVAILABLE" => "0",
         "AXIOM_METAL_AVAILABLE" => "0",
         "AXIOM_CUDA_DEVICE_COUNT" => "0",
-        "AXIOM_ROCM_DEVICE_COUNT" => "0"
+        "AXIOM_ROCM_DEVICE_COUNT" => "0",
+        "AXIOM_METAL_DEVICE_COUNT" => "0",
     )) do
         model = Sequential(
             Dense(6, 4, relu),
@@ -89,6 +90,7 @@ end
         @test !metal_available()
         @test Axiom.cuda_device_count() == 0
         @test Axiom.rocm_device_count() == 0
+        @test Axiom.metal_device_count() == 0
         @test detect_gpu() === nothing
 
         @test compile(model, backend = CUDABackend(0), verify = false, optimize = :none) === model
@@ -112,6 +114,7 @@ end
         "AXIOM_METAL_AVAILABLE" => "1",
         "AXIOM_CUDA_DEVICE_COUNT" => "1",
         "AXIOM_ROCM_DEVICE_COUNT" => "1",
+        "AXIOM_METAL_DEVICE_COUNT" => "1",
     )) do
         model = Sequential(
             Dense(6, 4, relu),
@@ -131,6 +134,9 @@ end
             @test GPU_TEST_HOOKS[typeof(backend)][:matmul] >= 2
             @test GPU_TEST_HOOKS[typeof(backend)][:relu] >= 1
             @test GPU_TEST_HOOKS[typeof(backend)][:softmax] >= 1
+
+            out_of_range = select_device!(backend, 9)
+            @test compile(model, backend=out_of_range, verify=false, optimize=:none) === model
         end
     end
 end

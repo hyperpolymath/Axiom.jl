@@ -11,11 +11,11 @@ These items are roadmap promises with explicit implementation status and accepta
 | `from_pytorch(...)` model import | Baseline shipped (descriptor + direct `.pt/.pth/.ckpt` bridge + CI interop smoke) | Stage 3 | Keep bridge stable across representative checkpoints and maintain parity validation matrix |
 | `to_onnx(...)` export | Baseline shipped (Dense/Conv/Norm/Pool export + deterministic/CI interop smoke coverage) | Stage 3 | Expand operator coverage and add interoperability/round-trip validation matrix |
 | CPU + Rust + GPU extension backend parity/reliability | Baseline shipped (CI gates + readiness gate) | Stage 2 | Core-op parity tests on CPU+Rust, deterministic GPU extension tests (or fallback tests where unavailable), and CI/runtime smoke coverage |
-| TPU/NPU/DSP/FPGA backends | In progress (targets + strategy CI shipped) | Stage 5+ | At least one production-grade non-GPU accelerator backend with CI coverage and benchmark evidence |
+| TPU/NPU/DSP/FPGA backends | In progress (targets + strategy CI + capability/evidence reporting shipped) | Stage 5+ | At least one production-grade non-GPU accelerator backend with CI coverage and benchmark evidence |
 | REST/gRPC/GraphQL serving parity | In progress (REST/GraphQL + gRPC binary/json bridge shipped) | Stage 2-3 | External runtime interoperability/perf hardening and expanded conformance coverage |
-| GPU production hardening (CUDA/ROCm/Metal) | In progress (fallback + optional hardware CI + compiled hook dispatch shipped) | Stage 2 | Extension-backed kernels, deterministic tests, fallback behavior, and backend-specific performance baselines |
+| GPU production hardening (CUDA/ROCm/Metal) | In progress (fallback + optional hardware CI + compiled hook dispatch + device-range guards shipped) | Stage 2 | Extension-backed kernels, deterministic tests, fallback behavior, and backend-specific performance baselines |
 | Verification/certificate workflow hardening | In progress (integrity CI landed) | Stage 2 | Repeatable certificate serialization checks, tamper-detection tests, and digest-report artifacts in CI |
-| Proof assistant export beyond skeleton artifacts | In progress (obligation manifest + status metadata + import summaries shipped) | Stage 4 | Preserve machine-checkable proof obligations/status metadata and continue reducing manual placeholder workflows |
+| Proof assistant export beyond skeleton artifacts | In progress (obligation manifest + status metadata + automated reconciliation shipped) | Stage 4 | Preserve machine-checkable proof obligations/status metadata and continue reducing manual placeholder workflows |
 
 If roadmap wording and README/wiki claims diverge, the roadmap is the source of truth.
 
@@ -98,7 +98,7 @@ Source: `docs/wiki/Rust-Backend.md`.
 Maintainership is marked Unassigned in:
 - Core Julia implementation
 - Rust backend
-- Zig backend
+- Legacy prototype cleanup and de-scoping docs
 - Verification (@ensure, @prove, certificates)
 - Documentation
 - CI/CD

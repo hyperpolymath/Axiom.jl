@@ -65,11 +65,39 @@ using Axiom: ProofResult
         completed_lean,
         """
         -- AXIOM_CERTIFICATE_HASH: deadbeef
+        -- AXIOM_OBLIGATION_ID: feedface
         theorem completed : True := by
           trivial
         """
     )
     completed_cert = import_lean_certificate(completed_lean)
     @test completed_cert.status == :proven
-end
 
+    expected_id = manifest["obligations"][1]["id"]
+    report = proof_assistant_obligation_report(
+        assistant_paths["coq"],
+        :coq;
+        expected_certificate_hash = cert.hash,
+        expected_obligation_id = expected_id,
+    )
+    @test report["status"] == "incomplete"
+    @test report["hash_matches"] == true
+    @test report["obligation_matches"] == true
+
+    completed_bundle_lean = joinpath(bundle_dir, "softmax_norm.lean")
+    write(
+        completed_bundle_lean,
+        """
+        -- AXIOM_CERTIFICATE_HASH: $(cert.hash)
+        -- AXIOM_PROOF_STATUS: proven
+        -- AXIOM_PROOF_METHOD: pattern
+        -- AXIOM_OBLIGATION_ID: $(expected_id)
+
+        theorem completed_bundle : True := by
+          trivial
+        """
+    )
+    reconciled = reconcile_proof_bundle(bundle["manifest"])
+    @test reconciled["obligations"][1]["assistant_reports"]["lean"]["status"] == "complete"
+    @test reconciled["obligations"][1]["status"] == "interactive_required"
+end
