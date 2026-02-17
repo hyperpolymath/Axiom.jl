@@ -174,6 +174,16 @@ check_doc_alignment() {
     status=1
   fi
 
+  if ! rg -Fq "test/ci/math_required_mode.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing MATH strict-mode test guidance."
+    status=1
+  fi
+
+  if ! rg -Fq "scripts/math-strict-evidence.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing MATH strict evidence guidance."
+    status=1
+  fi
+
   if ! rg -Fq "test/ci/proof_bundle_reconciliation.jl" docs/wiki/Developer-Guide.md; then
     echo "docs/wiki/Developer-Guide.md is missing proof bundle reconciliation test guidance."
     status=1
@@ -342,6 +352,8 @@ run() {
     run_check "NPU strict mode evidence" "$JULIA_BIN" --project=. scripts/npu-strict-evidence.jl
     run_check "DSP strict mode behavior" "$JULIA_BIN" --project=. test/ci/dsp_required_mode.jl
     run_check "DSP strict mode evidence" "$JULIA_BIN" --project=. scripts/dsp-strict-evidence.jl
+    run_check "MATH strict mode behavior" "$JULIA_BIN" --project=. test/ci/math_required_mode.jl
+    run_check "MATH strict mode evidence" "$JULIA_BIN" --project=. scripts/math-strict-evidence.jl
   else
     record_skip "coprocessor strategy behavior (disabled)"
     record_skip "coprocessor capability evidence (disabled)"
@@ -353,6 +365,8 @@ run() {
     record_skip "NPU strict mode evidence (disabled)"
     record_skip "DSP strict mode behavior (disabled)"
     record_skip "DSP strict mode evidence (disabled)"
+    record_skip "MATH strict mode behavior (disabled)"
+    record_skip "MATH strict mode evidence (disabled)"
   fi
 
   if [ "$RUN_INTEROP" = "1" ]; then

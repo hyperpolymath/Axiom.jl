@@ -46,6 +46,7 @@ Useful toggles:
 - `AXIOM_TPU_REQUIRED=1` enforces strict TPU mode (no compile/runtime fallback).
 - `AXIOM_NPU_REQUIRED=1` enforces strict NPU mode (no compile/runtime fallback).
 - `AXIOM_DSP_REQUIRED=1` enforces strict DSP mode (no compile/runtime fallback).
+- `AXIOM_MATH_REQUIRED=1` enforces strict MATH mode (no compile/runtime fallback).
 - `AXIOM_COPROCESSOR_REQUIRED=1` enforces strict mode for all coprocessor backends unless backend-specific flags override.
 - `JULIA_BIN=/path/to/julia` selects a specific Julia binary.
 
@@ -179,25 +180,27 @@ Generate verification telemetry evidence artifact:
 julia --project=. scripts/verification-telemetry-evidence.jl
 ```
 
-## TPU/NPU/DSP Strict Mode (Production Gate)
+## TPU/NPU/DSP/MATH Strict Mode (Production Gate)
 
-Run strict-mode behavior checks for TPU/NPU/DSP fallback blocking and hook requirements:
+Run strict-mode behavior checks for TPU/NPU/DSP/MATH fallback blocking and hook requirements:
 
 ```bash
 julia --project=. test/ci/tpu_required_mode.jl
 julia --project=. test/ci/npu_required_mode.jl
 julia --project=. test/ci/dsp_required_mode.jl
+julia --project=. test/ci/math_required_mode.jl
 ```
 
-Generate machine-readable TPU/NPU/DSP strict-mode evidence:
+Generate machine-readable TPU/NPU/DSP/MATH strict-mode evidence:
 
 ```bash
 julia --project=. scripts/tpu-strict-evidence.jl
 julia --project=. scripts/npu-strict-evidence.jl
 julia --project=. scripts/dsp-strict-evidence.jl
+julia --project=. scripts/math-strict-evidence.jl
 ```
 
-Use `templates/AxiomTPUExtSkeleton.jl`, `templates/AxiomNPUExtSkeleton.jl`, and `templates/AxiomDSPExtSkeleton.jl` as starters for extension hook overrides.
+Use `templates/AxiomTPUExtSkeleton.jl`, `templates/AxiomNPUExtSkeleton.jl`, `templates/AxiomDSPExtSkeleton.jl`, and `templates/AxiomMathExtSkeleton.jl` as starters for extension hook overrides.
 
 ## Certificate Integrity Checks
 

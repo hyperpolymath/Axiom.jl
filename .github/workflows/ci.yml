@@ -265,7 +265,7 @@ jobs:
           if-no-files-found: warn
 
   coprocessor-strategy:
-    name: Coprocessor strategy, resilience, and TPU/NPU/DSP strict tests
+    name: Coprocessor strategy, resilience, and TPU/NPU/DSP/MATH strict tests
     runs-on: ubuntu-latest
 
     steps:
@@ -310,6 +310,12 @@ jobs:
       - name: Generate DSP strict mode evidence artifact
         run: julia --project=. scripts/dsp-strict-evidence.jl
 
+      - name: Run MATH strict mode tests
+        run: julia --project=. test/ci/math_required_mode.jl
+
+      - name: Generate MATH strict mode evidence artifact
+        run: julia --project=. scripts/math-strict-evidence.jl
+
       - name: Upload coprocessor evidence artifact
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -348,6 +354,14 @@ jobs:
         with:
           name: dsp-strict-evidence
           path: build/dsp_strict_evidence.json
+          if-no-files-found: warn
+
+      - name: Upload MATH strict mode evidence artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: math-strict-evidence
+          path: build/math_strict_evidence.json
           if-no-files-found: warn
 
   gpu-cuda-hardware:
