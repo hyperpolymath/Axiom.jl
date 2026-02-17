@@ -36,9 +36,10 @@ Run the consolidated release-readiness checks:
 Useful toggles:
 
 - `AXIOM_READINESS_RUN_RUST=0` disables Rust parity/smoke checks.
-- `AXIOM_READINESS_RUN_COPROCESSOR=0` disables coprocessor strategy checks.
+- `AXIOM_READINESS_RUN_COPROCESSOR=0` disables coprocessor strategy/resilience checks.
 - `AXIOM_READINESS_RUN_GPU_PERF=0` disables GPU resilience/performance evidence checks.
 - `AXIOM_READINESS_ALLOW_SKIPS=1` allows skipped checks without failing the run.
+- `AXIOM_COPROCESSOR_SELF_HEAL=0` disables coprocessor self-healing fallback (useful for failure-path testing).
 - `JULIA_BIN=/path/to/julia` selects a specific Julia binary.
 
 ## Runtime Smoke Tests
@@ -115,6 +116,18 @@ Generate a machine-readable capability/evidence artifact:
 
 ```bash
 julia --project=. scripts/coprocessor-evidence.jl
+```
+
+Run coprocessor resilience diagnostics (self-healing + fault-tolerance counters):
+
+```bash
+julia --project=. test/ci/coprocessor_resilience.jl
+```
+
+Generate coprocessor resilience evidence artifact:
+
+```bash
+julia --project=. scripts/coprocessor-resilience-evidence.jl
 ```
 
 ## Certificate Integrity Checks

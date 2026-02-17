@@ -205,7 +205,7 @@ jobs:
           if-no-files-found: warn
 
   coprocessor-strategy:
-    name: Coprocessor strategy tests
+    name: Coprocessor strategy and resilience tests
     runs-on: ubuntu-latest
 
     steps:
@@ -226,12 +226,26 @@ jobs:
       - name: Generate coprocessor evidence artifact
         run: julia --project=. scripts/coprocessor-evidence.jl
 
+      - name: Run coprocessor resilience diagnostics tests
+        run: julia --project=. test/ci/coprocessor_resilience.jl
+
+      - name: Generate coprocessor resilience evidence artifact
+        run: julia --project=. scripts/coprocessor-resilience-evidence.jl
+
       - name: Upload coprocessor evidence artifact
         if: always()
         uses: actions/upload-artifact@6d3e1c6c7da08dea67f074b3b34ddf5fd56a1bd7 # v4
         with:
           name: coprocessor-evidence
           path: build/coprocessor_evidence.json
+          if-no-files-found: warn
+
+      - name: Upload coprocessor resilience evidence artifact
+        if: always()
+        uses: actions/upload-artifact@6d3e1c6c7da08dea67f074b3b34ddf5fd56a1bd7 # v4
+        with:
+          name: coprocessor-resilience-evidence
+          path: build/coprocessor_resilience_evidence.json
           if-no-files-found: warn
 
   gpu-cuda-hardware:

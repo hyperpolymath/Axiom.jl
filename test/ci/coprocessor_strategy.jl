@@ -183,6 +183,8 @@ with_env(f::Function, overrides::Dict{String, String}) = with_env(overrides, f)
             report = coprocessor_capability_report()
             @test report["strategy_order"] == ["TPU", "NPU", "FPGA", "DSP"]
             @test occursin("TPUBackend", report["selected_backend"])
+            @test haskey(report, "runtime_diagnostics")
+            @test report["runtime_diagnostics"]["self_healing_enabled"] == true
             tpu = report["backends"]["TPU"]
             @test tpu["available"] == true
             @test tpu["device_count"] == 2

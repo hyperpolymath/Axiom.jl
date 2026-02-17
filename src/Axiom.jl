@@ -168,6 +168,7 @@ export tpu_available, npu_available, dsp_available, fpga_available
 export tpu_device_count, npu_device_count, dsp_device_count, fpga_device_count
 export select_device!, gpu_capability_report, coprocessor_capability_report
 export gpu_runtime_diagnostics, reset_gpu_runtime_diagnostics!
+export coprocessor_runtime_diagnostics, reset_coprocessor_runtime_diagnostics!
 
 # Data utilities
 export DataLoader, train_test_split, one_hot

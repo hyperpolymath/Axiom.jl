@@ -131,6 +131,16 @@ check_doc_alignment() {
     status=1
   fi
 
+  if ! rg -Fq "test/ci/coprocessor_resilience.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing coprocessor resilience test guidance."
+    status=1
+  fi
+
+  if ! rg -Fq "scripts/coprocessor-resilience-evidence.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing coprocessor resilience evidence guidance."
+    status=1
+  fi
+
   if ! rg -Fq "test/ci/proof_bundle_reconciliation.jl" docs/wiki/Developer-Guide.md; then
     echo "docs/wiki/Developer-Guide.md is missing proof bundle reconciliation test guidance."
     status=1
@@ -260,8 +270,14 @@ run() {
 
   if [ "$RUN_COPROCESSOR" = "1" ]; then
     run_check "coprocessor strategy behavior" "$JULIA_BIN" --project=. test/ci/coprocessor_strategy.jl
+    run_check "coprocessor capability evidence" "$JULIA_BIN" --project=. scripts/coprocessor-evidence.jl
+    run_check "coprocessor resilience diagnostics" "$JULIA_BIN" --project=. test/ci/coprocessor_resilience.jl
+    run_check "coprocessor resilience evidence" "$JULIA_BIN" --project=. scripts/coprocessor-resilience-evidence.jl
   else
     record_skip "coprocessor strategy behavior (disabled)"
+    record_skip "coprocessor capability evidence (disabled)"
+    record_skip "coprocessor resilience diagnostics (disabled)"
+    record_skip "coprocessor resilience evidence (disabled)"
   fi
 
   if [ "$RUN_INTEROP" = "1" ]; then

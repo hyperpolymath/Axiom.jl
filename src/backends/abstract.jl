@@ -307,6 +307,98 @@ function _coprocessor_label(backend::CoprocessorBackend)
     string(typeof(backend))
 end
 
+# Coprocessor runtime diagnostics counters (self-healing/fallback observability).
+const _COPROCESSOR_RUNTIME_DIAGNOSTICS = Dict{String, Dict{String, Int}}(
+    "tpu" => Dict(
+        "compile_fallbacks" => 0,
+        "runtime_errors" => 0,
+        "runtime_fallbacks" => 0,
+        "recoveries" => 0,
+    ),
+    "npu" => Dict(
+        "compile_fallbacks" => 0,
+        "runtime_errors" => 0,
+        "runtime_fallbacks" => 0,
+        "recoveries" => 0,
+    ),
+    "dsp" => Dict(
+        "compile_fallbacks" => 0,
+        "runtime_errors" => 0,
+        "runtime_fallbacks" => 0,
+        "recoveries" => 0,
+    ),
+    "fpga" => Dict(
+        "compile_fallbacks" => 0,
+        "runtime_errors" => 0,
+        "runtime_fallbacks" => 0,
+        "recoveries" => 0,
+    ),
+)
+
+function _coprocessor_backend_key(backend::CoprocessorBackend)
+    if backend isa TPUBackend
+        return "tpu"
+    elseif backend isa NPUBackend
+        return "npu"
+    elseif backend isa DSPBackend
+        return "dsp"
+    elseif backend isa FPGABackend
+        return "fpga"
+    end
+    "unknown"
+end
+
+function _coprocessor_record_diagnostic!(backend::CoprocessorBackend, key::String)
+    backend_key = _coprocessor_backend_key(backend)
+    haskey(_COPROCESSOR_RUNTIME_DIAGNOSTICS, backend_key) || return
+    counters = _COPROCESSOR_RUNTIME_DIAGNOSTICS[backend_key]
+    counters[key] = get(counters, key, 0) + 1
+end
+
+"""
+    reset_coprocessor_runtime_diagnostics!()
+
+Reset in-process coprocessor runtime diagnostics counters.
+"""
+function reset_coprocessor_runtime_diagnostics!()
+    for counters in values(_COPROCESSOR_RUNTIME_DIAGNOSTICS)
+        counters["compile_fallbacks"] = 0
+        counters["runtime_errors"] = 0
+        counters["runtime_fallbacks"] = 0
+        counters["recoveries"] = 0
+    end
+    nothing
+end
+
+"""
+    coprocessor_runtime_diagnostics() -> Dict{String,Any}
+
+Return machine-readable counters for coprocessor fallback/self-healing behavior.
+"""
+function coprocessor_runtime_diagnostics()
+    backends = Dict{String, Any}()
+    for key in ("tpu", "npu", "dsp", "fpga")
+        counters = get(_COPROCESSOR_RUNTIME_DIAGNOSTICS, key, Dict{String, Int}())
+        backends[key] = Dict(
+            "compile_fallbacks" => get(counters, "compile_fallbacks", 0),
+            "runtime_errors" => get(counters, "runtime_errors", 0),
+            "runtime_fallbacks" => get(counters, "runtime_fallbacks", 0),
+            "recoveries" => get(counters, "recoveries", 0),
+        )
+    end
+
+    Dict(
+        "generated_at" => Dates.format(now(Dates.UTC), "yyyy-mm-ddTHH:MM:SS.sssZ"),
+        "self_healing_enabled" => _coprocessor_self_healing_enabled(),
+        "backends" => backends,
+    )
+end
+
+function _coprocessor_self_healing_enabled()
+    forced = _backend_env_available("AXIOM_COPROCESSOR_SELF_HEAL")
+    forced === nothing ? true : forced
+end
+
 # Coprocessor extension hooks. Concrete accelerator extensions can overload these.
 function backend_coprocessor_matmul end
 function backend_coprocessor_conv2d end
@@ -690,10 +782,12 @@ end
 function _compile_coprocessor(model, backend, available::Bool, device_count::Int, label::String)
     @info "Compiling to $(label) backend on device $(backend.device)..."
     if !available
+        _coprocessor_record_diagnostic!(backend, "compile_fallbacks")
         @warn "$(label) backend not available, falling back to Julia backend"
         return model
     end
     if backend.device < 0 || backend.device >= device_count
+        _coprocessor_record_diagnostic!(backend, "compile_fallbacks")
         @warn "$(label) device $(backend.device) out of range (available: 0:$(max(0, device_count - 1))), falling back to Julia backend"
         return model
     end
@@ -919,6 +1013,7 @@ function coprocessor_capability_report()
         "generated_at" => Dates.format(now(Dates.UTC), "yyyy-mm-ddTHH:MM:SS.sssZ"),
         "strategy_order" => ["TPU", "NPU", "FPGA", "DSP"],
         "selected_backend" => selected === nothing ? nothing : string(typeof(selected)),
+        "runtime_diagnostics" => coprocessor_runtime_diagnostics(),
         "backends" => backends,
     )
 end
@@ -1231,8 +1326,30 @@ function _coprocessor_forward(model, x::AbstractTensor, ::CoprocessorBackend)
     forward(model, x)
 end
 
+function _coprocessor_forward_with_recovery(model, x::AbstractTensor, backend::CoprocessorBackend)
+    try
+        return _coprocessor_forward(model, x, backend)
+    catch err
+        _coprocessor_record_diagnostic!(backend, "runtime_errors")
+        if !_coprocessor_self_healing_enabled()
+            message = string(
+                _coprocessor_label(backend),
+                " execution failed with self-healing disabled (AXIOM_COPROCESSOR_SELF_HEAL=0). ",
+                "Original error: ",
+                sprint(showerror, err),
+            )
+            throw(ErrorException(message))
+        end
+        _coprocessor_record_diagnostic!(backend, "runtime_fallbacks")
+        @warn "$(_coprocessor_label(backend)) execution failed; self-healing fallback to Julia backend" exception=(err, catch_backtrace())
+        recovered = forward(model, x)
+        _coprocessor_record_diagnostic!(backend, "recoveries")
+        return recovered
+    end
+end
+
 function forward(cm::CoprocessorCompiledModel, x::AbstractTensor)
-    _coprocessor_forward(cm.model, x, cm.backend)
+    _coprocessor_forward_with_recovery(cm.model, x, cm.backend)
 end
 
 function forward(cm::CoprocessorCompiledModel, x)
