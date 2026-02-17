@@ -16,6 +16,9 @@ Thumbs.db
 /build/
 /dist/
 /out/
+ffi/idris/build/exec/hello_app/*.so
+ffi/idris/build/exec/hello_app/*.dylib
+ffi/idris/build/exec/hello_app/*.dll
 
 # Dependencies
 /node_modules/

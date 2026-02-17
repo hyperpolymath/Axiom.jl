@@ -11,10 +11,7 @@ on:
         description: 'Version to release (e.g., v0.1.0)'
         required: true
 
-permissions:
-  contents: write  # For creating releases
-  id-token: write  # For SLSA provenance
-  packages: write  # For container publishing
+permissions: read-all
 
 jobs:
   # ============================================================================
@@ -204,6 +201,8 @@ jobs:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     needs: [build-julia, build-rust, generate-sbom]
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
