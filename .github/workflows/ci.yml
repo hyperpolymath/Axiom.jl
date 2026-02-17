@@ -205,6 +205,17 @@ jobs:
       - name: Run coprocessor strategy tests
         run: julia --project=. test/ci/coprocessor_strategy.jl
 
+      - name: Generate coprocessor evidence artifact
+        run: julia --project=. scripts/coprocessor-evidence.jl
+
+      - name: Upload coprocessor evidence artifact
+        if: always()
+        uses: actions/upload-artifact@6d3e1c6c7da08dea67f074b3b34ddf5fd56a1bd7 # v4
+        with:
+          name: coprocessor-evidence
+          path: build/coprocessor_evidence.json
+          if-no-files-found: warn
+
   gpu-cuda-hardware:
     name: GPU hardware smoke (CUDA)
     if: ${{ vars.AXIOM_ENABLE_GPU_HARDWARE_CI == 'true' }}
