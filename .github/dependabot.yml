@@ -4,14 +4,14 @@ updates:
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-patch"]
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     groups:
       actions:
         patterns:
@@ -19,4 +19,4 @@ updates:
   - package-ecosystem: "nix"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
