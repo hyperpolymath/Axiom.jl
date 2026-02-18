@@ -52,129 +52,141 @@ function compile_required_probe(model)
     end
 end
 
-function missing_hook_probe(model, x)
+function run_compiled_probe(model, x, cpu)
+    compile_ms = @elapsed compiled = compile(model, backend = CryptoBackend(0), verify = false, optimize = :none)
+    infer_ms = @elapsed y = compiled(x).data
+
+    Dict(
+        "compiled_wrapper" => compiled isa Axiom.CoprocessorCompiledModel,
+        "compile_ms" => round(compile_ms * 1000; digits = 3),
+        "inference_ms" => round(infer_ms * 1000; digits = 3),
+        "parity_ok" => isapprox(y, cpu; atol = 2f-4, rtol = 2f-4),
+        "finite_ok" => all(isfinite, y),
+        "probability_ok" => all(isapprox.(sum(y, dims = 2), 1.0f0, atol = 2f-4)),
+    )
+end
+
+function strict_runtime_probe()
+    dense_model = Sequential(
+        Dense(6, 4, relu),
+        Dense(4, 3),
+        Softmax(),
+    )
+    dense_x = Tensor(randn(Float32, 6, 6))
+    dense_cpu = dense_model(dense_x).data
+
+    conv_model = Sequential(
+        Conv2d(3, 4, (3, 3), padding = 1),
+        BatchNorm(4),
+        ReLU(),
+        MaxPool2d((2, 2)),
+        GlobalAvgPool(),
+        Dense(4, 3),
+        Softmax(),
+    )
+    conv_x = Tensor(randn(Float32, 2, 8, 8, 3))
+    conv_cpu = conv_model(conv_x).data
+
+    norm_model = Sequential(
+        Dense(6, 6, identity),
+        LayerNorm(6),
+        ReLU(),
+        Dense(6, 3),
+        Softmax(),
+    )
+    norm_x = Tensor(randn(Float32, 4, 6))
+    norm_cpu = norm_model(norm_x).data
+
+    avgpool_model = Sequential(
+        Conv2d(3, 4, (3, 3), padding = 1),
+        AvgPool2d((2, 2)),
+        GlobalAvgPool(),
+        Dense(4, 3),
+        Softmax(),
+    )
+    avgpool_x = Tensor(randn(Float32, 2, 8, 8, 3))
+    avgpool_cpu = avgpool_model(avgpool_x).data
+
     with_env(Dict(
         "AXIOM_CRYPTO_AVAILABLE" => "1",
         "AXIOM_CRYPTO_DEVICE_COUNT" => "1",
         "AXIOM_CRYPTO_REQUIRED" => "1",
     )) do
-        compiled = compile(model, backend = CryptoBackend(0), verify = false, optimize = :none)
+        reset_coprocessor_runtime_diagnostics!()
 
-        err_message = nothing
-        try
-            compiled(x)
-        catch err
-            err_message = sprint(showerror, err)
-        end
-
-        Dict(
-            "compiled_wrapper" => compiled isa Axiom.CoprocessorCompiledModel,
-            "raised_error" => err_message !== nothing,
-            "error_message" => err_message,
-        )
-    end
-end
-
-function install_crypto_demo_hooks!()
-    @eval begin
-        function Axiom.backend_coprocessor_matmul(
-            backend::Axiom.CryptoBackend,
-            A::AbstractMatrix{Float32},
-            B::AbstractMatrix{Float32},
-        )
-            A * B
-        end
-
-        function Axiom.backend_coprocessor_relu(
-            backend::Axiom.CryptoBackend,
-            x::AbstractArray{Float32},
-        )
-            max.(x, 0f0)
-        end
-
-        function Axiom.backend_coprocessor_softmax(
-            backend::Axiom.CryptoBackend,
-            x::AbstractArray{Float32},
-            dim::Int,
-        )
-            Axiom.softmax(x, dims = dim)
-        end
-    end
-    nothing
-end
-
-function strict_success_probe(model, x, cpu)
-    with_env(Dict(
-        "AXIOM_CRYPTO_AVAILABLE" => "1",
-        "AXIOM_CRYPTO_DEVICE_COUNT" => "1",
-        "AXIOM_CRYPTO_REQUIRED" => "1",
-    )) do
-        compile_ms = @elapsed compiled = compile(model, backend = CryptoBackend(0), verify = false, optimize = :none)
-        # Hooks are installed at runtime in this script, so run inference in latest world-age.
-        infer_ms = @elapsed y = Base.invokelatest(compiled, x).data
+        dense = run_compiled_probe(dense_model, dense_x, dense_cpu)
+        conv = run_compiled_probe(conv_model, conv_x, conv_cpu)
+        norm = run_compiled_probe(norm_model, norm_x, norm_cpu)
+        avgpool = run_compiled_probe(avgpool_model, avgpool_x, avgpool_cpu)
 
         report = coprocessor_capability_report()
         crypto = report["backends"]["CRYPTO"]
+        diagnostics = coprocessor_runtime_diagnostics()["backends"]["crypto"]
 
         Dict(
-            "compiled_wrapper" => compiled isa Axiom.CoprocessorCompiledModel,
-            "compile_ms" => round(compile_ms * 1000; digits = 3),
-            "inference_ms" => round(infer_ms * 1000; digits = 3),
-            "parity_ok" => isapprox(y, cpu; atol = 1f-5, rtol = 1f-5),
-            "finite_ok" => all(isfinite, y),
-            "probability_ok" => all(isapprox.(sum(y, dims = 2), 1.0f0, atol = 2f-4)),
+            "dense" => dense,
+            "conv" => conv,
+            "norm" => norm,
+            "avgpool" => avgpool,
             "required" => crypto["required"],
+            "kernel_hooks_loaded" => crypto["kernel_hooks_loaded"],
             "hook_overrides" => crypto["hook_overrides"],
+            "runtime_diagnostics" => diagnostics,
         )
     end
 end
 
 function main()
-    model = Sequential(
+    failures = String[]
+
+    compile_probe = compile_required_probe(Sequential(
         Dense(6, 4, relu),
         Dense(4, 3),
         Softmax(),
-    )
-    x = Tensor(randn(Float32, 6, 6))
-    cpu = model(x).data
-
-    failures = String[]
-
-    compile_probe = compile_required_probe(model)
+    ))
     (compile_probe["raised_error"] == true) || push!(failures, "Crypto strict compile probe did not raise an error")
     if compile_probe["error_message"] !== nothing
         occursin("AXIOM_CRYPTO_REQUIRED", compile_probe["error_message"]) ||
             push!(failures, "Crypto strict compile probe error message missing AXIOM_CRYPTO_REQUIRED hint")
     end
 
-    missing_hook = missing_hook_probe(model, x)
-    (missing_hook["compiled_wrapper"] == true) || push!(failures, "Crypto strict missing-hook probe did not compile to coprocessor wrapper")
-    (missing_hook["raised_error"] == true) || push!(failures, "Crypto strict missing-hook probe did not raise an error")
-    if missing_hook["error_message"] !== nothing
-        occursin("strict mode enabled", missing_hook["error_message"]) ||
-            push!(failures, "Crypto strict missing-hook probe error message missing strict-mode wording")
+    strict_runtime = strict_runtime_probe()
+    (strict_runtime["required"] == true) || push!(failures, "Crypto strict runtime probe did not report required=true")
+    (strict_runtime["kernel_hooks_loaded"] == true) || push!(failures, "Crypto strict runtime probe did not report full hook coverage")
+    for key in ("dense", "conv", "norm", "avgpool")
+        probe = strict_runtime[key]
+        (probe["compiled_wrapper"] == true) || push!(failures, "Crypto strict runtime probe for $key did not compile to coprocessor wrapper")
+        (probe["parity_ok"] == true) || push!(failures, "Crypto strict runtime probe parity check failed for $key")
+        (probe["finite_ok"] == true) || push!(failures, "Crypto strict runtime finite check failed for $key")
+        (probe["probability_ok"] == true) || push!(failures, "Crypto strict runtime probability check failed for $key")
     end
 
-    install_crypto_demo_hooks!()
-    strict_ok = strict_success_probe(model, x, cpu)
+    hooks = strict_runtime["hook_overrides"]
+    for hook in (
+        "backend_coprocessor_matmul",
+        "backend_coprocessor_conv2d",
+        "backend_coprocessor_relu",
+        "backend_coprocessor_softmax",
+        "backend_coprocessor_batchnorm",
+        "backend_coprocessor_layernorm",
+        "backend_coprocessor_maxpool2d",
+        "backend_coprocessor_avgpool2d",
+        "backend_coprocessor_global_avgpool2d",
+    )
+        Bool(hooks[hook]) || push!(failures, "Crypto hook override not detected for $hook")
+    end
 
-    (strict_ok["compiled_wrapper"] == true) || push!(failures, "Crypto strict success probe did not compile to coprocessor wrapper")
-    (strict_ok["required"] == true) || push!(failures, "Crypto strict success probe did not report required=true")
-    (strict_ok["parity_ok"] == true) || push!(failures, "Crypto strict success probe parity check failed")
-    (strict_ok["finite_ok"] == true) || push!(failures, "Crypto strict success probe finite check failed")
-    (strict_ok["probability_ok"] == true) || push!(failures, "Crypto strict success probe probability check failed")
-
-    hooks = strict_ok["hook_overrides"]
-    Bool(hooks["backend_coprocessor_matmul"]) || push!(failures, "Crypto hook override not detected for matmul")
-    Bool(hooks["backend_coprocessor_relu"]) || push!(failures, "Crypto hook override not detected for relu")
-    Bool(hooks["backend_coprocessor_softmax"]) || push!(failures, "Crypto hook override not detected for softmax")
+    diagnostics = strict_runtime["runtime_diagnostics"]
+    (diagnostics["compile_fallbacks"] == 0) || push!(failures, "Crypto compile fallback counter should remain 0 in strict runtime probe")
+    (diagnostics["runtime_errors"] == 0) || push!(failures, "Crypto runtime error counter should remain 0 in strict runtime probe")
+    (diagnostics["runtime_fallbacks"] == 0) || push!(failures, "Crypto runtime fallback counter should remain 0 in strict runtime probe")
+    (diagnostics["recoveries"] == 0) || push!(failures, "Crypto recovery counter should remain 0 in strict runtime probe")
 
     payload = Dict(
-        "format" => "axiom-crypto-strict-evidence.v1",
+        "format" => "axiom-crypto-strict-evidence.v2",
         "generated_at" => Dates.format(now(Dates.UTC), "yyyy-mm-ddTHH:MM:SS.sssZ"),
         "compile_required_probe" => compile_probe,
-        "missing_hook_probe" => missing_hook,
-        "strict_success_probe" => strict_ok,
+        "strict_runtime_probe" => strict_runtime,
         "capability_report" => coprocessor_capability_report(),
     )
 

@@ -107,6 +107,10 @@ include("proof_export.jl")  # Issue #19 - Proof assistant integration
 # Backend abstraction
 include("backends/abstract.jl")
 include("backends/julia_backend.jl")
+include("backends/ppu_backend.jl")
+include("backends/crypto_backend.jl")
+include("backends/fpga_backend.jl")
+include("backends/math_backend.jl")
 include("backends/gpu_hooks.jl")  # GPU backend interface (issue #12)
 
 # Rust FFI (loaded conditionally)
@@ -206,7 +210,7 @@ export proof_assistant_obligation_report, reconcile_proof_bundle
 export import_lean_certificate, import_coq_certificate, import_isabelle_certificate
 
 # Version info
-const VERSION = v"1.0.2"
+const VERSION = v"1.0.3"
 
 function __init__()
     # Check for Rust backend availability

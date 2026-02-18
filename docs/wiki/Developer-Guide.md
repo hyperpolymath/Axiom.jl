@@ -140,6 +140,54 @@ Generate coprocessor resilience evidence artifact:
 julia --project=. scripts/coprocessor-resilience-evidence.jl
 ```
 
+Validate PPU production kernels and emit machine-readable performance/correctness evidence:
+
+```bash
+julia --project=. scripts/ppu-production-evidence.jl
+```
+
+`scripts/ppu-production-evidence.jl` reads optional thresholds from:
+
+- `AXIOM_PPU_BASELINE_PATH` (default: `benchmark/ppu_performance_baseline.json`)
+- `AXIOM_PPU_BASELINE_ENFORCE` (set to `1` to fail on regressions vs baseline)
+- `AXIOM_PPU_MAX_REGRESSION_RATIO` (default: `1.20`)
+
+Validate Math production kernels and emit machine-readable performance/correctness evidence:
+
+```bash
+julia --project=. scripts/math-production-evidence.jl
+```
+
+`scripts/math-production-evidence.jl` reads optional thresholds from:
+
+- `AXIOM_MATH_BASELINE_PATH` (default: `benchmark/math_performance_baseline.json`)
+- `AXIOM_MATH_BASELINE_ENFORCE` (set to `1` to fail on regressions vs baseline)
+- `AXIOM_MATH_MAX_REGRESSION_RATIO` (default: `1.20`)
+
+Validate Crypto production kernels and emit machine-readable performance/correctness evidence:
+
+```bash
+julia --project=. scripts/crypto-production-evidence.jl
+```
+
+`scripts/crypto-production-evidence.jl` reads optional thresholds from:
+
+- `AXIOM_CRYPTO_BASELINE_PATH` (default: `benchmark/crypto_performance_baseline.json`)
+- `AXIOM_CRYPTO_BASELINE_ENFORCE` (set to `1` to fail on regressions vs baseline)
+- `AXIOM_CRYPTO_MAX_REGRESSION_RATIO` (default: `1.20`)
+
+Validate FPGA production kernels and emit machine-readable performance/correctness evidence:
+
+```bash
+julia --project=. scripts/fpga-production-evidence.jl
+```
+
+`scripts/fpga-production-evidence.jl` reads optional thresholds from:
+
+- `AXIOM_FPGA_BASELINE_PATH` (default: `benchmark/fpga_performance_baseline.json`)
+- `AXIOM_FPGA_BASELINE_ENFORCE` (set to `1` to fail on regressions vs baseline)
+- `AXIOM_FPGA_MAX_REGRESSION_RATIO` (default: `1.20`)
+
 ## Could: Model Packaging + Registry
 
 Run packaging/registry workflow checks:
@@ -182,9 +230,9 @@ Generate verification telemetry evidence artifact:
 julia --project=. scripts/verification-telemetry-evidence.jl
 ```
 
-## TPU/NPU/PPU/MATH/CRYPTO/DSP Strict Mode (Production Gate)
+## TPU/NPU/PPU/MATH/CRYPTO/FPGA/DSP Strict Mode (Production Gate)
 
-Run strict-mode behavior checks for TPU/NPU/PPU/MATH/CRYPTO/DSP fallback blocking and hook requirements:
+Run strict-mode behavior checks for TPU/NPU/PPU/MATH/CRYPTO/FPGA/DSP fallback blocking and kernel coverage:
 
 ```bash
 julia --project=. test/ci/tpu_required_mode.jl
@@ -192,10 +240,11 @@ julia --project=. test/ci/npu_required_mode.jl
 julia --project=. test/ci/ppu_required_mode.jl
 julia --project=. test/ci/math_required_mode.jl
 julia --project=. test/ci/crypto_required_mode.jl
+julia --project=. test/ci/fpga_required_mode.jl
 julia --project=. test/ci/dsp_required_mode.jl
 ```
 
-Generate machine-readable TPU/NPU/PPU/MATH/CRYPTO/DSP strict-mode evidence:
+Generate machine-readable TPU/NPU/PPU/MATH/CRYPTO/FPGA/DSP strict-mode evidence:
 
 ```bash
 julia --project=. scripts/tpu-strict-evidence.jl
@@ -203,10 +252,13 @@ julia --project=. scripts/npu-strict-evidence.jl
 julia --project=. scripts/ppu-strict-evidence.jl
 julia --project=. scripts/math-strict-evidence.jl
 julia --project=. scripts/crypto-strict-evidence.jl
+julia --project=. scripts/fpga-strict-evidence.jl
 julia --project=. scripts/dsp-strict-evidence.jl
 ```
 
-Use `templates/AxiomTPUExtSkeleton.jl`, `templates/AxiomNPUExtSkeleton.jl`, `templates/AxiomPPUExtSkeleton.jl`, `templates/AxiomMathExtSkeleton.jl`, `templates/AxiomCryptoExtSkeleton.jl`, and `templates/AxiomDSPExtSkeleton.jl` as starters for extension hook overrides.
+Use `templates/AxiomTPUExtSkeleton.jl`, `templates/AxiomNPUExtSkeleton.jl`, `templates/AxiomPPUExtSkeleton.jl`, `templates/AxiomMathExtSkeleton.jl`, `templates/AxiomCryptoExtSkeleton.jl`, `templates/AxiomFPGAExtSkeleton.jl`, and `templates/AxiomDSPExtSkeleton.jl` as starters for extension hook overrides.
+
+`PPUBackend`, `MathBackend`, `CryptoBackend`, and `FPGABackend` now ship built-in production kernels in-tree (`src/backends/ppu_backend.jl`, `src/backends/math_backend.jl`, `src/backends/crypto_backend.jl`, `src/backends/fpga_backend.jl`), so extension hooks are optional for backend-specific hardware acceleration rather than required for strict-mode correctness.
 
 ## Certificate Integrity Checks
 

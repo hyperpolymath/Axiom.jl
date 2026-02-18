@@ -34,13 +34,13 @@ with_env(f::Function, overrides::Dict{String, String}) = with_env(overrides, f)
 
 function compile_required_probe(model)
     with_env(Dict(
-        "AXIOM_PPU_AVAILABLE" => "0",
-        "AXIOM_PPU_DEVICE_COUNT" => "0",
-        "AXIOM_PPU_REQUIRED" => "1",
+        "AXIOM_FPGA_AVAILABLE" => "0",
+        "AXIOM_FPGA_DEVICE_COUNT" => "0",
+        "AXIOM_FPGA_REQUIRED" => "1",
     )) do
         err_message = nothing
         try
-            compile(model, backend = PPUBackend(0), verify = false, optimize = :none)
+            compile(model, backend = FPGABackend(0), verify = false, optimize = :none)
         catch err
             err_message = sprint(showerror, err)
         end
@@ -53,7 +53,7 @@ function compile_required_probe(model)
 end
 
 function run_compiled_probe(model, x, cpu)
-    compile_ms = @elapsed compiled = compile(model, backend = PPUBackend(0), verify = false, optimize = :none)
+    compile_ms = @elapsed compiled = compile(model, backend = FPGABackend(0), verify = false, optimize = :none)
     infer_ms = @elapsed y = compiled(x).data
 
     Dict(
@@ -108,9 +108,9 @@ function strict_runtime_probe()
     avgpool_cpu = avgpool_model(avgpool_x).data
 
     with_env(Dict(
-        "AXIOM_PPU_AVAILABLE" => "1",
-        "AXIOM_PPU_DEVICE_COUNT" => "1",
-        "AXIOM_PPU_REQUIRED" => "1",
+        "AXIOM_FPGA_AVAILABLE" => "1",
+        "AXIOM_FPGA_DEVICE_COUNT" => "1",
+        "AXIOM_FPGA_REQUIRED" => "1",
     )) do
         reset_coprocessor_runtime_diagnostics!()
 
@@ -120,17 +120,17 @@ function strict_runtime_probe()
         avgpool = run_compiled_probe(avgpool_model, avgpool_x, avgpool_cpu)
 
         report = coprocessor_capability_report()
-        ppu = report["backends"]["PPU"]
-        diagnostics = coprocessor_runtime_diagnostics()["backends"]["ppu"]
+        fpga = report["backends"]["FPGA"]
+        diagnostics = coprocessor_runtime_diagnostics()["backends"]["fpga"]
 
         Dict(
             "dense" => dense,
             "conv" => conv,
             "norm" => norm,
             "avgpool" => avgpool,
-            "required" => ppu["required"],
-            "kernel_hooks_loaded" => ppu["kernel_hooks_loaded"],
-            "hook_overrides" => ppu["hook_overrides"],
+            "required" => fpga["required"],
+            "kernel_hooks_loaded" => fpga["kernel_hooks_loaded"],
+            "hook_overrides" => fpga["hook_overrides"],
             "runtime_diagnostics" => diagnostics,
         )
     end
@@ -144,21 +144,21 @@ function main()
         Dense(4, 3),
         Softmax(),
     ))
-    (compile_probe["raised_error"] == true) || push!(failures, "PPU strict compile probe did not raise an error")
+    (compile_probe["raised_error"] == true) || push!(failures, "FPGA strict compile probe did not raise an error")
     if compile_probe["error_message"] !== nothing
-        occursin("AXIOM_PPU_REQUIRED", compile_probe["error_message"]) ||
-            push!(failures, "PPU strict compile probe error message missing AXIOM_PPU_REQUIRED hint")
+        occursin("AXIOM_FPGA_REQUIRED", compile_probe["error_message"]) ||
+            push!(failures, "FPGA strict compile probe error message missing AXIOM_FPGA_REQUIRED hint")
     end
 
     strict_runtime = strict_runtime_probe()
-    (strict_runtime["required"] == true) || push!(failures, "PPU strict runtime probe did not report required=true")
-    (strict_runtime["kernel_hooks_loaded"] == true) || push!(failures, "PPU strict runtime probe did not report full hook coverage")
+    (strict_runtime["required"] == true) || push!(failures, "FPGA strict runtime probe did not report required=true")
+    (strict_runtime["kernel_hooks_loaded"] == true) || push!(failures, "FPGA strict runtime probe did not report full hook coverage")
     for key in ("dense", "conv", "norm", "avgpool")
         probe = strict_runtime[key]
-        (probe["compiled_wrapper"] == true) || push!(failures, "PPU strict runtime probe for $key did not compile to coprocessor wrapper")
-        (probe["parity_ok"] == true) || push!(failures, "PPU strict runtime probe parity check failed for $key")
-        (probe["finite_ok"] == true) || push!(failures, "PPU strict runtime finite check failed for $key")
-        (probe["probability_ok"] == true) || push!(failures, "PPU strict runtime probability check failed for $key")
+        (probe["compiled_wrapper"] == true) || push!(failures, "FPGA strict runtime probe for $key did not compile to coprocessor wrapper")
+        (probe["parity_ok"] == true) || push!(failures, "FPGA strict runtime probe parity check failed for $key")
+        (probe["finite_ok"] == true) || push!(failures, "FPGA strict runtime finite check failed for $key")
+        (probe["probability_ok"] == true) || push!(failures, "FPGA strict runtime probability check failed for $key")
     end
 
     hooks = strict_runtime["hook_overrides"]
@@ -173,33 +173,33 @@ function main()
         "backend_coprocessor_avgpool2d",
         "backend_coprocessor_global_avgpool2d",
     )
-        Bool(hooks[hook]) || push!(failures, "PPU hook override not detected for $hook")
+        Bool(hooks[hook]) || push!(failures, "FPGA hook override not detected for $hook")
     end
 
     diagnostics = strict_runtime["runtime_diagnostics"]
-    (diagnostics["compile_fallbacks"] == 0) || push!(failures, "PPU compile fallback counter should remain 0 in strict runtime probe")
-    (diagnostics["runtime_errors"] == 0) || push!(failures, "PPU runtime error counter should remain 0 in strict runtime probe")
-    (diagnostics["runtime_fallbacks"] == 0) || push!(failures, "PPU runtime fallback counter should remain 0 in strict runtime probe")
-    (diagnostics["recoveries"] == 0) || push!(failures, "PPU recovery counter should remain 0 in strict runtime probe")
+    (diagnostics["compile_fallbacks"] == 0) || push!(failures, "FPGA compile fallback counter should remain 0 in strict runtime probe")
+    (diagnostics["runtime_errors"] == 0) || push!(failures, "FPGA runtime error counter should remain 0 in strict runtime probe")
+    (diagnostics["runtime_fallbacks"] == 0) || push!(failures, "FPGA runtime fallback counter should remain 0 in strict runtime probe")
+    (diagnostics["recoveries"] == 0) || push!(failures, "FPGA recovery counter should remain 0 in strict runtime probe")
 
     payload = Dict(
-        "format" => "axiom-ppu-strict-evidence.v2",
+        "format" => "axiom-fpga-strict-evidence.v2",
         "generated_at" => Dates.format(now(Dates.UTC), "yyyy-mm-ddTHH:MM:SS.sssZ"),
         "compile_required_probe" => compile_probe,
         "strict_runtime_probe" => strict_runtime,
         "capability_report" => coprocessor_capability_report(),
     )
 
-    out_path = get(ENV, "AXIOM_PPU_STRICT_EVIDENCE_PATH", joinpath(pwd(), "build", "ppu_strict_evidence.json"))
+    out_path = get(ENV, "AXIOM_FPGA_STRICT_EVIDENCE_PATH", joinpath(pwd(), "build", "fpga_strict_evidence.json"))
     mkpath(dirname(out_path))
     open(out_path, "w") do io
         JSON.print(io, payload, 2)
     end
 
-    println("ppu strict evidence written: $out_path")
+    println("fpga strict evidence written: $out_path")
 
     if !isempty(failures)
-        println("ppu strict evidence checks failed:")
+        println("fpga strict evidence checks failed:")
         for failure in failures
             println(" - $failure")
         end

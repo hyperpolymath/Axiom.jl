@@ -53,89 +53,108 @@ with_env(f::Function, overrides::Dict{String, String}) = with_env(overrides, f)
     end
 end
 
-@testset "Math strict mode runtime hook gate" begin
-    model = Sequential(
+@testset "Math strict mode runtime with built-in production kernels" begin
+    dense_model = Sequential(
         Dense(6, 4, relu),
         Dense(4, 3),
         Softmax(),
     )
-    x = Tensor(randn(Float32, 5, 6))
+    dense_x = Tensor(randn(Float32, 5, 6))
+    dense_cpu = dense_model(dense_x).data
+
+    conv_model = Sequential(
+        Conv2d(3, 4, (3, 3), padding = 1),
+        BatchNorm(4),
+        ReLU(),
+        MaxPool2d((2, 2)),
+        GlobalAvgPool(),
+        Dense(4, 3),
+        Softmax(),
+    )
+    conv_x = Tensor(randn(Float32, 2, 8, 8, 3))
+    conv_cpu = conv_model(conv_x).data
+
+    norm_model = Sequential(
+        Dense(6, 6, identity),
+        LayerNorm(6),
+        ReLU(),
+        Dense(6, 3),
+        Softmax(),
+    )
+    norm_x = Tensor(randn(Float32, 4, 6))
+    norm_cpu = norm_model(norm_x).data
+
+    avgpool_model = Sequential(
+        Conv2d(3, 4, (3, 3), padding = 1),
+        AvgPool2d((2, 2)),
+        GlobalAvgPool(),
+        Dense(4, 3),
+        Softmax(),
+    )
+    avgpool_x = Tensor(randn(Float32, 2, 8, 8, 3))
+    avgpool_cpu = avgpool_model(avgpool_x).data
 
     with_env(Dict(
         "AXIOM_MATH_AVAILABLE" => "1",
         "AXIOM_MATH_DEVICE_COUNT" => "1",
         "AXIOM_MATH_REQUIRED" => "1",
     )) do
-        compiled = compile(model, backend = MathBackend(0), verify = false, optimize = :none)
-        @test compiled isa Axiom.CoprocessorCompiledModel
+        reset_coprocessor_runtime_diagnostics!()
 
-        err = nothing
-        try
-            compiled(x)
-        catch caught
-            err = caught
-        end
+        dense_compiled = compile(dense_model, backend = MathBackend(0), verify = false, optimize = :none)
+        @test dense_compiled isa Axiom.CoprocessorCompiledModel
+        dense_y = dense_compiled(dense_x).data
+        @test size(dense_y) == size(dense_cpu)
+        @test all(isfinite, dense_y)
+        @test isapprox(dense_y, dense_cpu; atol = 1f-5, rtol = 1f-5)
+        @test all(isapprox.(sum(dense_y, dims = 2), 1.0f0, atol = 2f-4))
 
-        @test err isa ErrorException
-        msg = sprint(showerror, err)
-        @test occursin("AXIOM_MATH_REQUIRED", msg)
-        @test occursin("strict mode enabled", msg)
-    end
-end
+        conv_compiled = compile(conv_model, backend = MathBackend(0), verify = false, optimize = :none)
+        @test conv_compiled isa Axiom.CoprocessorCompiledModel
+        conv_y = conv_compiled(conv_x).data
+        @test size(conv_y) == size(conv_cpu)
+        @test all(isfinite, conv_y)
+        @test isapprox(conv_y, conv_cpu; atol = 2f-4, rtol = 2f-4)
+        @test all(isapprox.(sum(conv_y, dims = 2), 1.0f0, atol = 2f-4))
 
-# Install minimal Math hook overrides to demonstrate strict-mode success path.
-@eval begin
-    function Axiom.backend_coprocessor_matmul(
-        backend::Axiom.MathBackend,
-        A::AbstractMatrix{Float32},
-        B::AbstractMatrix{Float32},
-    )
-        A * B
-    end
+        norm_compiled = compile(norm_model, backend = MathBackend(0), verify = false, optimize = :none)
+        @test norm_compiled isa Axiom.CoprocessorCompiledModel
+        norm_y = norm_compiled(norm_x).data
+        @test size(norm_y) == size(norm_cpu)
+        @test all(isfinite, norm_y)
+        @test isapprox(norm_y, norm_cpu; atol = 1f-4, rtol = 1f-4)
+        @test all(isapprox.(sum(norm_y, dims = 2), 1.0f0, atol = 2f-4))
 
-    function Axiom.backend_coprocessor_relu(
-        backend::Axiom.MathBackend,
-        x::AbstractArray{Float32},
-    )
-        max.(x, 0f0)
-    end
-
-    function Axiom.backend_coprocessor_softmax(
-        backend::Axiom.MathBackend,
-        x::AbstractArray{Float32},
-        dim::Int,
-    )
-        Axiom.softmax(x, dims = dim)
-    end
-end
-
-@testset "Math strict mode with hook overrides" begin
-    model = Sequential(
-        Dense(6, 4, relu),
-        Dense(4, 3),
-        Softmax(),
-    )
-    x = Tensor(randn(Float32, 5, 6))
-    cpu = model(x).data
-
-    with_env(Dict(
-        "AXIOM_MATH_AVAILABLE" => "1",
-        "AXIOM_MATH_DEVICE_COUNT" => "1",
-        "AXIOM_MATH_REQUIRED" => "1",
-    )) do
-        compiled = compile(model, backend = MathBackend(0), verify = false, optimize = :none)
-        @test compiled isa Axiom.CoprocessorCompiledModel
-
-        y = compiled(x).data
-        @test size(y) == size(cpu)
-        @test all(isfinite, y)
-        @test isapprox(y, cpu; atol = 1f-5, rtol = 1f-5)
+        avgpool_compiled = compile(avgpool_model, backend = MathBackend(0), verify = false, optimize = :none)
+        @test avgpool_compiled isa Axiom.CoprocessorCompiledModel
+        avgpool_y = avgpool_compiled(avgpool_x).data
+        @test size(avgpool_y) == size(avgpool_cpu)
+        @test all(isfinite, avgpool_y)
+        @test isapprox(avgpool_y, avgpool_cpu; atol = 2f-4, rtol = 2f-4)
+        @test all(isapprox.(sum(avgpool_y, dims = 2), 1.0f0, atol = 2f-4))
 
         report = coprocessor_capability_report()
         math = report["backends"]["MATH"]
         @test math["required"] == true
-        @test math["hook_overrides"]["backend_coprocessor_matmul"] == true
-        @test math["hook_overrides"]["backend_coprocessor_relu"] == true
-        @test math["hook_overrides"]["backend_coprocessor_softmax"] == true
+        @test math["kernel_hooks_loaded"] == true
+        for hook in (
+            "backend_coprocessor_matmul",
+            "backend_coprocessor_conv2d",
+            "backend_coprocessor_relu",
+            "backend_coprocessor_softmax",
+            "backend_coprocessor_batchnorm",
+            "backend_coprocessor_layernorm",
+            "backend_coprocessor_maxpool2d",
+            "backend_coprocessor_avgpool2d",
+            "backend_coprocessor_global_avgpool2d",
+        )
+            @test math["hook_overrides"][hook] == true
+        end
+
+        diag = coprocessor_runtime_diagnostics()["backends"]["math"]
+        @test diag["compile_fallbacks"] == 0
+        @test diag["runtime_errors"] == 0
+        @test diag["runtime_fallbacks"] == 0
+        @test diag["recoveries"] == 0
     end
 end

@@ -30,7 +30,7 @@ end
 
 with_env(f::Function, overrides::Dict{String, String}) = with_env(overrides, f)
 
-@testset "PPU strict mode compile gate" begin
+@testset "FPGA strict mode compile gate" begin
     model = Sequential(
         Dense(6, 4, relu),
         Dense(4, 3),
@@ -38,22 +38,22 @@ with_env(f::Function, overrides::Dict{String, String}) = with_env(overrides, f)
     )
 
     with_env(Dict(
-        "AXIOM_PPU_AVAILABLE" => "0",
-        "AXIOM_PPU_DEVICE_COUNT" => "0",
-        "AXIOM_PPU_REQUIRED" => "1",
+        "AXIOM_FPGA_AVAILABLE" => "0",
+        "AXIOM_FPGA_DEVICE_COUNT" => "0",
+        "AXIOM_FPGA_REQUIRED" => "1",
     )) do
         err = nothing
         try
-            compile(model, backend = PPUBackend(0), verify = false, optimize = :none)
+            compile(model, backend = FPGABackend(0), verify = false, optimize = :none)
         catch caught
             err = caught
         end
         @test err isa ErrorException
-        @test occursin("AXIOM_PPU_REQUIRED", sprint(showerror, err))
+        @test occursin("AXIOM_FPGA_REQUIRED", sprint(showerror, err))
     end
 end
 
-@testset "PPU strict mode runtime with built-in production kernels" begin
+@testset "FPGA strict mode runtime with built-in production kernels" begin
     dense_model = Sequential(
         Dense(6, 4, relu),
         Dense(4, 3),
@@ -95,13 +95,13 @@ end
     avgpool_cpu = avgpool_model(avgpool_x).data
 
     with_env(Dict(
-        "AXIOM_PPU_AVAILABLE" => "1",
-        "AXIOM_PPU_DEVICE_COUNT" => "1",
-        "AXIOM_PPU_REQUIRED" => "1",
+        "AXIOM_FPGA_AVAILABLE" => "1",
+        "AXIOM_FPGA_DEVICE_COUNT" => "1",
+        "AXIOM_FPGA_REQUIRED" => "1",
     )) do
         reset_coprocessor_runtime_diagnostics!()
 
-        dense_compiled = compile(dense_model, backend = PPUBackend(0), verify = false, optimize = :none)
+        dense_compiled = compile(dense_model, backend = FPGABackend(0), verify = false, optimize = :none)
         @test dense_compiled isa Axiom.CoprocessorCompiledModel
         dense_y = dense_compiled(dense_x).data
         @test size(dense_y) == size(dense_cpu)
@@ -109,7 +109,7 @@ end
         @test isapprox(dense_y, dense_cpu; atol = 1f-5, rtol = 1f-5)
         @test all(isapprox.(sum(dense_y, dims = 2), 1.0f0, atol = 2f-4))
 
-        conv_compiled = compile(conv_model, backend = PPUBackend(0), verify = false, optimize = :none)
+        conv_compiled = compile(conv_model, backend = FPGABackend(0), verify = false, optimize = :none)
         @test conv_compiled isa Axiom.CoprocessorCompiledModel
         conv_y = conv_compiled(conv_x).data
         @test size(conv_y) == size(conv_cpu)
@@ -117,7 +117,7 @@ end
         @test isapprox(conv_y, conv_cpu; atol = 2f-4, rtol = 2f-4)
         @test all(isapprox.(sum(conv_y, dims = 2), 1.0f0, atol = 2f-4))
 
-        norm_compiled = compile(norm_model, backend = PPUBackend(0), verify = false, optimize = :none)
+        norm_compiled = compile(norm_model, backend = FPGABackend(0), verify = false, optimize = :none)
         @test norm_compiled isa Axiom.CoprocessorCompiledModel
         norm_y = norm_compiled(norm_x).data
         @test size(norm_y) == size(norm_cpu)
@@ -125,7 +125,7 @@ end
         @test isapprox(norm_y, norm_cpu; atol = 1f-4, rtol = 1f-4)
         @test all(isapprox.(sum(norm_y, dims = 2), 1.0f0, atol = 2f-4))
 
-        avgpool_compiled = compile(avgpool_model, backend = PPUBackend(0), verify = false, optimize = :none)
+        avgpool_compiled = compile(avgpool_model, backend = FPGABackend(0), verify = false, optimize = :none)
         @test avgpool_compiled isa Axiom.CoprocessorCompiledModel
         avgpool_y = avgpool_compiled(avgpool_x).data
         @test size(avgpool_y) == size(avgpool_cpu)
@@ -134,9 +134,9 @@ end
         @test all(isapprox.(sum(avgpool_y, dims = 2), 1.0f0, atol = 2f-4))
 
         report = coprocessor_capability_report()
-        ppu = report["backends"]["PPU"]
-        @test ppu["required"] == true
-        @test ppu["kernel_hooks_loaded"] == true
+        fpga = report["backends"]["FPGA"]
+        @test fpga["required"] == true
+        @test fpga["kernel_hooks_loaded"] == true
         for hook in (
             "backend_coprocessor_matmul",
             "backend_coprocessor_conv2d",
@@ -148,10 +148,10 @@ end
             "backend_coprocessor_avgpool2d",
             "backend_coprocessor_global_avgpool2d",
         )
-            @test ppu["hook_overrides"][hook] == true
+            @test fpga["hook_overrides"][hook] == true
         end
 
-        diag = coprocessor_runtime_diagnostics()["backends"]["ppu"]
+        diag = coprocessor_runtime_diagnostics()["backends"]["fpga"]
         @test diag["compile_fallbacks"] == 0
         @test diag["runtime_errors"] == 0
         @test diag["runtime_fallbacks"] == 0

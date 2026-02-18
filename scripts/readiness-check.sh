@@ -184,6 +184,11 @@ check_doc_alignment() {
     status=1
   fi
 
+  if ! rg -Fq "scripts/ppu-production-evidence.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing PPU production evidence guidance."
+    status=1
+  fi
+
   if ! rg -Fq "test/ci/math_required_mode.jl" docs/wiki/Developer-Guide.md; then
     echo "docs/wiki/Developer-Guide.md is missing Math strict-mode test guidance."
     status=1
@@ -194,6 +199,11 @@ check_doc_alignment() {
     status=1
   fi
 
+  if ! rg -Fq "scripts/math-production-evidence.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing Math production evidence guidance."
+    status=1
+  fi
+
   if ! rg -Fq "test/ci/crypto_required_mode.jl" docs/wiki/Developer-Guide.md; then
     echo "docs/wiki/Developer-Guide.md is missing Crypto strict-mode test guidance."
     status=1
@@ -201,6 +211,26 @@ check_doc_alignment() {
 
   if ! rg -Fq "scripts/crypto-strict-evidence.jl" docs/wiki/Developer-Guide.md; then
     echo "docs/wiki/Developer-Guide.md is missing Crypto strict evidence guidance."
+    status=1
+  fi
+
+  if ! rg -Fq "scripts/crypto-production-evidence.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing Crypto production evidence guidance."
+    status=1
+  fi
+
+  if ! rg -Fq "test/ci/fpga_required_mode.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing FPGA strict-mode test guidance."
+    status=1
+  fi
+
+  if ! rg -Fq "scripts/fpga-strict-evidence.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing FPGA strict evidence guidance."
+    status=1
+  fi
+
+  if ! rg -Fq "scripts/fpga-production-evidence.jl" docs/wiki/Developer-Guide.md; then
+    echo "docs/wiki/Developer-Guide.md is missing FPGA production evidence guidance."
     status=1
   fi
 
@@ -372,10 +402,16 @@ run() {
     run_check "NPU strict mode evidence" "$JULIA_BIN" --project=. scripts/npu-strict-evidence.jl
     run_check "PPU strict mode behavior" "$JULIA_BIN" --project=. test/ci/ppu_required_mode.jl
     run_check "PPU strict mode evidence" "$JULIA_BIN" --project=. scripts/ppu-strict-evidence.jl
+    run_check "PPU production evidence" "$JULIA_BIN" --project=. scripts/ppu-production-evidence.jl
     run_check "Math strict mode behavior" "$JULIA_BIN" --project=. test/ci/math_required_mode.jl
     run_check "Math strict mode evidence" "$JULIA_BIN" --project=. scripts/math-strict-evidence.jl
+    run_check "Math production evidence" "$JULIA_BIN" --project=. scripts/math-production-evidence.jl
     run_check "Crypto strict mode behavior" "$JULIA_BIN" --project=. test/ci/crypto_required_mode.jl
     run_check "Crypto strict mode evidence" "$JULIA_BIN" --project=. scripts/crypto-strict-evidence.jl
+    run_check "Crypto production evidence" "$JULIA_BIN" --project=. scripts/crypto-production-evidence.jl
+    run_check "FPGA strict mode behavior" "$JULIA_BIN" --project=. test/ci/fpga_required_mode.jl
+    run_check "FPGA strict mode evidence" "$JULIA_BIN" --project=. scripts/fpga-strict-evidence.jl
+    run_check "FPGA production evidence" "$JULIA_BIN" --project=. scripts/fpga-production-evidence.jl
     run_check "DSP strict mode behavior" "$JULIA_BIN" --project=. test/ci/dsp_required_mode.jl
     run_check "DSP strict mode evidence" "$JULIA_BIN" --project=. scripts/dsp-strict-evidence.jl
   else
@@ -389,10 +425,16 @@ run() {
     record_skip "NPU strict mode evidence (disabled)"
     record_skip "PPU strict mode behavior (disabled)"
     record_skip "PPU strict mode evidence (disabled)"
+    record_skip "PPU production evidence (disabled)"
     record_skip "Math strict mode behavior (disabled)"
     record_skip "Math strict mode evidence (disabled)"
+    record_skip "Math production evidence (disabled)"
     record_skip "Crypto strict mode behavior (disabled)"
     record_skip "Crypto strict mode evidence (disabled)"
+    record_skip "Crypto production evidence (disabled)"
+    record_skip "FPGA strict mode behavior (disabled)"
+    record_skip "FPGA strict mode evidence (disabled)"
+    record_skip "FPGA production evidence (disabled)"
     record_skip "DSP strict mode behavior (disabled)"
     record_skip "DSP strict mode evidence (disabled)"
   fi

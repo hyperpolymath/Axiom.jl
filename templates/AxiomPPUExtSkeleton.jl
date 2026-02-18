@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: PMPL-1.0-or-later
 # Template skeleton for a PPU backend extension module.
 #
-# Copy this into your PPU integration package and replace CPU fallbacks with
-# real PPU kernel calls.
+# Copy this into your PPU integration package to override the in-tree PPU
+# kernels with hardware-specific implementations.
 
 module AxiomPPUExtSkeleton
 
@@ -35,7 +35,7 @@ function Axiom.backend_coprocessor_softmax(
     Axiom.softmax(x, dims = dim)
 end
 
-# Optional: implement additional hooks as kernel coverage expands.
+# Optional: override additional hooks to offload more operations.
 # - backend_coprocessor_conv2d
 # - backend_coprocessor_batchnorm
 # - backend_coprocessor_layernorm

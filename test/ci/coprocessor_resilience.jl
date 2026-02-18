@@ -70,6 +70,50 @@ function Axiom.backend_coprocessor_matmul(
     A * B
 end
 
+function Axiom.backend_coprocessor_matmul(
+    backend::Axiom.PPUBackend,
+    A::AbstractMatrix{Float32},
+    B::AbstractMatrix{Float32},
+)
+    if get(COPROCESSOR_FAILURE_MODE, typeof(backend), false)
+        error("Injected coprocessor matmul failure for $(typeof(backend))")
+    end
+    A * B
+end
+
+function Axiom.backend_coprocessor_matmul(
+    backend::Axiom.MathBackend,
+    A::AbstractMatrix{Float32},
+    B::AbstractMatrix{Float32},
+)
+    if get(COPROCESSOR_FAILURE_MODE, typeof(backend), false)
+        error("Injected coprocessor matmul failure for $(typeof(backend))")
+    end
+    A * B
+end
+
+function Axiom.backend_coprocessor_matmul(
+    backend::Axiom.CryptoBackend,
+    A::AbstractMatrix{Float32},
+    B::AbstractMatrix{Float32},
+)
+    if get(COPROCESSOR_FAILURE_MODE, typeof(backend), false)
+        error("Injected coprocessor matmul failure for $(typeof(backend))")
+    end
+    A * B
+end
+
+function Axiom.backend_coprocessor_matmul(
+    backend::Axiom.FPGABackend,
+    A::AbstractMatrix{Float32},
+    B::AbstractMatrix{Float32},
+)
+    if get(COPROCESSOR_FAILURE_MODE, typeof(backend), false)
+        error("Injected coprocessor matmul failure for $(typeof(backend))")
+    end
+    A * B
+end
+
 function Axiom.backend_coprocessor_relu(
     backend::Union{Axiom.TPUBackend, Axiom.NPUBackend, Axiom.DSPBackend, Axiom.PPUBackend, Axiom.MathBackend, Axiom.CryptoBackend, Axiom.FPGABackend},
     x::AbstractArray{Float32},

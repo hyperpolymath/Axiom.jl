@@ -1130,7 +1130,7 @@ function _hook_has_backend_override(hook::Function, backend_type::DataType)
         params = sig.parameters
         length(params) >= 2 || continue
         first_arg = params[2]
-        if first_arg == backend_type && method.module !== @__MODULE__
+        if first_arg == backend_type
             return true
         end
     end
@@ -1159,7 +1159,7 @@ end
     coprocessor_capability_report() -> Dict{String,Any}
 
 Return a machine-readable snapshot of non-GPU accelerator strategy state,
-including environment-based availability, device counts, and extension hook status.
+including environment-based availability, device counts, and kernel hook status.
 """
 function coprocessor_capability_report()
     selected = detect_coprocessor()

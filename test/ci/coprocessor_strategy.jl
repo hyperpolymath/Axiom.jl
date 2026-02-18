@@ -286,10 +286,20 @@ with_env(f::Function, overrides::Dict{String, String}) = with_env(overrides, f)
             @test npu["required"] == false
             ppu = report["backends"]["PPU"]
             @test ppu["required"] == false
+            @test ppu["kernel_hooks_loaded"] == true
+            @test all(values(ppu["hook_overrides"]))
             math = report["backends"]["MATH"]
             @test math["required"] == false
+            @test math["kernel_hooks_loaded"] == true
+            @test all(values(math["hook_overrides"]))
             crypto = report["backends"]["CRYPTO"]
             @test crypto["required"] == false
+            @test crypto["kernel_hooks_loaded"] == true
+            @test all(values(crypto["hook_overrides"]))
+            fpga = report["backends"]["FPGA"]
+            @test fpga["required"] == false
+            @test fpga["kernel_hooks_loaded"] == true
+            @test all(values(fpga["hook_overrides"]))
             dsp = report["backends"]["DSP"]
             @test dsp["required"] == false
         end

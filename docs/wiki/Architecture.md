@@ -236,7 +236,8 @@ end
 Current state:
 - Strategy and fallback behavior are implemented and CI-covered.
 - Extension hooks are available for backend-specific kernel overrides.
-- Production kernels for specific coprocessors remain roadmap work.
+- `MathBackend`, `PPUBackend`, `CryptoBackend`, and `FPGABackend` ship built-in production kernels with strict/production evidence gates.
+- Production kernels for TPU/NPU/DSP remain roadmap work.
 
 ## Memory Management
 

@@ -86,7 +86,8 @@ Yes, Axiom now includes first-class backend targets:
 Current status:
 - Detection and backend selection APIs are available now.
 - Compilation falls back safely to CPU when a coprocessor runtime is not present.
-- Production-grade non-GPU kernels are still in progress.
+- `MathBackend`, `PPUBackend`, `CryptoBackend`, and `FPGABackend` ship built-in production kernels with strict/prod evidence gates.
+- Production-grade kernels for TPU/NPU/DSP remain staged roadmap work.
 
 ### Do you support REST, GraphQL, and gRPC?
 
