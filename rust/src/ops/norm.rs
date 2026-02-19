@@ -6,6 +6,7 @@ use ndarray::ArrayD;
 ///
 /// x_norm = (x - mean) / sqrt(var + eps)
 /// output = gamma * x_norm + beta
+#[allow(clippy::too_many_arguments)]
 pub fn batchnorm(
     input: &ArrayD<f32>,
     gamma: &[f32],
@@ -116,7 +117,8 @@ pub fn layernorm(
         let var: f32 = input_slice[start..end]
             .iter()
             .map(|&x| (x - mean).powi(2))
-            .sum::<f32>() / norm_size as f32;
+            .sum::<f32>()
+            / norm_size as f32;
 
         // Normalize and scale
         let inv_std = 1.0 / (var + eps).sqrt();
@@ -135,7 +137,7 @@ pub fn layernorm(
 ///
 /// Normalizes each sample independently over spatial dimensions
 pub fn instancenorm(
-    input: &ArrayD<f32>,  // (N, H, W, C) or (N, ..., C)
+    input: &ArrayD<f32>, // (N, H, W, C) or (N, ..., C)
     gamma: Option<&[f32]>,
     beta: Option<&[f32]>,
     eps: f32,
@@ -190,7 +192,7 @@ pub fn instancenorm(
 ///
 /// Divides channels into groups and normalizes within each group
 pub fn groupnorm(
-    input: &ArrayD<f32>,  // (N, H, W, C)
+    input: &ArrayD<f32>, // (N, H, W, C)
     num_groups: usize,
     gamma: &[f32],
     beta: &[f32],
@@ -202,7 +204,11 @@ pub fn groupnorm(
     let num_channels = shape[ndim - 1];
     let spatial_size: usize = shape[1..ndim - 1].iter().product();
 
-    assert_eq!(num_channels % num_groups, 0, "num_channels must be divisible by num_groups");
+    assert_eq!(
+        num_channels % num_groups,
+        0,
+        "num_channels must be divisible by num_groups"
+    );
     let channels_per_group = num_channels / num_groups;
 
     let mut output = input.clone();
@@ -258,11 +264,7 @@ pub fn groupnorm(
 ///
 /// x_norm = x / sqrt(mean(x^2) + eps)
 /// output = weight * x_norm
-pub fn rmsnorm(
-    input: &ArrayD<f32>,
-    weight: &[f32],
-    eps: f32,
-) -> ArrayD<f32> {
+pub fn rmsnorm(input: &ArrayD<f32>, weight: &[f32], eps: f32) -> ArrayD<f32> {
     let shape = input.shape();
     let ndim = shape.len();
     let hidden_size = shape[ndim - 1];
@@ -278,16 +280,14 @@ pub fn rmsnorm(
         let end = start + hidden_size;
 
         // Compute RMS
-        let rms: f32 = input_slice[start..end]
-            .iter()
-            .map(|&x| x * x)
-            .sum::<f32>() / hidden_size as f32;
+        let rms: f32 =
+            input_slice[start..end].iter().map(|&x| x * x).sum::<f32>() / hidden_size as f32;
         let inv_rms = 1.0 / (rms + eps).sqrt();
 
         // Normalize and scale
-        for i in 0..hidden_size {
+        for (i, w) in weight.iter().enumerate().take(hidden_size) {
             let idx = start + i;
-            output_slice[idx] = weight[i] * input_slice[idx] * inv_rms;
+            output_slice[idx] = w * input_slice[idx] * inv_rms;
         }
     }
 
@@ -302,8 +302,9 @@ mod tests {
     fn test_layernorm() {
         let input = ArrayD::from_shape_vec(
             ndarray::IxDyn(&[2, 4]),
-            vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
-        ).expect("test: shape mismatch");
+            vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+        )
+        .expect("test: shape mismatch");
 
         let gamma = ArrayD::from_elem(ndarray::IxDyn(&[4]), 1.0f32);
         let beta = ArrayD::from_elem(ndarray::IxDyn(&[4]), 0.0f32);
@@ -320,8 +321,9 @@ mod tests {
     fn test_rmsnorm() {
         let input = ArrayD::from_shape_vec(
             ndarray::IxDyn(&[2, 4]),
-            vec![1.0, 2.0, 3.0, 4.0, 1.0, 2.0, 3.0, 4.0]
-        ).expect("test: shape mismatch");
+            vec![1.0, 2.0, 3.0, 4.0, 1.0, 2.0, 3.0, 4.0],
+        )
+        .expect("test: shape mismatch");
 
         let weight = vec![1.0f32; 4];
 

@@ -72,8 +72,8 @@ impl<T: Clone> Tensor<T> {
 impl Tensor<f32> {
     /// Create tensor with random values from normal distribution
     pub fn randn(shape: &[usize]) -> Self {
-        use ndarray_rand::RandomExt;
         use ndarray_rand::rand_distr::StandardNormal;
+        use ndarray_rand::RandomExt;
 
         let data = ArrayD::random(IxDyn(shape), StandardNormal);
         Self::from_array(data)
@@ -81,8 +81,8 @@ impl Tensor<f32> {
 
     /// Create tensor with uniform random values
     pub fn rand(shape: &[usize]) -> Self {
-        use ndarray_rand::RandomExt;
         use ndarray_rand::rand_distr::Uniform;
+        use ndarray_rand::RandomExt;
 
         let data = ArrayD::random(IxDyn(shape), Uniform::new(0.0, 1.0));
         Self::from_array(data)
@@ -96,7 +96,8 @@ impl Tensor<f32> {
 pub unsafe fn tensor_from_ptr<T: Clone>(ptr: *const T, shape: &[usize]) -> Tensor<T> {
     let len: usize = shape.iter().product();
     let slice = std::slice::from_raw_parts(ptr, len);
-    let data = ArrayD::from_shape_vec(IxDyn(shape), slice.to_vec()).expect("tensor: shape mismatch");
+    let data =
+        ArrayD::from_shape_vec(IxDyn(shape), slice.to_vec()).expect("tensor: shape mismatch");
     Tensor::from_array(data)
 }
 
@@ -105,6 +106,9 @@ pub unsafe fn tensor_from_ptr<T: Clone>(ptr: *const T, shape: &[usize]) -> Tenso
 /// # Safety
 /// The destination pointer must have enough space
 pub unsafe fn tensor_to_ptr<T: Clone>(tensor: &Tensor<T>, dst: *mut T) {
-    let src = tensor.data.as_slice().expect("tensor: array not contiguous");
+    let src = tensor
+        .data
+        .as_slice()
+        .expect("tensor: array not contiguous");
     std::ptr::copy_nonoverlapping(src.as_ptr(), dst, src.len());
 }

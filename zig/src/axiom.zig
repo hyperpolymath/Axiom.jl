@@ -53,7 +53,7 @@ export fn axiom_matmul(
 ) void {
     const a = a_ptr[0 .. m * k];
     const b = b_ptr[0 .. k * n];
-    var c = c_ptr[0 .. m * n];
+    const c = c_ptr[0 .. m * n];
 
     matmul.matmul_tiled(a, b, c, m, k, n);
 }
@@ -76,7 +76,7 @@ export fn axiom_bmm(
     while (i < batch) : (i += 1) {
         const a = a_ptr[i * mat_size_a ..][0..mat_size_a];
         const b = b_ptr[i * mat_size_b ..][0..mat_size_b];
-        var c = c_ptr[i * mat_size_c ..][0..mat_size_c];
+        const c = c_ptr[i * mat_size_c ..][0..mat_size_c];
 
         matmul.matmul_tiled(a, b, c, m, k, n);
     }

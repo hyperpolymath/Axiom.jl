@@ -3,9 +3,9 @@
 //! This crate provides optimized implementations of neural network operations
 //! that can be called from Julia via FFI.
 
+pub mod ffi;
 pub mod ops;
 pub mod tensor;
-pub mod ffi;
 
 use std::env;
 use std::ffi::CString;
@@ -99,7 +99,7 @@ fn choose_rayon_threads(
         }
         ThreadPolicy::Physical => physical,
         ThreadPolicy::Logical => logical,
-        ThreadPolicy::Balanced => ((logical + physical + 1) / 2).clamp(1, logical),
+        ThreadPolicy::Balanced => (logical + physical).div_ceil(2).clamp(1, logical),
     }
 }
 

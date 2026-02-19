@@ -112,6 +112,9 @@ include("backends/gpu_hooks.jl")  # GPU backend interface (issue #12)
 # Rust FFI (loaded conditionally)
 include("backends/rust_ffi.jl")
 
+# Zig FFI (loaded conditionally)
+include("backends/zig_ffi.jl")
+
 # Model metadata and packaging
 include("model_metadata.jl")
 include("model_packaging.jl")
@@ -158,7 +161,7 @@ export mse_loss, crossentropy, binary_crossentropy
 export train!, compile, verify
 
 # Backends
-export AbstractBackend, JuliaBackend, RustBackend
+export AbstractBackend, JuliaBackend, RustBackend, ZigBackend
 export CUDABackend, ROCmBackend, MetalBackend
 export TPUBackend, NPUBackend, DSPBackend, PPUBackend, MathBackend, FPGABackend
 export current_backend, set_backend!, @with_backend

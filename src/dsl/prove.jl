@@ -33,36 +33,58 @@ using LinearAlgebra
 ```
 """
 macro prove(args...)
+    if length(args) == 0
+        error("@prove expects at least one argument (the property)")
+    end
+
     # Parse arguments
-    if length(args) == 2
+    if args[1] in (:forall, :exists)
+        quantifier = args[1]
+        if length(args) < 2
+            error("@prove $(args[1]) expects a property expression")
+        end
+        # If multiple variables are passed before the block
+        # e.g., @prove forall x y begin ... end
+        variables_raw = args[2:end-1]
+        property_expr = args[end]
+    elseif length(args) == 2
         quantifier_expr = args[1]
         property_expr = args[2]
         if quantifier_expr isa Symbol
             quantifier = quantifier_expr
         elseif quantifier_expr isa Expr && quantifier_expr.head == :call && quantifier_expr.args[1] == :forall
             quantifier = :forall
-            if length(quantifier_expr.args) > 1
-                @warn "Ignoring additional arguments to `forall`. Use `forall x, y in D` form."
-            end
+            # Extracted later if not here
         elseif quantifier_expr isa Expr && quantifier_expr.head == :call && quantifier_expr.args[1] == :exists
             quantifier = :exists
-            if length(quantifier_expr.args) > 1
-                @warn "Ignoring additional arguments to `exists`. Use `exists x, y in D` form."
-            end
         else
             error("Invalid quantifier: $(quantifier_expr). Must be `forall` or `exists`.")
         end
+        variables_raw = []
     elseif length(args) == 1
         quantifier = :forall # Default quantifier
         property_expr = args[1]
+        variables_raw = []
     else
-        error("Invalid number of arguments for @prove. Expected 1 or 2.")
+        # Fallback for many args
+        quantifier = :forall
+        property_expr = args[end]
+        variables_raw = args[1:end-1]
     end
 
     # Extract variables and their types from the property expression
-    variables_typed = Symbol[]
+    variables_typed = Any[]
     variables_untyped = Symbol[]
     domain_constraints = Expr[]
+
+    # Process variables from raw arguments if any
+    for var in variables_raw
+        if var isa Symbol
+            push!(variables_untyped, var)
+        elseif var isa Expr && var.head == :(::)
+            push!(variables_typed, var)
+        end
+    end
 
     if property_expr isa Expr && property_expr.head == :block
         # Handle `begin ... end` block for property and domain
@@ -171,6 +193,8 @@ function Base.show(io::IO, result::ProofResult)
     end
 end
 
+function smt_proof end
+
 """
     prove_property(property::ParsedProperty)
 
@@ -182,10 +206,10 @@ function prove_property(property::ParsedProperty)::ProofResult
     result.status != :unknown && return result
 
     # Strategy 2: Call into SMT solver via extension (if SMTLib is loaded)
-    if isdefined(Base.Main, :AxiomSMTExt) && isdefined(Base.Main.AxiomSMTExt, :smt_proof)
+    if Base.get_extension(Axiom, :AxiomSMTExt) !== nothing
         # Check if the property is suitable for SMT solving
         if is_smt_compatible(property)
-            smt_result = Base.Main.AxiomSMTExt.smt_proof(property)
+            smt_result = Axiom.smt_proof(property)
             smt_result.status != :unknown && return smt_result
         end
     end
@@ -325,7 +349,10 @@ variable declarations and domain constraints.
 function process_block_expr!(expr::Expr, variables_typed::Vector{Any}, variables_untyped::Vector{Symbol}, domain_constraints::Vector{Expr})
     @assert expr.head == :block
     new_args = []
-    for arg in expr.args
+    # Identify the last non-LineNumberNode argument as the potential body
+    last_idx = findlast(x -> !(x isa LineNumberNode), expr.args)
+    
+    for (i, arg) in enumerate(expr.args)
         if arg isa LineNumberNode
             push!(new_args, arg)
             continue
@@ -339,8 +366,8 @@ function process_block_expr!(expr::Expr, variables_typed::Vector{Any}, variables
             # Untyped variable declaration: e.g., `x`
             push!(variables_untyped, arg)
             continue
-        elseif arg isa Expr && arg.head == :call && arg.args[1] in (:<, :>, :<=, :>=, :(==), :(!=))
-            # Domain constraint: e.g., `x > 0`
+        elseif i != last_idx && arg isa Expr && arg.head == :call && arg.args[1] in (:<, :>, :<=, :>=, :(==), :(!=))
+            # Domain constraint: e.g., `x > 0` (only if not the last expression)
             push!(domain_constraints, arg)
             continue
         else
@@ -349,11 +376,7 @@ function process_block_expr!(expr::Expr, variables_typed::Vector{Any}, variables
         end
     end
     # The remaining expressions in `new_args` form the actual property body
-    if length(new_args) == 1
-        expr.args = new_args[1].args
-    else
-        expr.args = new_args
-    end
+    expr.args = new_args
 end
 
 """
@@ -364,21 +387,31 @@ Checks if a property is suitable for SMT solving.
 function is_smt_compatible(property::ParsedProperty)::Bool
     # For now, a very basic check.
     # A more sophisticated check would analyze the AST for unsupported constructs.
-    body_str = string(property.body)
-    # Check for basic types SMT solvers usually handle (reals, integers, booleans)
-    # and operations (+, -, *, /, <, <=, >, >=, ==, and, or, not)
-    # Avoid complex types, higher-order functions, floating point arithmetic that's not carefully constrained.
-    # Also, check if variables have types that SMT can handle (e.g., Real, Int).
-    # This is a simplification; a full SMT compatibility check is complex.
-    all(var -> var isa Symbol || (var isa Expr && var.head == :(::) && var.args[2] in (:Real, :Int, :Bool)), property.variables) &&
+    body = property.body
+    
+    # Check variables
+    vars_ok = all(var -> var isa Symbol || (var isa Expr && var.head == :(::) && var.args[2] in (:Real, :Int, :Bool)), property.variables)
+    !vars_ok && return false
+
+    # Check for unsupported types in the body via AST traversal
+    unsupported = false
+    _check_ast(e) = nothing
+    function _check_ast(e::Expr)
+        if e.head in (:macrocall, :function, :struct, :try, :catch, :finally, :while, :for)
+            unsupported = true
+        end
+        for arg in e.args
+            _check_ast(arg)
+        end
+    end
+    _check_ast(body)
+    unsupported && return false
+
+    body_str = string(body)
     !contains(body_str, "BigFloat") &&
     !contains(body_str, "irrational") &&
     !contains(body_str, "complex") &&
-    !contains(body_str, "array") && # SMTLib has limited array support, avoid for now
-    !contains(body_str, "function") && # Higher-order functions
-    !contains(body_str, "struct") && # Custom types
-    !contains(body_str, "begin") && # Julia-specific blocks
-    !contains(body_str, "end") # Julia-specific blocks
+    !contains(body_str, "array") # SMTLib has limited array support, avoid for now
 end
 
 # Additional pattern matchers

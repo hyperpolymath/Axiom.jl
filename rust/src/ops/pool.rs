@@ -23,7 +23,8 @@ pub fn maxpool2d(
 
     let mut output = Array4::from_elem((n, h_out, w_out, c), f32::NEG_INFINITY);
 
-    output.axis_iter_mut(ndarray::Axis(0))
+    output
+        .axis_iter_mut(ndarray::Axis(0))
         .into_par_iter()
         .enumerate()
         .for_each(|(batch_idx, mut batch_output)| {
@@ -40,8 +41,11 @@ pub fn maxpool2d(
                                 let h_idx = h_start + ki;
                                 let w_idx = w_start + kj;
 
-                                if h_idx >= ph && h_idx < h_in + ph &&
-                                   w_idx >= pw && w_idx < w_in + pw {
+                                if h_idx >= ph
+                                    && h_idx < h_in + ph
+                                    && w_idx >= pw
+                                    && w_idx < w_in + pw
+                                {
                                     let val = input[[batch_idx, h_idx - ph, w_idx - pw, channel]];
                                     if val > max_val {
                                         max_val = val;
@@ -92,8 +96,8 @@ pub fn maxpool2d_with_indices(
                             let h_idx = h_start + ki;
                             let w_idx = w_start + kj;
 
-                            if h_idx >= ph && h_idx < h_in + ph &&
-                               w_idx >= pw && w_idx < w_in + pw {
+                            if h_idx >= ph && h_idx < h_in + ph && w_idx >= pw && w_idx < w_in + pw
+                            {
                                 let linear_idx = (h_idx - ph) * w_in + (w_idx - pw);
                                 let val = input[[batch_idx, h_idx - ph, w_idx - pw, channel]];
 
@@ -133,7 +137,8 @@ pub fn avgpool2d(
 
     let mut output = Array4::zeros((n, h_out, w_out, c));
 
-    output.axis_iter_mut(ndarray::Axis(0))
+    output
+        .axis_iter_mut(ndarray::Axis(0))
         .into_par_iter()
         .enumerate()
         .for_each(|(batch_idx, mut batch_output)| {
@@ -151,8 +156,11 @@ pub fn avgpool2d(
                                 let h_idx = h_start + ki;
                                 let w_idx = w_start + kj;
 
-                                if h_idx >= ph && h_idx < h_in + ph &&
-                                   w_idx >= pw && w_idx < w_in + pw {
+                                if h_idx >= ph
+                                    && h_idx < h_in + ph
+                                    && w_idx >= pw
+                                    && w_idx < w_in + pw
+                                {
                                     sum += input[[batch_idx, h_idx - ph, w_idx - pw, channel]];
                                     count += 1;
                                 } else if count_include_pad {
@@ -213,10 +221,7 @@ pub fn global_maxpool2d(input: ArrayView4<f32>) -> ndarray::Array2<f32> {
 }
 
 /// Adaptive Average Pooling
-pub fn adaptive_avgpool2d(
-    input: ArrayView4<f32>,
-    output_size: (usize, usize),
-) -> Array4<f32> {
+pub fn adaptive_avgpool2d(input: ArrayView4<f32>, output_size: (usize, usize)) -> Array4<f32> {
     let (n, h_in, w_in, c) = input.dim();
     let (h_out, w_out) = output_size;
 
@@ -228,9 +233,9 @@ pub fn adaptive_avgpool2d(
                 for j in 0..w_out {
                     // Compute window
                     let h_start = (i * h_in) / h_out;
-                    let h_end = ((i + 1) * h_in + h_out - 1) / h_out;
+                    let h_end = ((i + 1) * h_in).div_ceil(h_out);
                     let w_start = (j * w_in) / w_out;
-                    let w_end = ((j + 1) * w_in + w_out - 1) / w_out;
+                    let w_end = ((j + 1) * w_in).div_ceil(w_out);
 
                     let mut sum = 0.0f32;
                     let mut count = 0usize;
@@ -257,15 +262,13 @@ mod tests {
 
     #[test]
     fn test_maxpool2d() {
-        let input = Array4::from_shape_vec(
-            (1, 4, 4, 1),
-            (0..16).map(|x| x as f32).collect()
-        ).unwrap();
+        let input =
+            Array4::from_shape_vec((1, 4, 4, 1), (0..16).map(|x| x as f32).collect()).unwrap();
 
         let output = maxpool2d(input.view(), (2, 2), (2, 2), (0, 0));
 
         assert_eq!(output.dim(), (1, 2, 2, 1));
-        assert_eq!(output[[0, 0, 0, 0]], 5.0);  // max of [0,1,4,5]
+        assert_eq!(output[[0, 0, 0, 0]], 5.0); // max of [0,1,4,5]
         assert_eq!(output[[0, 1, 1, 0]], 15.0); // max of [10,11,14,15]
     }
 

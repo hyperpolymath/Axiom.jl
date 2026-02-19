@@ -27,7 +27,11 @@ function Axiom.smt_proof(property::Axiom.ParsedProperty)
     expr = normalize_smt_expr(property.body)
 
     for v in vars
-        SMTLib.declare(ctx, v, Float64)
+        # Strip Julia type annotations if present
+        name = v isa Expr && v.head == :(::) ? v.args[1] : v
+        if name isa Symbol
+            SMTLib.declare(ctx, name, Float64)
+        end
     end
 
     if property.quantifier == :exists
@@ -43,8 +47,8 @@ function Axiom.smt_proof(property::Axiom.ParsedProperty)
         cached !== nothing && return finalize_smt_result(property, cached)
     end
 
-    result = if use_rust_smt_runner() && rust_available()
-        output = rust_smt_run(string(ctx.solver.kind), ctx.solver.path, script, ctx.timeout_ms)
+    result = if use_rust_smt_runner() && Axiom.rust_available()
+        output = Axiom.rust_smt_run(string(ctx.solver.kind), ctx.solver.path, script, ctx.timeout_ms)
         SMTLib.parse_result(output)
     else
         SMTLib.check_sat(ctx; get_model=true)
@@ -59,6 +63,22 @@ Normalize expressions for SMT-LIB conversion.
 """
 function normalize_smt_expr(expr)
     if expr isa Expr
+        if expr.head == :block
+            # Handle blocks by taking the last non-LineNumberNode
+            args = filter(x -> !(x isa LineNumberNode), expr.args)
+            if isempty(args)
+                return :true
+            elseif length(args) == 1
+                return normalize_smt_expr(args[1])
+            else
+                # If multiple expressions remain, AND them together
+                return Expr(:call, :&&, map(normalize_smt_expr, args)...)
+            end
+        end
+        if expr.head == :(::) && length(expr.args) == 2
+            # Strip type annotation: x::Real -> x
+            return normalize_smt_expr(expr.args[1])
+        end
         if expr.head == :call && expr.args[1] == :≈ && length(expr.args) == 3
             return Expr(:call, :(==), normalize_smt_expr(expr.args[2]), normalize_smt_expr(expr.args[3]))
         end
@@ -76,48 +96,6 @@ const SMT_CACHE_ORDER = UInt64[]
 
 function use_rust_smt_runner()
     get(ENV, "AXIOM_SMT_RUNNER", "") == "rust"
-end
-
-function rust_available()
-    # Check if AXIOM_RUST_LIB is set and the library exists
-    rust_lib = get(ENV, "AXIOM_RUST_LIB", "")
-    isempty(rust_lib) && return false
-    isfile(rust_lib)
-end
-
-function rust_smt_run(solver_kind::String, solver_path::String, script::String, timeout_ms::Int)
-    # This requires the Rust library to be loaded
-    if !rust_available()
-        error("Rust SMT runner requested but AXIOM_RUST_LIB not available")
-    end
-
-    lib_path = get(ENV, "AXIOM_RUST_LIB", "libaxiom_core")
-
-    # ccall to the Rust FFI function
-    output_ptr = ccall(
-        (:smt_run_safe, lib_path),
-        Cstring,
-        (Cstring, Cstring, Cstring, Cint),
-        solver_kind, solver_path, script, timeout_ms
-    )
-
-    if output_ptr == C_NULL
-        @warn "Rust SMT runner returned a null pointer"
-        return "" # Fallback to Julia runner
-    end
-
-    try
-        output = unsafe_string(output_ptr)
-        return output
-    finally
-        # Assume the Rust library provides a function to free the string
-        ccall(
-            (:free_rust_string, lib_path),
-            Cvoid,
-            (Cstring,),
-            output_ptr
-        )
-    end
 end
 
 function smt_cache_enabled()

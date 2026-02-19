@@ -2,8 +2,8 @@
 //!
 //! These functions are called from Julia via ccall.
 
-use crate::ops::{matmul, activations, conv, pool, norm};
-use ndarray::{ArrayD, IxDyn, ArrayView2, ArrayView4};
+use crate::ops::{activations, conv, matmul, norm, pool};
+use ndarray::{ArrayD, ArrayView2, ArrayView4, IxDyn};
 use std::ffi::{CStr, CString};
 use std::process::{Command, Stdio};
 use std::slice;
@@ -15,6 +15,10 @@ use std::{env, thread};
 // ============================================================================
 
 /// Matrix multiplication: C = A @ B
+///
+/// # Safety
+///
+/// The input and output pointers must be valid and point to contiguous memory of the correct size.
 #[no_mangle]
 pub unsafe extern "C" fn axiom_matmul(
     a_ptr: *const f32,
@@ -27,10 +31,8 @@ pub unsafe extern "C" fn axiom_matmul(
     let a_slice = slice::from_raw_parts(a_ptr, m * k);
     let b_slice = slice::from_raw_parts(b_ptr, k * n);
 
-    let a = ArrayView2::from_shape((m, k), a_slice)
-        .expect("axiom_matmul: A shape mismatch");
-    let b = ArrayView2::from_shape((k, n), b_slice)
-        .expect("axiom_matmul: B shape mismatch");
+    let a = ArrayView2::from_shape((m, k), a_slice).expect("axiom_matmul: A shape mismatch");
+    let b = ArrayView2::from_shape((k, n), b_slice).expect("axiom_matmul: B shape mismatch");
 
     let c = matmul::matmul_parallel(a, b);
 
@@ -43,12 +45,12 @@ pub unsafe extern "C" fn axiom_matmul(
 // ============================================================================
 
 /// ReLU activation
+///
+/// # Safety
+///
+/// The input and output pointers must be valid and point to contiguous memory of size `n`.
 #[no_mangle]
-pub unsafe extern "C" fn axiom_relu(
-    x_ptr: *const f32,
-    y_ptr: *mut f32,
-    n: libc::size_t,
-) {
+pub unsafe extern "C" fn axiom_relu(x_ptr: *const f32, y_ptr: *mut f32, n: libc::size_t) {
     let x_slice = slice::from_raw_parts(x_ptr, n);
     let x = ArrayD::from_shape_vec(IxDyn(&[n]), x_slice.to_vec())
         .expect("axiom_relu: input shape mismatch");
@@ -60,12 +62,12 @@ pub unsafe extern "C" fn axiom_relu(
 }
 
 /// Sigmoid activation
+///
+/// # Safety
+///
+/// The input and output pointers must be valid and point to contiguous memory of size `n`.
 #[no_mangle]
-pub unsafe extern "C" fn axiom_sigmoid(
-    x_ptr: *const f32,
-    y_ptr: *mut f32,
-    n: libc::size_t,
-) {
+pub unsafe extern "C" fn axiom_sigmoid(x_ptr: *const f32, y_ptr: *mut f32, n: libc::size_t) {
     let x_slice = slice::from_raw_parts(x_ptr, n);
     let x = ArrayD::from_shape_vec(IxDyn(&[n]), x_slice.to_vec()).expect("FFI: shape mismatch");
 
@@ -76,6 +78,10 @@ pub unsafe extern "C" fn axiom_sigmoid(
 }
 
 /// Softmax activation
+///
+/// # Safety
+///
+/// The input and output pointers must be valid and point to contiguous memory of size `batch_size * num_classes`.
 #[no_mangle]
 pub unsafe extern "C" fn axiom_softmax(
     x_ptr: *const f32,
@@ -85,7 +91,8 @@ pub unsafe extern "C" fn axiom_softmax(
 ) {
     let n = batch_size * num_classes;
     let x_slice = slice::from_raw_parts(x_ptr, n);
-    let x = ArrayD::from_shape_vec(IxDyn(&[batch_size, num_classes]), x_slice.to_vec()).expect("FFI: shape mismatch");
+    let x = ArrayD::from_shape_vec(IxDyn(&[batch_size, num_classes]), x_slice.to_vec())
+        .expect("FFI: shape mismatch");
 
     let y = activations::softmax(&x);
 
@@ -94,12 +101,12 @@ pub unsafe extern "C" fn axiom_softmax(
 }
 
 /// GELU activation
+///
+/// # Safety
+///
+/// The input and output pointers must be valid and point to contiguous memory of size `n`.
 #[no_mangle]
-pub unsafe extern "C" fn axiom_gelu(
-    x_ptr: *const f32,
-    y_ptr: *mut f32,
-    n: libc::size_t,
-) {
+pub unsafe extern "C" fn axiom_gelu(x_ptr: *const f32, y_ptr: *mut f32, n: libc::size_t) {
     let x_slice = slice::from_raw_parts(x_ptr, n);
     let x = ArrayD::from_shape_vec(IxDyn(&[n]), x_slice.to_vec()).expect("FFI: shape mismatch");
 
@@ -110,12 +117,12 @@ pub unsafe extern "C" fn axiom_gelu(
 }
 
 /// Tanh activation
+///
+/// # Safety
+///
+/// The input and output pointers must be valid and point to contiguous memory of size `n`.
 #[no_mangle]
-pub unsafe extern "C" fn axiom_tanh(
-    x_ptr: *const f32,
-    y_ptr: *mut f32,
-    n: libc::size_t,
-) {
+pub unsafe extern "C" fn axiom_tanh(x_ptr: *const f32, y_ptr: *mut f32, n: libc::size_t) {
     let x_slice = slice::from_raw_parts(x_ptr, n);
     let x = ArrayD::from_shape_vec(IxDyn(&[n]), x_slice.to_vec()).expect("FFI: shape mismatch");
 
@@ -126,6 +133,10 @@ pub unsafe extern "C" fn axiom_tanh(
 }
 
 /// Leaky ReLU activation
+///
+/// # Safety
+///
+/// The input and output pointers must be valid and point to contiguous memory of size `n`.
 #[no_mangle]
 pub unsafe extern "C" fn axiom_leaky_relu(
     x_ptr: *const f32,
@@ -143,6 +154,10 @@ pub unsafe extern "C" fn axiom_leaky_relu(
 }
 
 /// ELU activation
+///
+/// # Safety
+///
+/// The input and output pointers must be valid and point to contiguous memory of size `n`.
 #[no_mangle]
 pub unsafe extern "C" fn axiom_elu(
     x_ptr: *const f32,
@@ -160,12 +175,12 @@ pub unsafe extern "C" fn axiom_elu(
 }
 
 /// SELU activation
+///
+/// # Safety
+///
+/// The input and output pointers must be valid and point to contiguous memory of size `n`.
 #[no_mangle]
-pub unsafe extern "C" fn axiom_selu(
-    x_ptr: *const f32,
-    y_ptr: *mut f32,
-    n: libc::size_t,
-) {
+pub unsafe extern "C" fn axiom_selu(x_ptr: *const f32, y_ptr: *mut f32, n: libc::size_t) {
     let x_slice = slice::from_raw_parts(x_ptr, n);
     let x = ArrayD::from_shape_vec(IxDyn(&[n]), x_slice.to_vec()).expect("FFI: shape mismatch");
 
@@ -176,12 +191,12 @@ pub unsafe extern "C" fn axiom_selu(
 }
 
 /// Swish/SiLU activation
+///
+/// # Safety
+///
+/// The input and output pointers must be valid and point to contiguous memory of size `n`.
 #[no_mangle]
-pub unsafe extern "C" fn axiom_swish(
-    x_ptr: *const f32,
-    y_ptr: *mut f32,
-    n: libc::size_t,
-) {
+pub unsafe extern "C" fn axiom_swish(x_ptr: *const f32, y_ptr: *mut f32, n: libc::size_t) {
     let x_slice = slice::from_raw_parts(x_ptr, n);
     let x = ArrayD::from_shape_vec(IxDyn(&[n]), x_slice.to_vec()).expect("FFI: shape mismatch");
 
@@ -192,12 +207,12 @@ pub unsafe extern "C" fn axiom_swish(
 }
 
 /// Mish activation
+///
+/// # Safety
+///
+/// The input and output pointers must be valid and point to contiguous memory of size `n`.
 #[no_mangle]
-pub unsafe extern "C" fn axiom_mish(
-    x_ptr: *const f32,
-    y_ptr: *mut f32,
-    n: libc::size_t,
-) {
+pub unsafe extern "C" fn axiom_mish(x_ptr: *const f32, y_ptr: *mut f32, n: libc::size_t) {
     let x_slice = slice::from_raw_parts(x_ptr, n);
     let x = ArrayD::from_shape_vec(IxDyn(&[n]), x_slice.to_vec()).expect("FFI: shape mismatch");
 
@@ -208,12 +223,12 @@ pub unsafe extern "C" fn axiom_mish(
 }
 
 /// Hard Swish activation
+///
+/// # Safety
+///
+/// The input and output pointers must be valid and point to contiguous memory of size `n`.
 #[no_mangle]
-pub unsafe extern "C" fn axiom_hardswish(
-    x_ptr: *const f32,
-    y_ptr: *mut f32,
-    n: libc::size_t,
-) {
+pub unsafe extern "C" fn axiom_hardswish(x_ptr: *const f32, y_ptr: *mut f32, n: libc::size_t) {
     let x_slice = slice::from_raw_parts(x_ptr, n);
     let x = ArrayD::from_shape_vec(IxDyn(&[n]), x_slice.to_vec()).expect("FFI: shape mismatch");
 
@@ -224,12 +239,12 @@ pub unsafe extern "C" fn axiom_hardswish(
 }
 
 /// Hard Sigmoid activation
+///
+/// # Safety
+///
+/// The input and output pointers must be valid and point to contiguous memory of size `n`.
 #[no_mangle]
-pub unsafe extern "C" fn axiom_hardsigmoid(
-    x_ptr: *const f32,
-    y_ptr: *mut f32,
-    n: libc::size_t,
-) {
+pub unsafe extern "C" fn axiom_hardsigmoid(x_ptr: *const f32, y_ptr: *mut f32, n: libc::size_t) {
     let x_slice = slice::from_raw_parts(x_ptr, n);
     let x = ArrayD::from_shape_vec(IxDyn(&[n]), x_slice.to_vec()).expect("FFI: shape mismatch");
 
@@ -240,6 +255,10 @@ pub unsafe extern "C" fn axiom_hardsigmoid(
 }
 
 /// Log Softmax activation
+///
+/// # Safety
+///
+/// The input and output pointers must be valid and point to contiguous memory of size `batch_size * num_classes`.
 #[no_mangle]
 pub unsafe extern "C" fn axiom_log_softmax(
     x_ptr: *const f32,
@@ -249,7 +268,8 @@ pub unsafe extern "C" fn axiom_log_softmax(
 ) {
     let n = batch_size * num_classes;
     let x_slice = slice::from_raw_parts(x_ptr, n);
-    let x = ArrayD::from_shape_vec(IxDyn(&[batch_size, num_classes]), x_slice.to_vec()).expect("FFI: shape mismatch");
+    let x = ArrayD::from_shape_vec(IxDyn(&[batch_size, num_classes]), x_slice.to_vec())
+        .expect("FFI: shape mismatch");
 
     let y = activations::log_softmax(&x);
 
@@ -258,12 +278,12 @@ pub unsafe extern "C" fn axiom_log_softmax(
 }
 
 /// Softplus activation
+///
+/// # Safety
+///
+/// The input and output pointers must be valid and point to contiguous memory of size `n`.
 #[no_mangle]
-pub unsafe extern "C" fn axiom_softplus(
-    x_ptr: *const f32,
-    y_ptr: *mut f32,
-    n: libc::size_t,
-) {
+pub unsafe extern "C" fn axiom_softplus(x_ptr: *const f32, y_ptr: *mut f32, n: libc::size_t) {
     let x_slice = slice::from_raw_parts(x_ptr, n);
     let x = ArrayD::from_shape_vec(IxDyn(&[n]), x_slice.to_vec()).expect("FFI: shape mismatch");
 
@@ -278,6 +298,10 @@ pub unsafe extern "C" fn axiom_softplus(
 // ============================================================================
 
 /// 2D Convolution
+///
+/// # Safety
+///
+/// Input, weight, and output pointers must be valid and point to contiguous memory of the correct sizes.
 #[no_mangle]
 pub unsafe extern "C" fn axiom_conv2d(
     input_ptr: *const f32,
@@ -303,8 +327,10 @@ pub unsafe extern "C" fn axiom_conv2d(
     let input_slice = slice::from_raw_parts(input_ptr, input_size);
     let weight_slice = slice::from_raw_parts(weight_ptr, weight_size);
 
-    let input = ArrayView4::from_shape((n, h_in, w_in, c_in), input_slice).expect("FFI: view shape mismatch");
-    let weight = ArrayView4::from_shape((kh, kw, c_in, c_out), weight_slice).expect("FFI: view shape mismatch");
+    let input = ArrayView4::from_shape((n, h_in, w_in, c_in), input_slice)
+        .expect("FFI: view shape mismatch");
+    let weight = ArrayView4::from_shape((kh, kw, c_in, c_out), weight_slice)
+        .expect("FFI: view shape mismatch");
 
     let bias = if bias_ptr.is_null() {
         None
@@ -312,13 +338,7 @@ pub unsafe extern "C" fn axiom_conv2d(
         Some(slice::from_raw_parts(bias_ptr, c_out))
     };
 
-    let output = conv::conv2d(
-        input,
-        weight,
-        bias,
-        (stride_h, stride_w),
-        (pad_h, pad_w),
-    );
+    let output = conv::conv2d(input, weight, bias, (stride_h, stride_w), (pad_h, pad_w));
 
     let h_out = (h_in + 2 * pad_h - kh) / stride_h + 1;
     let w_out = (w_in + 2 * pad_w - kw) / stride_w + 1;
@@ -333,6 +353,10 @@ pub unsafe extern "C" fn axiom_conv2d(
 // ============================================================================
 
 /// 2D Max Pooling
+///
+/// # Safety
+///
+/// The input and output pointers must be valid and point to contiguous memory of the correct size.
 #[no_mangle]
 pub unsafe extern "C" fn axiom_maxpool2d(
     input_ptr: *const f32,
@@ -350,14 +374,10 @@ pub unsafe extern "C" fn axiom_maxpool2d(
 ) {
     let input_size = n * h_in * w_in * c;
     let input_slice = slice::from_raw_parts(input_ptr, input_size);
-    let input = ArrayView4::from_shape((n, h_in, w_in, c), input_slice).expect("FFI: view shape mismatch");
+    let input =
+        ArrayView4::from_shape((n, h_in, w_in, c), input_slice).expect("FFI: view shape mismatch");
 
-    let output = pool::maxpool2d(
-        input,
-        (kh, kw),
-        (stride_h, stride_w),
-        (pad_h, pad_w),
-    );
+    let output = pool::maxpool2d(input, (kh, kw), (stride_h, stride_w), (pad_h, pad_w));
 
     let h_out = (h_in + 2 * pad_h - kh) / stride_h + 1;
     let w_out = (w_in + 2 * pad_w - kw) / stride_w + 1;
@@ -378,17 +398,19 @@ fn use_containerized_smt() -> bool {
 
 /// Get container image for SMT runner
 fn get_smt_container_image() -> String {
-    env::var("AXIOM_SMT_CONTAINER_IMAGE")
-        .unwrap_or_else(|_| "axiom-smt-runner:latest".to_string())
+    env::var("AXIOM_SMT_CONTAINER_IMAGE").unwrap_or_else(|_| "axiom-smt-runner:latest".to_string())
 }
 
 /// Get container runtime (podman, svalinn, docker)
 fn get_container_runtime() -> String {
-    env::var("AXIOM_CONTAINER_RUNTIME")
-        .unwrap_or_else(|_| "podman".to_string())
+    env::var("AXIOM_CONTAINER_RUNTIME").unwrap_or_else(|_| "podman".to_string())
 }
 
 /// Run SMT solver in container
+///
+/// # Safety
+///
+/// The script path must be a valid path to an SMT-LIB script.
 unsafe fn run_smt_containerized(
     solver_kind: &str,
     script_path: &std::path::Path,
@@ -459,6 +481,10 @@ unsafe fn run_smt_containerized(
 }
 
 /// Run SMT solver directly (without container)
+///
+/// # Safety
+///
+/// The solver path must be a valid executable and the script path must be a valid script.
 unsafe fn run_smt_direct(
     solver_kind: &str,
     solver_path: &str,
@@ -466,21 +492,18 @@ unsafe fn run_smt_direct(
     timeout_ms: u64,
 ) -> Result<String, String> {
     let timeout = Duration::from_millis(timeout_ms);
-    let timeout_sec = (timeout_ms / 1000) as u64;
+    let timeout_sec = timeout_ms / 1000;
 
     let mut cmd = Command::new(solver_path);
     match solver_kind {
         "z3" => {
-            cmd.arg(format!("-T:{}", timeout_sec))
-                .arg(script_path);
+            cmd.arg(format!("-T:{}", timeout_sec)).arg(script_path);
         }
         "cvc5" => {
-            cmd.arg(format!("--tlimit={}", timeout_ms))
-                .arg(script_path);
+            cmd.arg(format!("--tlimit={}", timeout_ms)).arg(script_path);
         }
         "yices" => {
-            cmd.arg(format!("--timeout={}", timeout_sec))
-                .arg(script_path);
+            cmd.arg(format!("--timeout={}", timeout_sec)).arg(script_path);
         }
         _ => {
             cmd.arg(script_path);
@@ -529,6 +552,11 @@ unsafe fn run_smt_direct(
     }
 }
 
+/// Run SMT solver
+///
+/// # Safety
+///
+/// The input pointers must be valid C strings.
 #[no_mangle]
 pub unsafe extern "C" fn axiom_smt_run(
     solver_kind: *const libc::c_char,
@@ -559,7 +587,9 @@ pub unsafe extern "C" fn axiom_smt_run(
     let script_path = env::temp_dir().join(filename);
 
     if let Err(e) = std::fs::write(&script_path, script_str) {
-        return CString::new(format!("error: {}", e)).expect("FFI: CString conversion failed").into_raw();
+        return CString::new(format!("error: {}", e))
+            .expect("FFI: CString conversion failed")
+            .into_raw();
     }
 
     // Choose execution method: containerized or direct
@@ -583,6 +613,11 @@ pub unsafe extern "C" fn axiom_smt_run(
     }
 }
 
+/// Free SMT result string
+///
+/// # Safety
+///
+/// The pointer must have been returned by `axiom_smt_run`.
 #[no_mangle]
 pub unsafe extern "C" fn axiom_smt_free(ptr: *mut libc::c_char) {
     if !ptr.is_null() {
@@ -591,6 +626,10 @@ pub unsafe extern "C" fn axiom_smt_free(ptr: *mut libc::c_char) {
 }
 
 /// Global Average Pooling
+///
+/// # Safety
+///
+/// The input and output pointers must be valid and point to contiguous memory of the correct size.
 #[no_mangle]
 pub unsafe extern "C" fn axiom_global_avgpool2d(
     input_ptr: *const f32,
@@ -602,7 +641,8 @@ pub unsafe extern "C" fn axiom_global_avgpool2d(
 ) {
     let input_size = n * h * w * c;
     let input_slice = slice::from_raw_parts(input_ptr, input_size);
-    let input = ArrayView4::from_shape((n, h, w, c), input_slice).expect("FFI: view shape mismatch");
+    let input =
+        ArrayView4::from_shape((n, h, w, c), input_slice).expect("FFI: view shape mismatch");
 
     let output = pool::global_avgpool2d(input);
 
@@ -616,6 +656,10 @@ pub unsafe extern "C" fn axiom_global_avgpool2d(
 // ============================================================================
 
 /// Batch Normalization
+///
+/// # Safety
+///
+/// All pointers must be valid and point to contiguous memory of the correct size.
 #[no_mangle]
 pub unsafe extern "C" fn axiom_batchnorm(
     x_ptr: *const f32,
@@ -636,7 +680,8 @@ pub unsafe extern "C" fn axiom_batchnorm(
     let running_var = slice::from_raw_parts_mut(running_var_ptr, n_features);
 
     let batch_size = n_elements / n_features;
-    let x = ArrayD::from_shape_vec(IxDyn(&[batch_size, n_features]), x_slice.to_vec()).expect("FFI: shape mismatch");
+    let x = ArrayD::from_shape_vec(IxDyn(&[batch_size, n_features]), x_slice.to_vec())
+        .expect("FFI: shape mismatch");
 
     let y = norm::batchnorm(
         &x,
@@ -654,6 +699,10 @@ pub unsafe extern "C" fn axiom_batchnorm(
 }
 
 /// Layer Normalization
+///
+/// # Safety
+///
+/// All pointers must be valid and point to contiguous memory of the correct size.
 #[no_mangle]
 pub unsafe extern "C" fn axiom_layernorm(
     x_ptr: *const f32,
@@ -669,9 +718,12 @@ pub unsafe extern "C" fn axiom_layernorm(
     let gamma_slice = slice::from_raw_parts(gamma_ptr, hidden_size);
     let beta_slice = slice::from_raw_parts(beta_ptr, hidden_size);
 
-    let x = ArrayD::from_shape_vec(IxDyn(&[batch_size, hidden_size]), x_slice.to_vec()).expect("FFI: shape mismatch");
-    let gamma = ArrayD::from_shape_vec(IxDyn(&[hidden_size]), gamma_slice.to_vec()).expect("FFI: shape mismatch");
-    let beta = ArrayD::from_shape_vec(IxDyn(&[hidden_size]), beta_slice.to_vec()).expect("FFI: shape mismatch");
+    let x = ArrayD::from_shape_vec(IxDyn(&[batch_size, hidden_size]), x_slice.to_vec())
+        .expect("FFI: shape mismatch");
+    let gamma = ArrayD::from_shape_vec(IxDyn(&[hidden_size]), gamma_slice.to_vec())
+        .expect("FFI: shape mismatch");
+    let beta = ArrayD::from_shape_vec(IxDyn(&[hidden_size]), beta_slice.to_vec())
+        .expect("FFI: shape mismatch");
 
     let y = norm::layernorm(&x, &gamma, &beta, &[hidden_size], eps);
 
@@ -680,6 +732,10 @@ pub unsafe extern "C" fn axiom_layernorm(
 }
 
 /// RMS Normalization
+///
+/// # Safety
+///
+/// All pointers must be valid and point to contiguous memory of the correct size.
 #[no_mangle]
 pub unsafe extern "C" fn axiom_rmsnorm(
     x_ptr: *const f32,
@@ -693,7 +749,8 @@ pub unsafe extern "C" fn axiom_rmsnorm(
     let x_slice = slice::from_raw_parts(x_ptr, n_elements);
     let weight = slice::from_raw_parts(weight_ptr, hidden_size);
 
-    let x = ArrayD::from_shape_vec(IxDyn(&[batch_size, hidden_size]), x_slice.to_vec()).expect("FFI: shape mismatch");
+    let x = ArrayD::from_shape_vec(IxDyn(&[batch_size, hidden_size]), x_slice.to_vec())
+        .expect("FFI: shape mismatch");
 
     let y = norm::rmsnorm(&x, weight, eps);
 

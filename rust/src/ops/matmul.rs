@@ -87,8 +87,8 @@ pub fn bmm(a: &[Array2<f32>], b: &[Array2<f32>]) -> Vec<Array2<f32>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ndarray::array;
     use approx::assert_abs_diff_eq;
+    use ndarray::array;
 
     #[test]
     fn test_matmul() {

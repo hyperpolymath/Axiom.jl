@@ -29,6 +29,15 @@ struct RustBackend <: AbstractBackend
 end
 
 """
+    ZigBackend
+
+High-performance Zig implementation.
+"""
+struct ZigBackend <: AbstractBackend
+    lib_path::String
+end
+
+"""
     CUDABackend
 
 GPU acceleration via CUDA (NVIDIA).

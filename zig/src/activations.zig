@@ -185,7 +185,7 @@ pub fn softmax_batched(
     while (b < batch_size) : (b += 1) {
         const offset = b * num_classes;
         const input = input_ptr[offset..][0..num_classes];
-        var output = output_ptr[offset..][0..num_classes];
+        const output = output_ptr[offset..][0..num_classes];
 
         softmax(input, output);
     }
@@ -193,9 +193,6 @@ pub fn softmax_batched(
 
 /// Log softmax (more numerically stable)
 pub fn log_softmax(input: []const f32, output: []f32) void {
-    const n = input.len;
-
-    // Find max
     var max_val: f32 = input[0];
     for (input[1..]) |x| {
         if (x > max_val) max_val = x;

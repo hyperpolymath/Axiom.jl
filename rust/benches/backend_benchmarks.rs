@@ -6,7 +6,7 @@
 //
 // Refs: Issue #13 - Benchmarks and regression baselines
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 
 // Import Axiom Rust backend functions
 // (These would normally come from the axiom crate)
@@ -32,9 +32,13 @@ mod ops {
 
     #[inline(always)]
     pub fn gelu(x: &[f32]) -> Vec<f32> {
-        x.iter().map(|&v| {
-            0.5 * v * (1.0 + ((2.0 / std::f32::consts::PI).sqrt() * (v + 0.044715 * v.powi(3))).tanh())
-        }).collect()
+        x.iter()
+            .map(|&v| {
+                0.5 * v
+                    * (1.0
+                        + ((2.0 / std::f32::consts::PI).sqrt() * (v + 0.044715 * v.powi(3))).tanh())
+            })
+            .collect()
     }
 
     #[inline(always)]
@@ -75,9 +79,7 @@ fn matmul_benchmarks(c: &mut Criterion) {
         let b: Vec<f32> = (0..size * size).map(|_| rand::random()).collect();
 
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |bencher, &size| {
-            bencher.iter(|| {
-                ops::matmul(black_box(&a), black_box(&b), size, size, size)
-            });
+            bencher.iter(|| ops::matmul(black_box(&a), black_box(&b), size, size, size));
         });
     }
 
@@ -88,39 +90,25 @@ fn activation_benchmarks(c: &mut Criterion) {
     let mut group = c.benchmark_group("activations");
 
     for size in [1000, 10000, 100000].iter() {
-        let x: Vec<f32> = (0..*size).map(|_| rand::random::<f32>() * 2.0 - 1.0).collect();
+        let x: Vec<f32> = (0..*size)
+            .map(|_| rand::random::<f32>() * 2.0 - 1.0)
+            .collect();
 
-        group.bench_with_input(
-            BenchmarkId::new("relu", size),
-            size,
-            |bencher, _| {
-                bencher.iter(|| ops::relu(black_box(&x)));
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("relu", size), size, |bencher, _| {
+            bencher.iter(|| ops::relu(black_box(&x)));
+        });
 
-        group.bench_with_input(
-            BenchmarkId::new("gelu", size),
-            size,
-            |bencher, _| {
-                bencher.iter(|| ops::gelu(black_box(&x)));
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("gelu", size), size, |bencher, _| {
+            bencher.iter(|| ops::gelu(black_box(&x)));
+        });
 
-        group.bench_with_input(
-            BenchmarkId::new("swish", size),
-            size,
-            |bencher, _| {
-                bencher.iter(|| ops::swish(black_box(&x)));
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("swish", size), size, |bencher, _| {
+            bencher.iter(|| ops::swish(black_box(&x)));
+        });
 
-        group.bench_with_input(
-            BenchmarkId::new("softmax", size),
-            size,
-            |bencher, _| {
-                bencher.iter(|| ops::softmax(black_box(&x)));
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("softmax", size), size, |bencher, _| {
+            bencher.iter(|| ops::softmax(black_box(&x)));
+        });
     }
 
     group.finish();

@@ -55,7 +55,7 @@ Parsed representation of an @axiom body.
 struct AxiomDefinition
     input_type::Union{Expr, Nothing}
     output_type::Union{Expr, Nothing}
-    layers::Vector{Pair{Symbol, Expr}}
+    layers::Vector{Pair{Symbol, Union{Expr, Symbol}}}
     ensures::Vector{Expr}
     proves::Vector{Expr}
 end
@@ -72,7 +72,7 @@ function parse_axiom_body(body::Expr)
 
     input_type = nothing
     output_type = nothing
-    layers = Pair{Symbol, Expr}[]
+    layers = Pair{Symbol, Union{Expr, Symbol}}[]
     ensures = Expr[]
     proves = Expr[]
 
@@ -197,12 +197,7 @@ end
 function _generate_forward_body(def::AxiomDefinition)
     forward_body = []
     for (layer_name, layer_expr) in def.layers
-        if is_pipeline_expr(layer_expr)
-            # Pipeline expression: x |> Layer(...)
-            push!(forward_body, :($layer_name = $(transform_pipeline(layer_expr))))
-        else
-            push!(forward_body, :($layer_name = $(esc(layer_expr))))
-        end
+        push!(forward_body, :($layer_name = $(transform_pipeline(layer_expr))))
     end
     return forward_body
 end
@@ -226,10 +221,9 @@ end
 
 Check if a given expression is a pipeline expression using the `|>` operator.
 """
-function is_pipeline_expr(expr::Expr)
-    expr.head == :call && expr.args[1] == :|>
+function is_pipeline_expr(expr::Union{Expr, Symbol})
+    expr isa Expr && expr.head == :call && expr.args[1] == :|>
 end
-is_pipeline_expr(::Any) = false
 
 """
     transform_pipeline(expr::Expr) -> Expr
@@ -237,7 +231,7 @@ is_pipeline_expr(::Any) = false
 Recursively transform a pipeline expression `a |> b |> c` into nested
 function calls `c(b(a))`.
 """
-function transform_pipeline(expr::Expr)
+function transform_pipeline(expr::Union{Expr, Symbol})
     if !is_pipeline_expr(expr)
         return esc(expr)
     end

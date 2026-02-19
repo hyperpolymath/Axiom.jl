@@ -363,7 +363,6 @@ end
 Get SMT-LIB type string for Julia type.
 """
 smt_type(::Type{Int}) = "Int"
-smt_type(::Type{Int64}) = "Int"
 smt_type(::Type{Int32}) = "Int"
 smt_type(::Type{Bool}) = "Bool"
 smt_type(::Type{Float64}) = "Real"
@@ -572,7 +571,7 @@ end
 
 Parse an SMT-LIB value.
 """
-function parse_smt_value(s::String)
+function parse_smt_value(s::AbstractString)
     s = strip(s)
 
     # Boolean
@@ -738,8 +737,8 @@ function _extract_vars!(vars::Dict, expr)
 end
 
 function is_operator(s::Symbol)
-    s in [:+, :-, :*, :/, :div, :mod, :==, :!=, :<, :>, :<=, :>=,
-          :!, :&&, :||, :true, :false, :∧, :∨, :¬, :⟹, :⟺]
+    s in [:(+), :(-), :(*), :(/), :div, :mod, :(==), :(!=), :(<), :(>), :(<=), :(>=),
+          :(!), :(&&), :(||), :true, :false, :∧, :∨, :¬, :⟹, :⟺]
 end
 
 end # module

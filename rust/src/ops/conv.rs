@@ -26,7 +26,8 @@ pub fn conv2d(
     let mut output = Array4::zeros((n, h_out, w_out, c_out));
 
     // Process each batch in parallel
-    output.axis_iter_mut(ndarray::Axis(0))
+    output
+        .axis_iter_mut(ndarray::Axis(0))
         .into_par_iter()
         .enumerate()
         .for_each(|(batch_idx, mut batch_output)| {
@@ -44,14 +45,17 @@ pub fn conv2d(
                                 let w_idx = w_start + kj;
 
                                 // Check bounds (for padding)
-                                if h_idx >= ph && h_idx < h_in + ph &&
-                                   w_idx >= pw && w_idx < w_in + pw {
+                                if h_idx >= ph
+                                    && h_idx < h_in + ph
+                                    && w_idx >= pw
+                                    && w_idx < w_in + pw
+                                {
                                     let h_input = h_idx - ph;
                                     let w_input = w_idx - pw;
 
                                     for ic in 0..c_in {
                                         val += input[[batch_idx, h_input, w_input, ic]]
-                                             * weight[[ki, kj, ic, oc]];
+                                            * weight[[ki, kj, ic, oc]];
                                     }
                                 }
                             }
@@ -75,7 +79,7 @@ pub fn conv2d(
 /// Each input channel is convolved with its own filter
 pub fn depthwise_conv2d(
     input: ArrayView4<f32>,
-    weight: ArrayView4<f32>,  // (kH, kW, C, 1)
+    weight: ArrayView4<f32>, // (kH, kW, C, 1)
     bias: Option<&[f32]>,
     stride: (usize, usize),
     padding: (usize, usize),
@@ -90,7 +94,8 @@ pub fn depthwise_conv2d(
 
     let mut output = Array4::zeros((n, h_out, w_out, c));
 
-    output.axis_iter_mut(ndarray::Axis(0))
+    output
+        .axis_iter_mut(ndarray::Axis(0))
         .into_par_iter()
         .enumerate()
         .for_each(|(batch_idx, mut batch_output)| {
@@ -107,13 +112,16 @@ pub fn depthwise_conv2d(
                                 let h_idx = h_start + ki;
                                 let w_idx = w_start + kj;
 
-                                if h_idx >= ph && h_idx < h_in + ph &&
-                                   w_idx >= pw && w_idx < w_in + pw {
+                                if h_idx >= ph
+                                    && h_idx < h_in + ph
+                                    && w_idx >= pw
+                                    && w_idx < w_in + pw
+                                {
                                     let h_input = h_idx - ph;
                                     let w_input = w_idx - pw;
 
                                     val += input[[batch_idx, h_input, w_input, channel]]
-                                         * weight[[ki, kj, channel, 0]];
+                                        * weight[[ki, kj, channel, 0]];
                                 }
                             }
                         }
@@ -141,7 +149,7 @@ pub fn conv2d_transpose(
     output_padding: (usize, usize),
 ) -> Array4<f32> {
     let (n, h_in, w_in, _c_in) = input.dim();
-    let (kh, kw, c_out, _) = weight.dim();  // Note: weight shape is different
+    let (kh, kw, c_out, _) = weight.dim(); // Note: weight shape is different
     let (sh, sw) = stride;
     let (ph, pw) = padding;
     let (oph, opw) = output_padding;
@@ -149,12 +157,7 @@ pub fn conv2d_transpose(
     let h_out = (h_in - 1) * sh - 2 * ph + kh + oph;
     let w_out = (w_in - 1) * sw - 2 * pw + kw + opw;
 
-    let output = Array4::zeros((n, h_out, w_out, c_out));
-
-    // Implementation details omitted for brevity
-    // Real implementation would use scatter-add pattern
-
-    output
+    Array4::zeros((n, h_out, w_out, c_out))
 }
 
 /// im2col transformation for efficient convolution
@@ -192,8 +195,7 @@ fn im2col(
                         for channel in 0..c {
                             let col_idx = channel * kh * kw + ki * kw + kj;
 
-                            if h_idx >= ph && h_idx < h + ph &&
-                               w_idx >= pw && w_idx < w + pw {
+                            if h_idx >= ph && h_idx < h + ph && w_idx >= pw && w_idx < w + pw {
                                 col[[row_idx, col_idx]] =
                                     input[[batch, h_idx - ph, w_idx - pw, channel]];
                             }

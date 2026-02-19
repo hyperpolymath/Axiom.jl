@@ -1,13 +1,13 @@
 //! Neural network operations
 
-pub mod matmul;
 pub mod activations;
 pub mod conv;
-pub mod pool;
+pub mod matmul;
 pub mod norm;
+pub mod pool;
 
-pub use matmul::*;
 pub use activations::*;
 pub use conv::*;
-pub use pool::*;
+pub use matmul::*;
 pub use norm::*;
+pub use pool::*;

@@ -23,7 +23,7 @@ const BACKENDS_TO_TEST = AbstractBackend[]
 push!(BACKENDS_TO_TEST, JuliaBackend())
 
 # Check Rust backend
-rust_lib = joinpath(@__DIR__, "..", "rust", "target", "release", "libaxiom.so")
+rust_lib = joinpath(@__DIR__, "..", "rust", "target", "release", "libaxiom_core.so")
 if isfile(rust_lib) || isfile(replace(rust_lib, ".so" => ".dylib")) || isfile(replace(rust_lib, ".so" => ".dll"))
     push!(BACKENDS_TO_TEST, RustBackend(rust_lib))
 end
@@ -45,7 +45,7 @@ for size in [64, 256, 1024]
     for backend in BACKENDS_TO_TEST
         backend_name = string(typeof(backend))
         SUITE["matmul"][size][backend_name] = @benchmarkable begin
-            backend_matmul($backend, $A, $B)
+            Axiom.backend_matmul($backend, $A, $B)
         end
     end
 end
@@ -66,15 +66,15 @@ for size in sizes
         backend_name = string(typeof(backend))
 
         SUITE["activations"][size]["relu_$backend_name"] = @benchmarkable begin
-            backend_relu($backend, $x)
+            Axiom.backend_relu($backend, $x)
         end
 
         SUITE["activations"][size]["gelu_$backend_name"] = @benchmarkable begin
-            backend_gelu($backend, $x)
+            Axiom.backend_gelu($backend, $x)
         end
 
         SUITE["activations"][size]["swish_$backend_name"] = @benchmarkable begin
-            backend_swish($backend, $x)
+            Axiom.backend_swish($backend, $x)
         end
     end
 end
@@ -103,7 +103,7 @@ for (i, config) in enumerate(conv_configs)
         backend_name = string(typeof(backend))
 
         SUITE["conv2d"]["config_$i"][backend_name] = @benchmarkable begin
-            backend_conv2d($backend, $input, $weight, $bias, $(config.stride), $(config.padding))
+            Axiom.backend_conv2d($backend, $input, $weight, $bias, ($(config.stride), $(config.stride)), ($(config.padding), $(config.padding)))
         end
     end
 end
@@ -124,13 +124,13 @@ for (batch, features) in norm_sizes
     beta = zeros(Float32, features)
     mean = zeros(Float32, features)
     var = ones(Float32, features)
-    eps = 1e-5f0
+    eps = Float32(1e-5)
 
     for backend in BACKENDS_TO_TEST
         backend_name = string(typeof(backend))
 
         SUITE["normalization"]["batchnorm_$(batch)x$(features)"][backend_name] = @benchmarkable begin
-            backend_batchnorm($backend, $x, $gamma, $beta, $mean, $var, $eps)
+            Axiom.backend_batchnorm($backend, $x, $gamma, $beta, $mean, $var, $eps)
         end
     end
 end
@@ -141,29 +141,34 @@ end
 
 SUITE["models"] = BenchmarkGroup()
 
+# Define models at top level
+@axiom SmallCNN begin
+    input :: Tensor{Float32, (224, 224, 3, 1)}
+    
+    l1 = input |> Conv2d(3, 32, 3, stride=1, padding=1) |> relu |> MaxPool2d(2)
+    l2 = l1 |> Conv2d(32, 64, 3, stride=1, padding=1) |> relu |> MaxPool2d(2)
+    l3 = l2 |> Flatten |> Dense(64 * 56 * 56, 10)
+    
+    output = l3
+end
+
+@axiom ResNetBlock begin
+    input :: Tensor{Float32, (56, 56, 64, 1)}
+    
+    l1 = input |> Conv2d(64, 64, 3, stride=1, padding=1) |> BatchNorm(64) |> relu
+    l2 = l1 |> Conv2d(64, 64, 3, stride=1, padding=1) |> BatchNorm(64)
+    
+    output = l2
+end
+
 # Small CNN
 function create_small_cnn()
-    @axiom begin
-        Conv2d(3, 32, 3, stride=1, padding=1)
-        relu
-        MaxPool2d(2)
-        Conv2d(32, 64, 3, stride=1, padding=1)
-        relu
-        MaxPool2d(2)
-        Flatten()
-        Dense(64 * 56 * 56, 10)
-    end
+    return SmallCNN()
 end
 
 # ResNet block
 function create_resnet_block()
-    @axiom begin
-        Conv2d(64, 64, 3, stride=1, padding=1)
-        BatchNorm(64)
-        relu
-        Conv2d(64, 64, 3, stride=1, padding=1)
-        BatchNorm(64)
-    end
+    return ResNetBlock()
 end
 
 SUITE["models"]["small_cnn"] = BenchmarkGroup()
@@ -175,7 +180,7 @@ for backend in BACKENDS_TO_TEST
     model_compiled = compile(model, backend=backend, verify=false)
 
     SUITE["models"]["small_cnn"][backend_name] = @benchmarkable begin
-        forward($model_compiled, $input)
+        Axiom.forward($model_compiled, $input)
     end
 end
 
@@ -192,7 +197,7 @@ for backend in BACKENDS_TO_TEST
     backend_name = string(typeof(backend))
 
     SUITE["allocations"]["matmul_$backend_name"] = @benchmarkable begin
-        backend_matmul($backend, $x, $y)
+        Axiom.backend_matmul($backend, $x, $y)
     end samples=100 evals=1
 end
 
