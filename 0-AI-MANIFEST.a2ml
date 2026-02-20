@@ -1,0 +1,114 @@
+;; SPDX-License-Identifier: PMPL-1.0-or-later
+;; 0-AI-MANIFEST.a2ml - AI Agent Entry Point for Axiom.jl
+;; Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <jonathan.jewell@open.ac.uk>
+;;
+;; This file is the FIRST file any AI agent must read when entering this repository.
+;; It defines canonical locations, critical invariants, and lifecycle hooks.
+
+(ai-manifest
+  (version "1.0")
+  (project "Axiom.jl")
+  (description "Provably correct machine learning framework for Julia")
+
+  ;; =========================================================================
+  ;; Canonical File Locations
+  ;; =========================================================================
+  (canonical-locations
+    (scm-files ".machine_readable/"
+      (state ".machine_readable/STATE.scm")
+      (ecosystem ".machine_readable/ECOSYSTEM.scm")
+      (meta ".machine_readable/META.scm"))
+
+    (source-code "src/"
+      (main-module "src/Axiom.jl")
+      (types "src/types/")
+      (layers "src/layers/")
+      (dsl "src/dsl/")
+      (autograd "src/autograd/")
+      (training "src/training/")
+      (verification "src/verification/")
+      (backends "src/backends/")
+      (integrations "src/integrations/"))
+
+    (native-backends
+      (rust "rust/" "Cargo crate axiom-core, FFI via rust/src/ffi.rs")
+      (zig "zig/" "SIMD kernels via zig/src/axiom.zig"))
+
+    (extensions "ext/"
+      (cuda "ext/AxiomCUDAExt.jl")
+      (amdgpu "ext/AxiomAMDGPUExt.jl")
+      (metal "ext/AxiomMetalExt.jl")
+      (pytorch "ext/AxiomPyTorchExt.jl"))
+
+    (bundled-packages "packages/"
+      (smtlib "packages/SMTLib.jl/"))
+
+    (tests "test/runtests.jl")
+    (benchmarks "benchmark/benchmarks.jl")
+    (examples "examples/")
+    (templates "templates/")
+    (documentation "docs/wiki/")
+    (topology "TOPOLOGY.md")
+    (project-config "Project.toml"))
+
+  ;; =========================================================================
+  ;; Critical Invariants - NEVER violate these
+  ;; =========================================================================
+  (invariants
+    ("SCM files ONLY in .machine_readable/ - NEVER in repository root"
+     "SPDX header must be PMPL-1.0-or-later on all hyperpolymath-authored files"
+     "Author attribution: Jonathan D.A. Jewell <jonathan.jewell@open.ac.uk>"
+     "Julia backend is always the reference implementation - other backends must match its behavior"
+     "GPU backends are package extensions only - never hard dependencies"
+     "@prove macro must use SMT solvers, never return unverified results as proven"
+     "Proof certificates must include SHA256 integrity hash"
+     "Never use banned languages (TypeScript, Node, npm, Go, Python, Java)"
+     "Container images use cgr.dev/chainguard base, never debian/ubuntu"
+     "Containerfiles not Dockerfiles, Podman not Docker"))
+
+  ;; =========================================================================
+  ;; Repository Structure Overview
+  ;; =========================================================================
+  (structure
+    (language "Julia")
+    (version "0.1.0")
+    (julia-compat ">= 1.9")
+    (backend-languages ("Rust" "Zig"))
+    (build-system "Julia Pkg + Cargo + Zig Build")
+    (task-runner "just (Justfile)")
+    (key-commands
+      ("just test" "Run Julia test suite")
+      ("just build-rust" "Build Rust backend .so")
+      ("just build-zig" "Build Zig backend .so")
+      ("just bench" "Run benchmarks")
+      ("just status" "Show project status")))
+
+  ;; =========================================================================
+  ;; Current Status (see STATE.scm for details)
+  ;; =========================================================================
+  (status
+    (completion-pct 55)
+    (phase "Active Development")
+    (known-disabled-features
+      ("@prove macro (SMTLib import ordering issue)"
+       "Rust end-to-end dispatch (ccall stub in rust_forward)"
+       "Zig compiled artifact (needs zig build)"
+       "HuggingFace model converters (GPT-2, ViT, ResNet)"
+       "Compile optimizations (fold_batchnorm, etc.)"
+       "Proof assistant import (Lean/Coq/Isabelle)"
+       "Autograd (finite differences placeholder)")))
+
+  ;; =========================================================================
+  ;; Lifecycle Hooks
+  ;; =========================================================================
+  (lifecycle
+    (on-enter
+      ("Read this manifest"
+       "Acknowledge canonical locations"
+       "Read .machine_readable/STATE.scm for current status"
+       "Read TOPOLOGY.md for architecture overview"))
+    (on-exit
+      ("Update .machine_readable/STATE.scm with work completed"
+       "Update TOPOLOGY.md completion dashboard if components changed"
+       "Run just test if code was modified"
+       "Run just scan if security-relevant changes were made"))))
