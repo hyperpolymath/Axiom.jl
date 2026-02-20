@@ -24,7 +24,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
 
       - name: Setup Julia
         uses: julia-actions/setup-julia@9e6ca3eecabac0e486d6babab8f371b3f5b4b4e5 # v2.7.1
@@ -216,7 +216,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
 
       - name: Setup Julia
         uses: julia-actions/setup-julia@9e6ca3eecabac0e486d6babab8f371b3f5b4b4e5 # v2.7.1

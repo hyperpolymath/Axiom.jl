@@ -39,13 +39,13 @@ jobs:
             julia-version: 'nightly'
 
     steps:
-      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
 
       - uses: julia-actions/setup-julia@824fb972babf1837cf21c49159bf8a8130f26840 # v2
         with:
           version: ${{ matrix.julia-version }}
 
-      - uses: julia-actions/cache@e8472695fb3c2028b1118dc399c8440ff497d409 # v2
+      - uses: julia-actions/cache@227b3767fc1745305b0eebbda74b17692aea0fcc # v2
 
       - name: Build package
         uses: julia-actions/julia-buildpkg@de39c5185a88e499828ade1f6431ebd1e7e0c4fd # v1
@@ -59,7 +59,7 @@ jobs:
 
       - name: Upload coverage
         if: matrix.julia-version == '1.10' && matrix.os == 'ubuntu-latest'
-        uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4
+        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
         with:
           files: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -72,7 +72,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@6d9817901c499d6b02debbb57edb38d33daa680b # stable
@@ -81,7 +81,7 @@ jobs:
           components: rustfmt, clippy
 
       - name: Cache Cargo
-        uses: actions/cache@6849a6489940f00c2f30c0fb92c6274307ccb58a # v4
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v4
         with:
           path: |
             ~/.cargo/registry
@@ -113,7 +113,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
 
       - name: Setup Zig
         uses: goto-bus-stop/setup-zig@5a2baf4f01b5c1440a5db0bd7b57d0d1fb1e29bd # v2
@@ -140,7 +140,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
 
       - name: Install cargo-audit
         run: cargo install cargo-audit
@@ -165,7 +165,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
-      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
 
       - uses: julia-actions/setup-julia@824fb972babf1837cf21c49159bf8a8130f26840 # v2
         with:
@@ -194,7 +194,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
 
       - name: Check required files
         run: |
