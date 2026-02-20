@@ -20,24 +20,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Axiom.jl
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
         with:
           path: axiom
 
       - name: Checkout casket-ssg
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
         with:
           repository: hyperpolymath/casket-ssg
           path: casket-ssg
 
       - name: Setup GHCup
-        uses: haskell-actions/setup@ec49483bfc012387b227434aba94f59a6ecd0900 # v2
+        uses: haskell-actions/setup@f9150cb1d140e9a9271700670baa38991e6fa25c # v2
         with:
           ghc-version: '9.8.2'
           cabal-version: '3.10'
 
       - name: Cache Cabal
-        uses: actions/cache@6849a6489940f00c2f30c0fb92c6274307ccb58a # v4
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v4
         with:
           path: |
             ~/.cabal/packages
