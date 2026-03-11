@@ -1,0 +1,10 @@
+{
+  "format": "axiom-gpu-performance-baseline.v1",
+  "updated_at": "2026-02-17T00:00:00.000Z",
+  "notes": "Populate backend p50 baselines from dedicated CUDA/ROCm/Metal hardware runners.",
+  "backends": {
+    "cuda": {},
+    "rocm": {},
+    "metal": {}
+  }
+}

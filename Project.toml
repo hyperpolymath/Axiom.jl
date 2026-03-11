@@ -1,0 +1,66 @@
+name = "Axiom"
+uuid = "bbd403f8-dcc5-405a-84eb-8de9d358675c"
+license = "MPL-2.0"
+version = "1.0.0"
+authors = ["Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"]
+
+[deps]
+AcceleratorGate = "59f742c7-270d-4a76-95d4-a853ae16cc71"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
+JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
+Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+SHA = "ea8e919c-243c-51af-8825-aaa63cd721ce"
+Serialization = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
+
+[weakdeps]
+AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+CryptoAccel = "99999999-9999-9999-9999-999999999999"
+DSPLibs = "33333333-3333-3333-3333-333333333333"
+FPGASynthesis = "44444444-4444-4444-4444-444444444444"
+KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
+MathAccel = "88888888-8888-8888-8888-888888888888"
+Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
+NPUAccel = "22222222-2222-2222-2222-222222222222"
+PPUCompute = "77777777-7777-7777-7777-777777777777"
+PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
+QPUInterface = "66666666-6666-6666-6666-666666666666"
+TPUCompute = "11111111-1111-1111-1111-111111111111"
+VPURuntime = "55555555-5555-5555-5555-555555555555"
+
+[extensions]
+AxiomAMDGPUExt = "AMDGPU"
+AxiomCUDAExt = "CUDA"
+AxiomCryptoExt = "CryptoAccel"
+AxiomDSPExt = "DSPLibs"
+AxiomFPGAExt = "FPGASynthesis"
+AxiomMathExt = "MathAccel"
+AxiomMetalExt = "Metal"
+AxiomNPUExt = "NPUAccel"
+AxiomPPUExt = "PPUCompute"
+AxiomPyTorchExt = "PyCall"
+AxiomQPUExt = "QPUInterface"
+AxiomTPUExt = "TPUCompute"
+AxiomVPUExt = "VPURuntime"
+
+[compat]
+AcceleratorGate = "0.1"
+Dates = "1"
+HTTP = "1.10.19"
+JSON = "0.21, 1"
+JSON3 = "1.14.3"
+SHA = "0.7, 1"
+Zygote = "0.6"
+julia = "1.10"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]

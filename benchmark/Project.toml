@@ -1,0 +1,15 @@
+name = "AxiomBenchmarks"
+
+[deps]
+Axiom = "bbd403f8-dcc5-405a-84eb-8de9d358675c"
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
+JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+
+[compat]
+Axiom = "1"
+BenchmarkTools = "1"
+julia = "1.10"

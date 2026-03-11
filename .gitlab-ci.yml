@@ -1,0 +1,180 @@
+# SPDX-FileCopyrightText: 2025 Axiom.jl Contributors
+# SPDX-License-Identifier: PMPL-1.0-or-later
+
+# GitLab CI/CD Configuration for Axiom.jl
+# RSR-compliant pipeline
+
+stages:
+  - validate
+  - build
+  - test
+  - security
+  - deploy
+
+variables:
+  JULIA_NUM_THREADS: "2"
+  RUST_BACKTRACE: "1"
+
+# =============================================================================
+# Validation Stage
+# =============================================================================
+
+rsr-compliance:
+  stage: validate
+  image: alpine:latest
+  script:
+    - |
+      echo "Checking RSR compliance..."
+      files="README.md LICENSE SECURITY.md CODE_OF_CONDUCT.md CONTRIBUTING.md GOVERNANCE.md CHANGELOG.md MAINTAINERS.md FUNDING.yml flake.nix Justfile"
+      for file in $files; do
+        if [ -f "$file" ]; then
+          echo "✓ $file"
+        else
+          echo "✗ $file MISSING"
+          exit 1
+        fi
+      done
+      echo "✓ RSR compliance passed"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+lint:
+  stage: validate
+  image: rust:latest
+  script:
+    - cd rust && cargo fmt --check
+    - cd rust && cargo clippy -- -D warnings
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+# =============================================================================
+# Build Stage
+# =============================================================================
+
+build-rust:
+  stage: build
+  image: rust:latest
+  script:
+    - cd rust && cargo build --release
+  artifacts:
+    paths:
+      - rust/target/release/libaxiom_rust.*
+    expire_in: 1 week
+  cache:
+    key: rust-$CI_COMMIT_REF_SLUG
+    paths:
+      - rust/target/
+
+build-zig:
+  stage: build
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl xz
+    - curl -L https://ziglang.org/download/0.11.0/zig-linux-x86_64-0.11.0.tar.xz | tar -xJ
+    - export PATH="$PWD/zig-linux-x86_64-0.11.0:$PATH"
+  script:
+    - cd zig && zig build -Doptimize=ReleaseFast
+  artifacts:
+    paths:
+      - zig/zig-out/lib/libaxiom_zig.*
+    expire_in: 1 week
+
+# =============================================================================
+# Test Stage
+# =============================================================================
+
+test-julia:
+  stage: test
+  image: julia:1.10
+  script:
+    - julia --project -e 'using Pkg; Pkg.instantiate(); Pkg.test()'
+  coverage: '/Test Coverage: \d+\.\d+%/'
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+test-rust:
+  stage: test
+  image: rust:latest
+  script:
+    - cd rust && cargo test
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+test-zig:
+  stage: test
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl xz
+    - curl -L https://ziglang.org/download/0.11.0/zig-linux-x86_64-0.11.0.tar.xz | tar -xJ
+    - export PATH="$PWD/zig-linux-x86_64-0.11.0:$PATH"
+  script:
+    - cd zig && zig build test
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# =============================================================================
+# Security Stage
+# =============================================================================
+
+security-audit:
+  stage: security
+  image: rust:latest
+  before_script:
+    - cargo install cargo-audit
+  script:
+    - cd rust && cargo audit
+  allow_failure: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+
+dependency-scan:
+  stage: security
+  image:
+    name: aquasec/trivy:latest
+    entrypoint: [""]
+  script:
+    - trivy fs --exit-code 1 --severity HIGH,CRITICAL .
+  allow_failure: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# =============================================================================
+# Deploy Stage
+# =============================================================================
+
+pages:
+  stage: deploy
+  image: julia:1.10
+  script:
+    - julia --project=docs -e '
+        using Pkg
+        Pkg.develop(PackageSpec(path=pwd()))
+        Pkg.instantiate()
+        include("docs/make.jl")
+      '
+    - mv docs/build public
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# =============================================================================
+# Scheduled Jobs
+# =============================================================================
+
+weekly-security:
+  stage: security
+  image: rust:latest
+  before_script:
+    - cargo install cargo-audit cargo-deny
+  script:
+    - cd rust && cargo audit
+    - cd rust && cargo deny check
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'

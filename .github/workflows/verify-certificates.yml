@@ -1,0 +1,142 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
+name: Verify Proof Certificates
+
+on:
+  pull_request:
+    paths:
+      - 'proofs/**/*.proof'
+      - 'proofs/**/*.json'
+      - 'src/verification/**'
+      - 'test/verification/**'
+      - 'test/ci/certificate_integrity.jl'
+      - '.github/workflows/verify-certificates.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'proofs/**/*.proof'
+      - 'proofs/**/*.json'
+      - 'src/verification/**'
+      - '.github/workflows/verify-certificates.yml'
+  workflow_dispatch:
+
+permissions: read-all
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-certificates:
+    name: Verify proof artifacts and integrity
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+
+      - name: Setup Julia
+        uses: julia-actions/setup-julia@5c9647d97b78a5debe5164e9eec09d653d29bd71 # v2
+        with:
+          version: '1.10'
+
+      - name: Cache Julia dependencies
+        uses: julia-actions/cache@e8472695fb3c2028b1118dc399c8440ff497d409 # v2
+
+      - name: Instantiate / Build / Precompile
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile()'
+
+      - name: Run certificate integrity tests
+        run: julia --project=. test/ci/certificate_integrity.jl
+
+      - name: Verify repository proof certificates and build report
+        run: |
+          mkdir -p reports
+          julia --project=. -e '
+            using Axiom
+            using JSON
+            using SHA
+            using Dates
+
+            cert_files = String[]
+            if isdir("proofs")
+              for (root, _, files) in walkdir("proofs")
+                for file in files
+                  if endswith(file, ".proof") || endswith(file, ".json")
+                    push!(cert_files, joinpath(root, file))
+                  end
+                end
+              end
+            end
+
+            sort!(cert_files)
+
+            report = Dict(
+              "timestamp" => string(now(UTC)),
+              "workflow" => "verify-certificates",
+              "certificates" => Any[]
+            )
+
+            failed = String[]
+
+            open("reports/certificate-digests.sha256", "w") do digest_io
+              if isempty(cert_files)
+                println("No proof certificates found.")
+                println(digest_io, "# no proof certificates found")
+              end
+
+              for cert_file in cert_files
+                bytes = read(cert_file)
+                digest = bytes2hex(sha256(bytes))
+                println(digest_io, "$(digest)  $(cert_file)")
+
+                entry = Dict(
+                  "file" => cert_file,
+                  "sha256" => digest,
+                  "valid" => false
+                )
+
+                try
+                  cert = import_proof_certificate(cert_file)
+                  valid = verify_proof_certificate(cert)
+                  entry["valid"] = valid
+                  entry["property"] = cert.property
+                  entry["status"] = string(cert.status)
+                  entry["proof_method"] = cert.proof_method
+                  entry["axiom_version"] = cert.axiom_version
+                  if !valid
+                    push!(failed, cert_file)
+                  end
+                catch err
+                  entry["error"] = string(err)
+                  push!(failed, cert_file)
+                end
+
+                push!(report["certificates"], entry)
+              end
+            end
+
+            open("reports/certificate-verification-report.json", "w") do io
+              JSON.print(io, report, 2)
+            end
+
+            println("Certificates checked: $(length(cert_files))")
+            println("Failed certificates: $(length(failed))")
+
+            if !isempty(failed)
+              println("Failure list:")
+              for file in failed
+                println("  - $(file)")
+              end
+              exit(1)
+            end
+          '
+
+      - name: Upload verification report artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: certificate-integrity-report
+          path: |
+            reports/certificate-verification-report.json
+            reports/certificate-digests.sha256
+          retention-days: 90

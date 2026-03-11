@@ -1,0 +1,1 @@
+(parameterize ([optimize-level 3] [compile-file-message #f]) (compile-program "/var/mnt/eclipse/repos/Axiom.jl/ffi/idris/build/exec/hello_app/hello.ss"))

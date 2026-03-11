@@ -1,0 +1,335 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v0.1.0)'
+        required: true
+
+permissions: read-all
+
+jobs:
+  # ============================================================================
+  # Release Readiness Gates (Compatibility + Smoke)
+  # ============================================================================
+  release-readiness:
+    name: Release readiness - Julia ${{ matrix.julia-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        julia-version: ['1.10', '1.11']
+
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+
+      - uses: julia-actions/setup-julia@5c9647d97b78a5debe5164e9eec09d653d29bd71 # v2
+        with:
+          version: ${{ matrix.julia-version }}
+
+      - uses: julia-actions/cache@e8472695fb3c2028b1118dc399c8440ff497d409 # v2
+
+      - name: Instantiate / Build / Precompile / Test
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile(); Pkg.test()'
+
+      - name: Runtime smoke (CPU)
+        run: julia --project=. test/ci/runtime_smoke.jl
+
+  # ============================================================================
+  # Build Julia Package
+  # ============================================================================
+  build-julia:
+    name: Build Julia Package
+    needs: [release-readiness]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        julia-version: ['1.10']
+
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+
+      - uses: julia-actions/setup-julia@5c9647d97b78a5debe5164e9eec09d653d29bd71 # v2
+        with:
+          version: ${{ matrix.julia-version }}
+
+      - uses: julia-actions/cache@e8472695fb3c2028b1118dc399c8440ff497d409 # v2
+
+      - name: Instantiate / Build / Precompile / Test
+        run: |
+          julia --project -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile(); Pkg.test()'
+
+      - name: Runtime smoke (CPU)
+        run: julia --project=. test/ci/runtime_smoke.jl
+
+      - name: Package artifacts
+        run: |
+          mkdir -p dist
+          tar -czf dist/Axiom.jl-${{ matrix.os }}.tar.gz src/ Project.toml README.adoc LICENSE
+
+      - name: Upload Julia artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: julia-${{ matrix.os }}
+          path: dist/
+
+  # ============================================================================
+  # Build Rust Backend
+  # ============================================================================
+  build-rust:
+    name: Build Rust Backend
+    needs: [release-readiness]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: libaxiom_core.so
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: libaxiom_core.dylib
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: axiom_core.dll
+
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@6d9817901c499d6b02debbb57edb38d33daa680b # stable
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+
+      - name: Cache Cargo
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: ${{ runner.os }}-cargo-release-${{ hashFiles('rust/Cargo.lock') }}
+
+      - name: Build release
+        working-directory: rust
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package Rust artifacts
+        run: |
+          mkdir -p dist
+          cp rust/target/${{ matrix.target }}/release/${{ matrix.artifact_name }} dist/
+
+      - name: Upload Rust artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: rust-${{ matrix.os }}
+          path: dist/
+
+  # ============================================================================
+  # Generate SBOMs
+  # ============================================================================
+  generate-sbom:
+    name: Generate Software Bill of Materials
+    runs-on: ubuntu-latest
+    needs: [build-julia, build-rust]
+
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+
+      - name: Generate Julia SBOM
+        run: |
+          julia --project -e '
+            using Pkg
+            using JSON
+
+            # Get package info
+            pkg_info = Pkg.project()
+            deps = Pkg.dependencies()
+
+            sbom = Dict(
+              "bomFormat" => "CycloneDX",
+              "specVersion" => "1.4",
+              "version" => 1,
+              "metadata" => Dict(
+                "component" => Dict(
+                  "type" => "library",
+                  "name" => pkg_info.name,
+                  "version" => string(pkg_info.version),
+                  "description" => "Provably Correct Machine Learning Framework"
+                )
+              ),
+              "components" => [
+                Dict(
+                  "type" => "library",
+                  "name" => string(uuid),
+                  "version" => string(info.version)
+                ) for (uuid, info) in deps if info.is_direct_dep
+              ]
+            )
+
+            open("sbom-julia.json", "w") do f
+              JSON.print(f, sbom, 2)
+            end
+          '
+
+      - name: Generate Rust SBOM
+        working-directory: rust
+        run: |
+          cargo install cargo-sbom
+          cargo sbom > ../sbom-rust.json
+
+      - name: Upload SBOMs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sboms
+          path: |
+            sbom-julia.json
+            sbom-rust.json
+
+  # ============================================================================
+  # Create GitHub Release
+  # ============================================================================
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-julia, build-rust, generate-sbom]
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: release-artifacts/
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          find release-artifacts -type f -exec cp {} release/ \;
+
+      - name: Generate checksums
+        working-directory: release
+        run: |
+          sha256sum * > checksums.txt
+
+      - name: Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create release notes
+        run: |
+          cat > release-notes.md << 'EOF'
+          # Axiom.jl ${{ steps.version.outputs.version }}
+
+          ## What's New
+
+          <!-- Planned: Auto-generate from commits -->
+
+          ## Installation
+
+          ### Julia Package
+
+          ```julia
+          using Pkg
+          Pkg.add(url="https://github.com/hyperpolymath/Axiom.jl", rev="${{ steps.version.outputs.version }}")
+          ```
+
+          ### Rust Backend
+
+          Download the appropriate library for your platform:
+          - Linux: `libaxiom_core.so`
+          - macOS: `libaxiom_core.dylib`
+          - Windows: `axiom_core.dll`
+
+          ## Verification
+
+          All artifacts are signed and include SLSA provenance.
+
+          ### Verify Checksums
+
+          ```bash
+          sha256sum -c checksums.txt
+          ```
+
+          ### Verify SLSA Provenance
+
+          ```bash
+          # Install slsa-verifier
+          gh release download -R slsa-framework/slsa-verifier
+
+          # Verify artifacts
+          slsa-verifier verify-artifact --provenance-path attestation.intoto.jsonl --source-uri github.com/hyperpolymath/Axiom.jl
+          ```
+
+          ## SBOM
+
+          Software Bill of Materials included:
+          - `sbom-julia.json` - Julia dependencies (CycloneDX format)
+          - `sbom-rust.json` - Rust dependencies (CycloneDX format)
+
+          ---
+
+          **Full Changelog**: https://github.com/hyperpolymath/Axiom.jl/compare/previous...${{ steps.version.outputs.version }}
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Axiom.jl ${{ steps.version.outputs.version }}
+          body_path: release-notes.md
+          files: release/*
+          draft: false
+          prerelease: false
+
+  # ============================================================================
+  # SLSA Provenance
+  # ============================================================================
+  provenance:
+    name: Generate SLSA Provenance
+    needs: [create-release]
+    permissions:
+      actions: read
+      id-token: write
+      contents: write
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@c747fe7769adf3656dc7d588b161cb614d7abfee # v1.10.0
+    with:
+      base64-subjects: "${{ needs.create-release.outputs.hashes }}"
+      upload-assets: true
+
+  # ============================================================================
+  # Publish to Registries
+  # ============================================================================
+  publish-julia:
+    name: Publish to Julia General Registry
+    runs-on: ubuntu-latest
+    needs: [provenance]
+
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+
+      - uses: julia-actions/setup-julia@5c9647d97b78a5debe5164e9eec09d653d29bd71 # v2
+        with:
+          version: '1.10'
+
+      - name: Register with Julia General
+        run: |
+          # Trigger JuliaRegistrator
+          # This is typically done via @JuliaRegistrator comment on GitHub
+          echo "Visit: https://github.com/hyperpolymath/Axiom.jl/issues/new"
+          echo "Comment: @JuliaRegistrator register"

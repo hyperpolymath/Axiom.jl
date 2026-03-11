@@ -1,0 +1,58 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
+name: Code Quality
+permissions: read-all
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+
+      - name: Check file permissions
+        run: |
+          find . -type f -perm /111 -name "*.sh" | head -10 || true
+
+      - name: Check for secrets
+        uses: trufflesecurity/trufflehog@6961f2bace57ab32b23b3ba40f8f420f6bc7e004 # v3.93.3
+        with:
+          path: ./
+          base: ${{ github.event.pull_request.base.sha || github.event.before }}
+          head: ${{ github.sha }}
+        continue-on-error: true
+      
+      - name: Check unresolved markers
+        run: |
+          echo "=== unresolved markers (src/ext/test) ==="
+          markers=$(rg -n "TO[D]O|FIXM[E]|TB[D]|OPEN_ITEM|FIX_ITEM|HACK|XXX" src ext test || true)
+          if [ -n "$markers" ]; then
+            echo "$markers"
+            echo "::error::Unresolved implementation markers found in src/ext/test"
+            exit 1
+          fi
+          echo "✅ None found in src/ext/test"
+      
+      - name: Check for large files
+        run: |
+          find . -type f -size +1M -not -path "./.git/*" | head -10 || echo "No large files"
+      
+      - name: EditorConfig check
+        uses: editorconfig-checker/action-editorconfig-checker@9f8f6065f4db902c0c56cafa67cea18b3ebbb680 # main
+        continue-on-error: true
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+      - name: Check documentation
+        run: |
+          MISSING=""
+          [ ! -f "README.md" ] && [ ! -f "README.adoc" ] && MISSING="$MISSING README"
+          [ ! -f "LICENSE" ] && [ ! -f "LICENSE.txt" ] && [ ! -f "LICENSE.md" ] && MISSING="$MISSING LICENSE"
+          [ ! -f "CONTRIBUTING.md" ] && [ ! -f "CONTRIBUTING.adoc" ] && MISSING="$MISSING CONTRIBUTING"
+          
+          if [ -n "$MISSING" ]; then
+            echo "::warning::Missing docs:$MISSING"
+          else
+            echo "✅ Core documentation present"
+          fi

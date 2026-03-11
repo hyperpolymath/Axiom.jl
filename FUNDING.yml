@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2025 Axiom.jl Contributors
+# SPDX-License-Identifier: PMPL-1.0-or-later
+
+# Funding information for Axiom.jl
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository
+
+github: []
+patreon: # axiomjl
+open_collective: # axiomjl
+ko_fi: # axiomjl
+tidelift: # npm/axiom-jl
+community_bridge: # axiomjl
+liberapay: # axiomjl
+issuehunt: # axiomjl
+otechie: # axiomjl
+lfx_crowdfunding: # axiomjl
+custom:
+  - https://axiom-jl.org/sponsor
+  - https://github.com/sponsors/Hyperpolymath

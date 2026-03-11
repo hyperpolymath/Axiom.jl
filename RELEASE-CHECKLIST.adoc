@@ -1,0 +1,108 @@
+// SPDX-License-Identifier: PMPL-1.0-or-later
+= Axiom.jl Release Checklist
+:toc:
+:toclevels: 2
+
+Use this checklist for every release tag (`vX.Y.Z`).
+
+== 1. Pre-Release Readiness
+
+* [ ] Version metadata is consistent:
+** `Project.toml` version
+** `src/Axiom.jl` -> `const VERSION`
+** `CHANGELOG.adoc` (if release notes are curated manually)
+* [ ] Manifest is resolved on the target Julia line (`1.10+`).
+
+[source,bash]
+----
+julia --project=. -e 'using Pkg; Pkg.resolve(); Pkg.instantiate(); Pkg.precompile()'
+----
+
+== 2. Validation Gates (Must Pass)
+
+* [ ] Full package pipeline passes.
+
+[source,bash]
+----
+julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile(); Pkg.test()'
+----
+
+* [ ] Consolidated readiness gate passes (no skipped critical checks).
+
+[source,bash]
+----
+./scripts/readiness-check.sh
+----
+
+* [ ] Runtime smoke test passes (inference + verification + certificates).
+
+[source,bash]
+----
+julia --project=. -e 'using Axiom; model=Sequential(Dense(10,5,relu),Dense(5,3),Softmax()); x=Tensor(randn(Float32,2,10)); result=verify(model, properties=[ValidProbabilities(), FiniteOutput(), NoNaN(), NoInf()], data=[(x,nothing)]); @assert result.passed; cert=generate_certificate(model, result, model_name="release-smoke", test_data=[(x,nothing)]); p=tempname()*".cert"; save_certificate(cert,p); loaded=load_certificate(p); @assert verify_certificate(loaded); println("RELEASE_SMOKE_OK")'
+----
+
+* [ ] Example scripts pass.
+
+[source,bash]
+----
+julia --project=. examples/simple_classifier.jl
+julia --project=. examples/mnist.jl
+----
+
+== 3. Marker and Scope Hygiene
+
+* [ ] No unresolved code/work markers in tracked source paths.
+
+[source,bash]
+----
+rg -n "OPEN_ITEM|FIX_ITEM|XXX|HACK" src test ext
+----
+
+* [ ] No legacy marker strings remain.
+
+[source,bash]
+----
+rg -n "TO[D]O|FIXM[E]|TB[D]" .
+----
+
+== 4. Documentation and Promise Alignment
+
+* [ ] README and wiki claims match implemented, tested behavior.
+* [ ] Deferred/unshipped promises are tracked in:
+** `docs/wiki/Roadmap-Commitments.md`
+** `ROADMAP.md`
+** `ROADMAP.adoc`
+* [ ] User/developer docs reflect current workflows:
+** `docs/wiki/User-Guide.md`
+** `docs/wiki/Developer-Guide.md`
+
+== 5. Release Execution
+
+* [ ] Create and push tag.
+
+[source,bash]
+----
+git tag vX.Y.Z
+git push origin vX.Y.Z
+----
+
+* [ ] Confirm GitHub `Release` workflow succeeded:
+** `build-julia`
+** `build-rust`
+** `generate-sbom`
+** `create-release`
+** `provenance`
+** `publish-julia`
+
+* [ ] Confirm assets exist on release page:
+** Julia artifact archives
+** Rust backend binaries (`.so`, `.dylib`, `.dll`)
+** `checksums.txt`
+** `sbom-julia.json`, `sbom-rust.json`
+** SLSA provenance artifacts
+
+== 6. Post-Release
+
+* [ ] Trigger/confirm Julia registry registration (`@JuliaRegistrator register`).
+* [ ] Sanity-install from tag in a clean environment.
+* [ ] Open next development milestone and carry forward roadmap commitments.
