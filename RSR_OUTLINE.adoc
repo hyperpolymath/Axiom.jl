@@ -69,7 +69,7 @@ just validate-rsr
 |Task runner with 50+ recipes
 
 |`LICENSE.txt`
-|AGPL + Palimpsest dual license
+|MPL-2.0 (Julia ecosystem requirement)
 
 |`README.adoc`
 |This file
@@ -157,7 +157,7 @@ project/
 * `justfile`
 * `README.adoc`
 * `RSR_COMPLIANCE.adoc`
-* `LICENSE.txt` (AGPL + Palimpsest)
+* `LICENSE.txt` (MPL-2.0)
 * `.well-known/security.txt`
 * `.well-known/ai.txt`
 * `.well-known/humans.txt`
