@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: PMPL-1.0-or-later
 ||| Axiom.jl Foreign Function Interface Declarations
 |||
 ||| This module declares C ABI symbols used by the Idris2 ABI scaffold.

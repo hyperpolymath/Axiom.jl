@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: PMPL-1.0-or-later
 ||| Axiom.jl ABI Layout Utilities
 |||
 ||| This module provides a lightweight, concrete memory-layout model used by

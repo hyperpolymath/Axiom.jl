@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: PMPL-1.0-or-later
 ||| Axiom.jl ABI Type Definitions
 |||
 ||| This module defines the core ABI-facing types used by the Idris2
