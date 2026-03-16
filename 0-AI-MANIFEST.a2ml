@@ -1,6 +1,6 @@
 ;; SPDX-License-Identifier: PMPL-1.0-or-later
 ;; 0-AI-MANIFEST.a2ml - AI Agent Entry Point for Axiom.jl
-;; Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <jonathan.jewell@open.ac.uk>
+;; Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 ;;
 ;; This file is the FIRST file any AI agent must read when entering this repository.
 ;; It defines canonical locations, critical invariants, and lifecycle hooks.
@@ -56,7 +56,7 @@
   (invariants
     ("SCM files ONLY in .machine_readable/ - NEVER in repository root"
      "SPDX header must be PMPL-1.0-or-later on all hyperpolymath-authored files"
-     "Author attribution: Jonathan D.A. Jewell <jonathan.jewell@open.ac.uk>"
+     "Author attribution: Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
      "Julia backend is always the reference implementation - other backends must match its behavior"
      "GPU backends are package extensions only - never hard dependencies"
      "@prove macro must use SMT solvers, never return unverified results as proven"
