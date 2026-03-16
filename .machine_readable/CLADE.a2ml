@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
+# Clade declaration — part of the gv-clade-index registry
+# See: https://github.com/hyperpolymath/gv-clade-index
+
+[identity]
+uuid = "0dc4455a-08c8-57ed-9fdb-f7931c23526f"
+primary-forge = "github"
+primary-owner = "hyperpolymath"
+canonical-name = "Axiom.jl"
+prefixed-name = "dx-Axiom.jl"
+
+[clade]
+primary = "dx"
+secondary = ["fv"]
+assigned = "2026-03-16"
+rationale = ""
+
+[forges]
+github = "hyperpolymath/Axiom.jl"
+gitlab = "hyperpolymath/Axiom.jl"
+bitbucket = "hyperpolymath/Axiom.jl"
+
+[lineage]
+type = "standalone"
+parent = "Julia package — axiom systems"
+born = "2026-03-16"
