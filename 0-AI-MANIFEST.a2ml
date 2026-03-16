@@ -15,9 +15,9 @@
   ;; =========================================================================
   (canonical-locations
     (scm-files ".machine_readable/"
-      (state ".machine_readable/STATE.scm")
-      (ecosystem ".machine_readable/ECOSYSTEM.scm")
-      (meta ".machine_readable/META.scm"))
+      (state "`.machine_readable/6a2/STATE.a2ml`")
+      (ecosystem "`.machine_readable/6a2/ECOSYSTEM.a2ml`")
+      (meta "`.machine_readable/6a2/META.a2ml`"))
 
     (source-code "src/"
       (main-module "src/Axiom.jl")
@@ -82,7 +82,7 @@
       ("just status" "Show project status")))
 
   ;; =========================================================================
-  ;; Current Status (see STATE.scm for details)
+  ;; Current Status (see .machine_readable/6a2/STATE.a2ml for details)
   ;; =========================================================================
   (status
     (completion-pct 99)
@@ -99,10 +99,10 @@
     (on-enter
       ("Read this manifest"
        "Acknowledge canonical locations"
-       "Read .machine_readable/STATE.scm for current status"
+       "Read `.machine_readable/6a2/STATE.a2ml` for current status"
        "Read TOPOLOGY.md for architecture overview"))
     (on-exit
-      ("Update .machine_readable/STATE.scm with work completed"
+      ("Update `.machine_readable/6a2/STATE.a2ml` with work completed"
        "Update TOPOLOGY.md completion dashboard if components changed"
        "Run just test if code was modified"
        "Run just scan if security-relevant changes were made"))))
