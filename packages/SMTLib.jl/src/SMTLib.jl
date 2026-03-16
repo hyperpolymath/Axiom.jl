@@ -54,7 +54,7 @@ pop!(ctx)                # restore to just x > 0
 result = check_sat(ctx)  # :sat
 ```
 
-Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <jonathan.jewell@open.ac.uk>
+Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 """
 module SMTLib
 

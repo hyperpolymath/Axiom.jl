@@ -20,7 +20,7 @@ K9!
       name = "Axiom.jl",
       version = "1.0.0",
       description = "Build and deployment automation for Axiom.jl",
-      author = "Jonathan D.A. Jewell <jonathan.jewell@open.ac.uk>",
+      author = "Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>",
     },
     warnings = [
       "This component has full system access",
