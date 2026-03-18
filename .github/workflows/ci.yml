@@ -2,7 +2,8 @@
 # SPDX-FileCopyrightText: 2025 Axiom.jl Contributors
 
 name: CI
-permissions: read-all
+permissions:
+  contents: read
 
 on:
   push:

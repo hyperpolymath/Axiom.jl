@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: PMPL-1.0-or-later
 name: Code Quality
-permissions: read-all
+permissions:
+  contents: read
 on: [push, pull_request]
 
 jobs:
