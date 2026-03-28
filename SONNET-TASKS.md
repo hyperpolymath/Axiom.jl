@@ -15,7 +15,7 @@
 5. **Update STATE.scm** with honest completion percentages after each task.
 6. **Commit after each completed task** with message format: `fix(component): complete <description>`
 7. **Julia version:** 1.10+ (check Project.toml compat)
-8. **Run full test suite** after every 3 tasks: `cd /var/mnt/eclipse/repos/Axiom.jl && julia --project=. -e 'using Pkg; Pkg.test()'`
+8. **Run full test suite** after every 3 tasks: `cd /var$REPOS_DIR/Axiom.jl && julia --project=. -e 'using Pkg; Pkg.test()'`
 
 ---
 
@@ -37,7 +37,7 @@
 
 **Verification:**
 ```julia
-cd /var/mnt/eclipse/repos/Axiom.jl
+cd /var$REPOS_DIR/Axiom.jl
 julia --project=. -e '
 using Axiom
 # Test 1: gradient of scalar function
@@ -90,7 +90,7 @@ println("AUTOGRAD TESTS PASSED")
 
 **Verification:**
 ```julia
-cd /var/mnt/eclipse/repos/Axiom.jl
+cd /var$REPOS_DIR/Axiom.jl
 julia --project=. -e '
 using Axiom
 
@@ -171,7 +171,7 @@ println("PROOF EXPORT TESTS PASSED")
 >
 > **Verification (Option A):**
 > ```julia
-> cd /var/mnt/eclipse/repos/Axiom.jl
+> cd /var$REPOS_DIR/Axiom.jl
 > julia --project=. -e '
 > using Axiom
 >
@@ -191,7 +191,7 @@ println("PROOF EXPORT TESTS PASSED")
 >
 > **Verification (Option B):**
 > ```julia
-> cd /var/mnt/eclipse/repos/Axiom.jl
+> cd /var$REPOS_DIR/Axiom.jl
 > julia --project=. -e '
 > using Axiom
 > # Verify no broken exports
@@ -228,7 +228,7 @@ println("PROOF EXPORT TESTS PASSED")
 
 **Verification:**
 ```julia
-cd /var/mnt/eclipse/repos/Axiom.jl
+cd /var$REPOS_DIR/Axiom.jl
 julia --project=. -e '
 using Axiom
 
@@ -259,7 +259,7 @@ println("GPU HOOKS TESTS PASSED (no GPU packages loaded)")
 
 **Verification:**
 ```julia
-cd /var/mnt/eclipse/repos/Axiom.jl
+cd /var$REPOS_DIR/Axiom.jl
 julia --project=. -e '
 using Axiom
 d = Axiom.Dense(10, 5)
@@ -290,7 +290,7 @@ println("MODEL METADATA TESTS PASSED")
 
 **Verification:**
 ```julia
-cd /var/mnt/eclipse/repos/Axiom.jl
+cd /var$REPOS_DIR/Axiom.jl
 julia --project=. -e '
 using Axiom
 c = Axiom.Conv3d(3, 16; kernel_size=(3,3,3), stride=(1,1,1), padding=(1,1,1))
@@ -356,7 +356,7 @@ println("CONV3D TESTS PASSED")
 
 **Verification:**
 ```julia
-cd /var/mnt/eclipse/repos/Axiom.jl
+cd /var$REPOS_DIR/Axiom.jl
 julia --project=. -e '
 using Axiom
 # Check no phantom exports
@@ -388,7 +388,7 @@ println("INTEROP EXPORTS CHECK PASSED")
 ## FINAL VERIFICATION — RUN AFTER ALL TASKS
 
 ```bash
-cd /var/mnt/eclipse/repos/Axiom.jl
+cd /var$REPOS_DIR/Axiom.jl
 
 # 1. Full test suite
 julia --project=. -e 'using Pkg; Pkg.test()'
