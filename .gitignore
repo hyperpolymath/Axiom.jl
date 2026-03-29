@@ -94,3 +94,4 @@ sync_repos_report*.txt
 
 # Crash recovery artifacts
 ai-cli-crash-capture/
+SONNET-TASKS.md
