@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
+
+[project]
+name = "Axiom.jl"
+description = "Axiom Julia package for coprocessor dispatch"
+
+[container]
+base = "cgr.dev/chainguard/wolfi-base:latest"
