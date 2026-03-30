@@ -5,11 +5,11 @@
 #
 # This file defines the core `Shape` representation and associated functions
 # that enable Axiom.jl's powerful **compile-time shape checking and inference**.
-# The `Shape` type is a cornerstone of the framework's "provably correct ML"
+# The `Shape` type targets compile-time shape verification (formal proofs pending).
 # philosophy, allowing developers to define and reason about tensor dimensions
 # at the type level.
 #
-# Significance for Provably Correct ML:
+# Target: Provably Correct ML (formal proofs pending):
 # -----------------------------------
 # By making tensor shapes part of the type system, Axiom.jl can:
 # 1.  **Prevent Runtime Shape Errors**: Many common bugs in neural network

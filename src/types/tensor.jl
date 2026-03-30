@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: PMPL-1.0-or-later
 #
-# Axiom.jl Tensor Type System: Foundations for Provably Correct Machine Learning
+# Axiom.jl Tensor Type System: Foundations targeting provably correct ML (proofs pending)
 # ===========================================================================
 #
 # This file defines the core tensor types for Axiom.jl, designed to bring

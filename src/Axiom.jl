@@ -4,7 +4,7 @@
 """
     Axiom
 
-Axiom.jl: Provably Correct Machine Learning
+Axiom.jl: Toward Provably Correct Machine Learning (proofs in progress)
 
 Axiom.jl is a cutting-edge Julia framework designed to bridge the gap between
 high-performance machine learning and rigorous formal verification. In an era
