@@ -32,3 +32,9 @@
 - **0 E2E tests** for a foundational math library
 
 ## Priority: P2 (MEDIUM) -- solid foundation, needs E2E and benchmark verification
+
+## FAKE-FUZZ ALERT
+
+- `tests/fuzz/placeholder.txt` is a scorecard placeholder inherited from rsr-template-repo — it does NOT provide real fuzz testing
+- Replace with an actual fuzz harness (see rsr-template-repo/tests/fuzz/README.adoc) or remove the file
+- Priority: P2 — creates false impression of fuzz coverage
