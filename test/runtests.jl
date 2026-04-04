@@ -751,6 +751,10 @@ with open(args.output, "w", encoding="utf-8") as f:
     include("verification/serialization_tests.jl")
     include("verification/proof_export_tests.jl")
 
+    # CRG Grade C tests
+    include("e2e_test.jl")
+    include("property_test.jl")
+
 end
 
 println("\nAll tests passed!")
