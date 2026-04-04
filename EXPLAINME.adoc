@@ -1,36 +1,243 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
 = Axiom.jl — Show Me The Receipts
+Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 :toc:
 :icons: font
 
-The README makes claims. This file backs them up.
+The README makes claims. This file backs them up with file paths, honest caveats,
+and a precise description of the critical paths through a sizeable codebase.
 
 [quote, README]
 ____
-Axiom.jl is a *next-generation ML framework* that combines:
+Axiom.jl is a next-generation ML framework that combines compile-time shape
+verification, formal property guarantees, optional Zig/GPU backend acceleration,
+and Julia elegance. Machine learning where bugs are caught at compile time, not in
+production. Shape errors caught before runtime. Verification checks and certificate
+workflows. Model packaging with registry manifests. REST, GraphQL, and gRPC serving.
+PyTorch import and ONNX export.
 ____
 
-== Technology Choices
+== What It Actually Does Today
+
+=== Claim: Neural network layers with correct forward passes
+
+*True and tested.* `Dense(in, out, activation)` in `src/layers/dense.jl` supports
+forward pass, optional bias, activation functions, and `DimensionMismatch` on wrong
+input shapes. `Conv2d(in_ch, out_ch, kernel_size; padding, stride)` in
+`src/layers/conv.jl` computes correct output spatial dimensions — the test verifies
+a (4,32,32,3) input through a (3,64,(3,3)) conv produces (4,30,30,64), and (4,32,32,64)
+with `padding=1`. `Sequential`, `Chain`, `Residual` containers are present.
+Activation functions: `relu`, `sigmoid`, `tanh`, `softmax`, `gelu`, `leaky_relu`
+and their in-place backend variants. `BatchNorm`, `LayerNorm`, `Dropout`,
+`MaxPool2d`, `AvgPool2d`, `GlobalAvgPool`, `Flatten` are all exported.
+Invertible layers (`CouplingLayer`, `ActNorm`, `Invertible1x1Conv`, `RevBlock`,
+`NormalizingFlow`) with `inverse`, `log_abs_det_jacobian`, and `forward_and_log_det`.
+
+=== Claim: Compile-time shape verification via `@axiom` DSL
+
+*DSL implemented; proof backend is partial.* `src/dsl/axiom_macro.jl` implements
+the `@axiom ModelName begin ... end` macro. `src/dsl/ensure.jl` implements `@ensure`
+for runtime assertion. `src/dsl/prove.jl` implements `@prove` — Julia-native by
+default via `packages/SMTLib.jl`; an optional Zig SMT runner is triggered by the
+`AXIOM_SMT_RUNNER=zig` environment variable and `AXIOM_ZIG_LIB` path. The
+`@prove ∃x. x > 0` example from the README works with the Julia-native backend.
+
+*Honest caveat:* The `@axiom` macro's shape-mismatch detection at "compile time"
+means macro-expansion time, not Julia's actual compile pass. For the `Conv -> Dense`
+mismatch example in the README, the error is raised when the model is constructed,
+not when the file is parsed. This is earlier than a runtime crash but is not
+type-level (dependent type) verification. The README's PyTorch comparison is
+directionally accurate.
+
+=== Claim: Verification properties, certificates, and proof assistant export
+
+`src/verification/properties.jl` defines `ValidProbabilities`, `FiniteOutput`,
+`NoNaN`, `NoInf` as checkable property types. `src/verification/checker.jl`
+implements `verify(model, properties, data)` returning `VerificationResult` with
+`passed::Bool`. `src/verification/certificates.jl` provides `ProofCertificate`,
+`generate_certificate`, `save_certificate`, `load_certificate`. Telemetry:
+`reset_verification_telemetry!`, `verification_result_telemetry`,
+`verification_telemetry_report`. Proof assistant export (`src/proof_export.jl`):
+`export_lean`, `export_coq`, `export_isabelle`, `proof_obligation_manifest`,
+`reconcile_proof_bundle`.
+
+=== Claim: REST, GraphQL, and gRPC serving APIs
+
+`src/serving/api.jl` implements `serve_rest(model; host, port, background)`,
+`serve_graphql(model; ...)`, `serve_grpc(model; ...)` and `generate_grpc_proto`.
+HTTP is a hard dependency in `Project.toml`. Tests verify the serving functions
+exist and that the gRPC proto generation produces a valid `.proto` file.
+
+=== Claim: PyTorch import and ONNX export
+
+`src/integrations/interop.jl` exports `from_pytorch` and `to_onnx`. `from_pytorch`
+supports both direct `.pt/.pth/.ckpt` checkpoint import (via optional `PyCall`)
+and canonical descriptor JSON import. `to_onnx` supports `Sequential`/`Pipeline`
+models with Dense/Conv/Norm/Pool layers and common activations. The PyCall path
+is declared as a weak dependency extension (`AxiomPyTorchExt`).
+
+=== Claim: Zig backend with optional SIMD / multi-threading
+
+`src/backends/zig_ffi.jl` defines `ZigBackend` and `init_zig_backend(lib_path)`.
+The `__init__` function in `src/Axiom.jl` loads the Zig shared library when
+`AXIOM_ZIG_LIB` is set in the environment, with a graceful warning fallback.
+`src/zig/` contains the Zig source for matmul, conv, norm, attention, and related
+kernels. The Zig backend is also used for the optional SMT runner path in `@prove`.
+
+== How It Works
+
+Module load sequence (critical path order in `src/Axiom.jl`):
+
+. Types: `src/types/tensor.jl` (`Tensor`, `DynamicTensor`, `Shape`),
+  `src/types/shapes.jl`.
+. Layers: `abstract.jl` → `dense.jl` → `conv.jl` → `activations.jl` →
+  `normalization.jl` → `pooling.jl`.
+. DSL macros: `axiom_macro.jl` → `ensure.jl` → `prove.jl` → `pipeline.jl`.
+. Autograd: `gradient.jl` → `tape.jl` → `invertible.jl` → `invertible_rules.jl`.
+. Training: `optimizers.jl` → `loss.jl` → `train.jl`.
+. Verification: `properties.jl` → `checker.jl` → `certificates.jl` →
+  `serialization.jl` → `proof_export.jl`.
+. Backends: `abstract.jl` → `julia_backend.jl` → `gpu_hooks.jl` → `zig_ffi.jl`.
+. Model packaging: `model_metadata.jl` → `model_packaging.jl`.
+. Utilities and serving: `utils/` → `serving/api.jl` → `integrations/interop.jl`.
+
+GPU backends (CUDA, ROCm, Metal) and coprocessor backends (TPU, NPU, DSP, PPU,
+Math, FPGA, VPU, QPU, Crypto) are declared as `[extensions]` in `Project.toml`
+and loaded conditionally. The PyTorch bridge is also an extension (`AxiomPyTorchExt`
+requiring `PyCall`).
+
+== Dogfooded Across The Account
 
 [cols="1,2"]
 |===
-| Technology | Learn More
+| Project | Connection
 
-| **Zig** | https://ziglang.org
-| **Julia** | https://julialang.org
+| `ZeroProb.jl`
+| ZeroProb types are directly usable in Axiom `@ensure` assertions. The
+  module docstring in `ZeroProb.jl` shows a full `@axiom RobustTradingModel`
+  with `@ensure handles_zero_prob_events(output, MarketCrashEvent())`.
+
+| `SiliconCore.jl`
+| `smart_select_backend` and `detect_coprocessor` consume SiliconCore's
+  `CpuFeatures` struct for backend capability assessment at startup.
+
+| `AcceleratorGate.jl`
+| Direct dependency; Axiom's 15-backend dispatch architecture extends
+  AcceleratorGate's type hierarchy with ML-specific operations.
+
+| `QuantumCircuit.jl`
+| Shares the backend dispatch pattern (JuliaBackend → hardware fallthrough).
+  QuantumCircuit was an earlier proving ground for the architecture.
+
+| `VeriSimDB`
+| Model metadata and registry entry JSON is designed to be stored in
+  per-project VeriSimDB instances for queryable model provenance.
+
+| `Ephapax`
+| Axiom's invertible layers and `log_abs_det_jacobian` are a potential
+  proving ground for Ephapax linear-type proofs on reversible computation.
+
+| `hypatia` CI scan
+| `hypatia-scan.yml` validates SPDX headers; Axiom's `@prove`/`@ensure`
+  DSL is a case study in the Hypatia neurosymbolic rule design.
 |===
 
 == File Map
 
-[cols="1,2"]
+[cols="1,3"]
 |===
 | Path | What's There
 
-| `src/` | Source code
-| `ffi/` | Foreign function interface
-| `test(s)/` | Test suite
+| `src/Axiom.jl`
+| Top-level module (~250 lines): all includes in dependency order; ~150 exports
+  covering every public type, function, macro, and backend symbol.
+
+| `src/types/`
+| `tensor.jl` — `Tensor`, `DynamicTensor`, static/dynamic shape types, factory
+  functions (`axiom_zeros`, `axiom_ones`, `axiom_randn`, `zeros_like`, etc.).
+  `shapes.jl` — `Shape`, `DynamicShape`, shape inference helpers.
+
+| `src/layers/`
+| `abstract.jl` (layer protocol); `dense.jl` (Dense with bias/activation, assertion
+  guards on dimensions); `conv.jl` (Conv2d with padding/stride); `activations.jl`
+  (relu/sigmoid/tanh/softmax/gelu + in-place backend variants + ReLU/Sigmoid/Tanh
+  capitalised layer wrappers); `normalization.jl` (BatchNorm, LayerNorm, Dropout);
+  `pooling.jl` (MaxPool2d, AvgPool2d, GlobalAvgPool, Flatten);
+  `invertible.jl` (CouplingLayer, ActNorm, Invertible1x1Conv, RevBlock,
+  InvertibleSequential, NormalizingFlow).
+
+| `src/dsl/`
+| `axiom_macro.jl` — `@axiom` model definition macro; `ensure.jl` — `@ensure`
+  runtime assertion; `prove.jl` — `@prove` with Julia-native SMT + optional
+  Zig runner; `pipeline.jl` — `|>` chain sugar for model definition.
+
+| `src/autograd/`
+| `gradient.jl` (Zygote-backed `gradient`, `jacobian`, `pullback`, `@no_grad`,
+  `clip_grad_norm!`); `tape.jl` (`GradientTape`, `gradient_with_tape`);
+  `invertible_rules.jl` (Zygote rules for invertible layers).
+
+| `src/training/`
+| `optimizers.jl` (Adam, SGD, RMSprop, AdamW); `loss.jl` (mse_loss,
+  crossentropy, binary_crossentropy); `train.jl` (`train!`, `compile`).
+
+| `src/verification/`
+| `properties.jl` (ValidProbabilities, FiniteOutput, NoNaN, NoInf, check);
+  `checker.jl` (`verify`, `VerificationResult`, `EnsureViolation`);
+  `certificates.jl` (`ProofCertificate`, generate/save/load/verify certificate);
+  `serialization.jl` (serialize/deserialize proof); `verification.jl` (telemetry).
+
+| `src/proof_export.jl`
+| Lean/Coq/Isabelle export, proof obligation manifest, bundle reconciliation,
+  certificate import from proof assistants.
+
+| `src/backends/`
+| `abstract.jl` (AbstractBackend protocol); `julia_backend.jl` (JuliaBackend,
+  SmartBackend, 15 coprocessor type stubs); `gpu_hooks.jl` (detect_gpu,
+  cuda/rocm/metal_available, device counts, resource report);
+  `zig_ffi.jl` (ZigBackend, init_zig_backend, Zig SMT runner).
+
+| `src/model_metadata.jl`
+| `ModelMetadata`, `VerificationClaim`, create/save/load/validate, `verify_and_claim!`.
+
+| `src/model_packaging.jl`
+| `export_model_package`, `load_model_package_manifest`, `build_registry_entry`,
+  `export_registry_entry`, `save_model_bundle`, `load_model_bundle`.
+
+| `src/serving/api.jl`
+| `serve_rest`, `serve_graphql`, `graphql_execute`, `serve_grpc`,
+  `generate_grpc_proto`, `grpc_predict`, `grpc_health`.
+
+| `src/integrations/interop.jl`
+| `from_pytorch` (checkpoint + descriptor JSON), `to_onnx`.
+
+| `zig/`
+| Zig native backend source: matmul, conv, normalization, attention, and
+  related compute kernels.
+
+| `ext/`
+| GPU extensions (CUDA, ROCm, Metal) and 9 coprocessor extensions plus
+  PyTorch bridge (PyCall).
+
+| `test/runtests.jl`
+| Comprehensive suite: tensor creation, Dense/Conv2d forward passes and error
+  cases, Sequential model, activation functions, BatchNorm/Dropout, verify with
+  ValidProbabilities/FiniteOutput, `@ensure` assertions, `from_pytorch`/`to_onnx`
+  interop, serving endpoints, model packaging, proof export, backend detection.
+
+| `packages/SMTLib.jl`
+| Internal Julia-native SMT library consumed by the `@prove` default backend.
+
+| `Project.toml`
+| Package identity (uuid `bbd403f8...`), v1.0.0, `AcceleratorGate`/`HTTP`/`SHA`/
+  `JSON`/`JSON3`/`Zygote`/`Libdl` hard dependencies, 13 weak dependencies for
+  GPU and coprocessor extensions.
+
+| `docs/wiki/`
+| Markdown wiki: Home, User-Guide, Developer-Guide, Vision, Axiom-DSL,
+  Verification, Migration-Guide, FAQ.
 |===
 
 == Questions?
 
-Open an issue or reach out directly — happy to explain anything in more detail.
+Open an issue or reach out — happy to explain the backend dispatch architecture,
+the `@prove` SMT integration design, or the proof assistant export format.
