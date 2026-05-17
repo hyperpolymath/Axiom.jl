@@ -45,7 +45,8 @@ pub const Handle = struct {
     // Internal state hidden from C
     allocator: std.mem.Allocator,
     initialized: bool,
-    // Add your fields here
+    // Registered runtime->host callback (raw fn pointer from the C side).
+    callback: ?Callback = null,
 };
 
 //==============================================================================
@@ -214,18 +215,16 @@ export fn axiom_build_info() [*:0]const u8 {
 /// Callback function type (C ABI)
 pub const Callback = *const fn (u64, u32) callconv(.c) u32;
 
-/// Register a callback
+/// Register a runtime->host callback.
+///
+/// Matches the C header: the callback is passed as a raw pointer encoded in
+/// a `u64` (`uint64_t callback_ptr`), reinterpreted as an `axiom_callback_t`.
 export fn axiom_register_callback(
     handle: ?*Handle,
-    callback: ?Callback,
+    callback_ptr: u64,
 ) Result {
     const h = handle orelse {
         setError("Null handle");
-        return .null_pointer;
-    };
-
-    const cb = callback orelse {
-        setError("Null callback");
         return .null_pointer;
     };
 
@@ -234,8 +233,48 @@ export fn axiom_register_callback(
         return .@"error";
     }
 
-    // Store callback for later use
-    _ = cb;
+    if (callback_ptr == 0) {
+        setError("Null callback");
+        return .null_pointer;
+    }
+
+    h.callback = @ptrFromInt(callback_ptr);
+
+    clearError();
+    return .ok;
+}
+
+/// Invoke the previously registered callback (the bidirectional bridge).
+///
+/// Writes the callback's `u32` result through `out`. Returns `.@"error"` if
+/// no callback has been registered.
+export fn axiom_invoke_callback(
+    handle: ?*Handle,
+    ctx: u64,
+    input: u32,
+    out: ?*u32,
+) Result {
+    const h = handle orelse {
+        setError("Null handle");
+        return .null_pointer;
+    };
+
+    if (!h.initialized) {
+        setError("Handle not initialized");
+        return .@"error";
+    }
+
+    const cb = h.callback orelse {
+        setError("No callback registered");
+        return .@"error";
+    };
+
+    const o = out orelse {
+        setError("Null out pointer");
+        return .null_pointer;
+    };
+
+    o.* = cb(ctx, input);
 
     clearError();
     return .ok;
