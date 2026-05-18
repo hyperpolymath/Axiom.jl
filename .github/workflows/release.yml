@@ -29,11 +29,11 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
 
-      - uses: julia-actions/setup-julia@4c0cb0fce8556fdb04a90347310e5db8b1f98fb9 # v2
+      - uses: julia-actions/setup-julia@fa02766e078afaaf09b14210362cee14137e6a32 # v3.0.2
         with:
           version: ${{ matrix.julia-version }}
 
-      - uses: julia-actions/cache@e33b4bfa0ea7cd9caedd7cb82b0e36956ef40285 # v2
+      - uses: julia-actions/cache@a45e8fa8be21c18a06b7177052533149e61e9b38 # v2
 
       - name: Instantiate / Build / Precompile / Test
         run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile(); Pkg.test()'
@@ -56,11 +56,11 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
 
-      - uses: julia-actions/setup-julia@4c0cb0fce8556fdb04a90347310e5db8b1f98fb9 # v2
+      - uses: julia-actions/setup-julia@fa02766e078afaaf09b14210362cee14137e6a32 # v3.0.2
         with:
           version: ${{ matrix.julia-version }}
 
-      - uses: julia-actions/cache@e33b4bfa0ea7cd9caedd7cb82b0e36956ef40285 # v2
+      - uses: julia-actions/cache@a45e8fa8be21c18a06b7177052533149e61e9b38 # v2
 
       - name: Instantiate / Build / Precompile / Test
         run: |
@@ -75,7 +75,7 @@ jobs:
           tar -czf dist/Axiom.jl-${{ matrix.os }}.tar.gz src/ Project.toml README.adoc LICENSE
 
       - name: Upload Julia artifacts
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: julia-${{ matrix.os }}
           path: dist/
@@ -105,13 +105,13 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9 # stable
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # stable
         with:
           toolchain: stable
           targets: ${{ matrix.target }}
 
       - name: Cache Cargo
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
             ~/.cargo/registry
@@ -129,7 +129,7 @@ jobs:
           cp rust/target/${{ matrix.target }}/release/${{ matrix.artifact_name }} dist/
 
       - name: Upload Rust artifacts
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: rust-${{ matrix.os }}
           path: dist/
@@ -188,7 +188,7 @@ jobs:
           cargo sbom > ../sbom-rust.json
 
       - name: Upload SBOMs
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: sboms
           path: |
@@ -289,7 +289,7 @@ jobs:
           EOF
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v2
         with:
           tag_name: ${{ steps.version.outputs.version }}
           name: Axiom.jl ${{ steps.version.outputs.version }}
@@ -324,7 +324,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
 
-      - uses: julia-actions/setup-julia@4c0cb0fce8556fdb04a90347310e5db8b1f98fb9 # v2
+      - uses: julia-actions/setup-julia@fa02766e078afaaf09b14210362cee14137e6a32 # v3.0.2
         with:
           version: '1.10'
 
