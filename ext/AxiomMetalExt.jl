@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 # Axiom.jl Metal Extension
 #
 # Provides GPU acceleration via Apple Metal (M1/M2/M3).

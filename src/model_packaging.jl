@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 # Model package + registry manifests
 #
 # Baseline packaging workflow for reusable model artifacts with deterministic

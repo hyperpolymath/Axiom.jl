@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 # Template skeleton for a Math backend extension module.
 #
 # Copy this into your Math integration package and replace CPU fallbacks with

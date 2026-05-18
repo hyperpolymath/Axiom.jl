@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: PMPL-1.0-or-later
+// SPDX-License-Identifier: MPL-2.0
 //! Activation Functions
 //!
 //! SIMD-optimized activation functions for neural networks.

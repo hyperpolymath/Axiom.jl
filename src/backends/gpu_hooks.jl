@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 # GPU Backend Hooks for Axiom.jl
 #
 # This file defines the interface for GPU backends (CUDA, ROCm, Metal).

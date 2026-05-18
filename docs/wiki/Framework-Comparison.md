@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: PMPL-1.0-or-later -->
+<!-- SPDX-License-Identifier: MPL-2.0 -->
 # Framework Comparison
 
 > An honest comparison: Axiom.jl vs PyTorch vs TensorFlow vs JAX

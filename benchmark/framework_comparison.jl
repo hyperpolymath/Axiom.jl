@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 # External framework benchmark: Axiom.jl vs Flux.jl vs PyTorch
 # Usage:
 #   1. pip install torch --index-url https://download.pytorch.org/whl/cpu

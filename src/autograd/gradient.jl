@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 # Axiom.jl Automatic Differentiation
 #
 # Production-grade reverse-mode AD using Zygote.jl backend

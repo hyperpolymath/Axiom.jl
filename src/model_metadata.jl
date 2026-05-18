@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 # Model Package Metadata Schema
 #
 # Defines metadata structure for pretrained models including:
@@ -117,7 +117,7 @@ Create metadata for a model with sensible defaults.
 - `version::String` - Version (default: "0.1.0")
 - `task::String` - Task type (default: "general")
 - `authors::Vector{String}` - Authors (default: empty)
-- `license::String` - License (default: "PMPL-1.0-or-later")
+- `license::String` - License (default: "MPL-2.0")
 - `description::String` - Description (default: "")
 - `source::String` - Source (default: "local")
 - `training_data::String` - Dataset (default: "unknown")
@@ -143,7 +143,7 @@ function create_metadata(
     version::String = "0.1.0",
     task::String = "general",
     authors::Vector{String} = String[],
-    license::String = "PMPL-1.0-or-later",
+    license::String = "MPL-2.0",
     description::String = "",
     source::String = "local",
     training_data::String = "unknown",

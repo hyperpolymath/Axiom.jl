@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 #
 # Axiom.jl Convolutional Layers: Processing Sequential and Spatial Data
 # ====================================================================

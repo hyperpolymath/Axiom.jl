@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 # Axiom.jl HuggingFace Integration
 #
 # Import pretrained models from HuggingFace Hub with security verification.

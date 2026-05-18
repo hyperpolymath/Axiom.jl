@@ -218,7 +218,7 @@ known certificate-workflow and property-test issues noted above — are welcome.
 
 Licensed under the https://www.mozilla.org/en-US/MPL/2.0/[Mozilla Public
 License 2.0 (MPL-2.0)], as declared in `Project.toml`. Some repository files
-carry `PMPL-1.0-or-later` SPDX headers referring to an in-development license;
+carry `MPL-2.0` SPDX headers referring to an in-development license;
 the binding distribution license for the package is MPL-2.0.
 
 == Acknowledgments

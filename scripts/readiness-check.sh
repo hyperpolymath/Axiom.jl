@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 #
 # Consolidated production-readiness gate for Axiom.jl.
 # Runs the must-pass local checks that mirror CI jobs.

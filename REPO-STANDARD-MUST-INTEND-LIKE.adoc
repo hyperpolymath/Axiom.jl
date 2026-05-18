@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: PMPL-1.0-or-later
+// SPDX-License-Identifier: MPL-2.0
 = Universal Repo Standard (Must / Intend / Like)
 
 This document is designed as a reusable baseline for *every* repository (Julia and non-Julia).

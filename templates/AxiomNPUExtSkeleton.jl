@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 # Template skeleton for a NPU backend extension module.
 #
 # Copy this into your NPU integration package and replace CPU fallbacks with
