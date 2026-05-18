@@ -29,8 +29,8 @@ function Base.:*(a::Tensor{T, 2, S1}, b::Tensor{T, 2, S2}) where {T, S1, S2}
 end
 
 # 5. Reductions
-function Base.sum(t::Tensor)
-    return sum(t.data)
+function Base.sum(t::Tensor; dims=Colon())
+    return dims === Colon() ? sum(t.data) : sum(t.data; dims=dims)
 end
 
 # 6. Transpose
