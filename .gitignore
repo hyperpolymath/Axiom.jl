@@ -103,3 +103,5 @@ deps/
 .cache/
 build/
 dist/
+/Manifest.toml
+ffi/zig/.zig-cache/
