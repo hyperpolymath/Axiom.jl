@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 # RSR-compliant .gitignore
 
 # OS & Editor
@@ -103,3 +103,5 @@ deps/
 .cache/
 build/
 dist/
+/Manifest.toml
+ffi/zig/.zig-cache/

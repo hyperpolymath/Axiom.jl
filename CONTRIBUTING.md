@@ -1,22 +1,22 @@
-<!-- SPDX-License-Identifier: PMPL-1.0-or-later -->
+<!-- SPDX-License-Identifier: MPL-2.0 -->
 # Contributing
 
-Thank you for your interest in contributing! We follow a "Dual-Track" architecture where human-readable documentation lives in the root and machine-readable policies live in `.machine_readable/`.
+Thank you for your interest in contributing to Axiom.jl.
 
 ## How to Contribute
 
 We welcome contributions in many forms:
 
-- **Code:** Improving the core stack or extensions
-- **Documentation:** Enhancing docs or AI manifests
-- **Testing:** Adding property-based tests or formal proofs
+- **Code:** Improving the layers, verification, serving, or interop code
+- **Documentation:** Enhancing docs (see `EXPLAINME.adoc` for a claim-by-claim accounting)
+- **Testing:** Adding tests, especially for the known gaps noted in `EXPLAINME.adoc`
 - **Bug reports:** Filing clear, reproducible issues
 
 ## Getting Started
 
-1. **Read the AI Manifest:** Start with `0-AI-MANIFEST.a2ml` (if present) to understand the repository structure.
-2. **Environment:** Use `nix develop` or `direnv allow` to set up your tools.
-3. **Task Runner:** Use `just` to see available commands (`just --list`).
+1. **Read `EXPLAINME.adoc`:** It documents, with file paths, what is implemented and what is known-broken.
+2. **Environment:** Julia 1.10+. `julia --project=. -e 'using Pkg; Pkg.instantiate()'`.
+3. **Tests:** `julia --project=. -e 'using Pkg; Pkg.test()'`.
 
 ## Development Workflow
 

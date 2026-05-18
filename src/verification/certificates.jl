@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 # Axiom.jl Verification Certificates
 #
 # Cryptographically signed certificates proving model properties.
@@ -42,7 +42,8 @@ function generate_certificate(
     result::VerificationResult;
     model_name::String = "unnamed",
     test_data = nothing,
-    verifier_id::String = "axiom-default"
+    verifier_id::String = "axiom-default",
+    verification_mode::VerificationMode = STANDARD
 )
     # Compute model hash
     model_hash = compute_model_hash(model)
@@ -58,7 +59,7 @@ function generate_certificate(
         model_hash,
         model_name,
         [prop for (prop, passed) in result.properties_checked if passed],
-        result.mode !== nothing ? result.mode : STANDARD,
+        verification_mode,
         test_data_hash,
         proof_type,
         time(),

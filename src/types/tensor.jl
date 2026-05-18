@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 #
 # Axiom.jl Tensor Type System: Foundations targeting provably correct ML (proofs pending)
 # ===========================================================================
@@ -237,11 +237,20 @@ tuple, representing an unknown dimension size.
 Base.size(t::Tensor{T, N, Shape}) where {T, N, Shape} = Shape
 
 """
+    Base.size(t::Tensor, d::Integer)
+
+Size along dimension `d` (mirrors `Base.size(::AbstractArray, ::Integer)`),
+so `size(t, 1)` etc. work even though `Tensor` is not an `AbstractArray`.
+"""
+Base.size(t::Tensor, d::Integer) = size(t)[d]
+
+"""
     Base.size(t::DynamicTensor)
 
 Returns the runtime `size` of the underlying `data` array for a `DynamicTensor`.
 """
 Base.size(t::DynamicTensor) = size(t.data)
+Base.size(t::DynamicTensor, d::Integer) = size(t.data, d)
 """
     Base.length(t::AbstractTensor)
 

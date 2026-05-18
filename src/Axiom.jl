@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2025 Axiom.jl Contributors
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 
 """
     Axiom
@@ -108,6 +108,9 @@ include("verification/checker.jl")
 include("verification/certificates.jl")
 include("verification/serialization.jl")
 include("proof_export.jl")  # Issue #19 - Proof assistant integration
+
+# Vendored AcceleratorGate selection logic (registry decoupling — see file header)
+include("vendored/AcceleratorGateVendored.jl")
 
 # Backend abstraction
 include("backends/abstract.jl")

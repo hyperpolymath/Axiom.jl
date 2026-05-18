@@ -88,7 +88,7 @@
           meta = with pkgs.lib; {
             description = "{project-description}";
             homepage = "{repo-url}";
-            license = with licenses; [ mit ];  # MIT + Palimpsest
+            license = with licenses; [ mit ];  # MIT + Mozilla Public License 2.0
             maintainers = [ "{maintainer-name}" ];
             platforms = platforms.unix;
           };

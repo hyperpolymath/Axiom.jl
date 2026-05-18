@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 # Template skeleton for a Crypto (Cryptographic Accelerator) backend extension module.
 #
 # Copy this into your crypto accelerator integration package and replace CPU

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 # Axiom.jl Threaded Benchmark Suite
 #
 # Measures Zig multi-threaded dispatch vs Julia across all operations.

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 # Proof Export to External Proof Assistants
 #
 # Export verification certificates to Lean 4, Coq, Isabelle, etc.

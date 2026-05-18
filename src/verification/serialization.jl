@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 # Proof Serialization
 #
 # Serialize and deserialize proof results for auditing, caching, and verification.

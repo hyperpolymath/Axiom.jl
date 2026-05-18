@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: PMPL-1.0-or-later -->
+<!-- SPDX-License-Identifier: MPL-2.0 -->
 # User Guide
 
 This guide covers day-1 usage of Axiom.jl for model definition, inference, and verification.

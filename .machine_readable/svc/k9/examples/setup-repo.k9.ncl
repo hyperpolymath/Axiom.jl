@@ -1,5 +1,5 @@
 K9!
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 # Example Hunt-level K9 component: Repository setup automation
 # Security Level: Hunt (full execution with Just recipes)
 # ⚠️ SIGNATURE REQUIRED - DO NOT RUN WITHOUT VERIFICATION
@@ -130,7 +130,7 @@ K9!
     },
 
     "add-license" = {
-      description = "Add PMPL-1.0 license",
+      description = "Add MPL-2.0 license",
       commands = [
         "curl -sL https://raw.githubusercontent.com/hyperpolymath/pmpl/main/LICENSE -o LICENSE",
         "echo '✓ License added'",

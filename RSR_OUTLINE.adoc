@@ -1,6 +1,6 @@
 = RSR Template Repository
 
-image:[Palimpsest-MPL-1.0,link="https://github.com/hyperpolymath/palimpsest-license"] image:[Palimpsest,link="https://github.com/hyperpolymath/palimpsest-license"]
+image:[Mozilla Public License 2.0-MPL-1.0,link="https://github.com/hyperpolymath/palimpsest-license"] image:[Mozilla Public License 2.0,link="https://github.com/hyperpolymath/palimpsest-license"]
 :toc:
 :sectnums:
 
@@ -209,7 +209,7 @@ This template is part of:
 
 == License
 
-SPDX-License-Identifier: PMPL-1.0-or-later-or-later
+SPDX-License-Identifier: MPL-2.0-or-later
 
 == Links
 
