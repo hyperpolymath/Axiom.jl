@@ -109,6 +109,9 @@ include("verification/certificates.jl")
 include("verification/serialization.jl")
 include("proof_export.jl")  # Issue #19 - Proof assistant integration
 
+# Vendored AcceleratorGate selection logic (registry decoupling — see file header)
+include("vendored/AcceleratorGateVendored.jl")
+
 # Backend abstraction
 include("backends/abstract.jl")
 include("backends/julia_backend.jl")

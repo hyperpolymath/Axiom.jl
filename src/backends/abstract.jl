@@ -5,7 +5,10 @@
 
 using Libdl
 using LinearAlgebra: I
-using AcceleratorGate: select_backend as ag_select_backend,
+# AcceleratorGate selection logic is vendored internally to decouple Axiom.jl
+# from the registry-readiness of the unregistered AcceleratorGate.jl package.
+# See src/vendored/AcceleratorGateVendored.jl for full provenance/attribution.
+using ..AcceleratorGateVendored: select_backend as ag_select_backend,
     fits_on_device as ag_fits_on_device, estimate_cost as ag_estimate_cost,
     DeviceCapabilities, device_capabilities, PlatformInfo, detect_platform
 

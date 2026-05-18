@@ -20,3 +20,23 @@ The legally binding terms are:
 
 For more information about the Palimpsest License:
   https://github.com/hyperpolymath/palimpsest-license
+
+================================================================================
+Vendored Third-Party Code
+================================================================================
+
+src/vendored/AcceleratorGateVendored.jl contains code vendored verbatim from:
+
+  hyperpolymath/AcceleratorGate.jl  (src/AcceleratorGate.jl)
+  SPDX-License-Identifier: MPL-2.0
+  Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath)
+                      <j.d.a.jewell@open.ac.uk>
+
+Only the definitions Axiom.jl consumes (select_backend, fits_on_device,
+estimate_cost, DeviceCapabilities, device_capabilities, PlatformInfo,
+detect_platform) and their transitive helpers were copied, unmodified in
+behaviour. AcceleratorGate.jl is licensed MPL-2.0; its original copyright
+and SPDX header are preserved in the vendored file. This vendoring exists
+solely to decouple Axiom.jl from the registry-readiness of the (currently
+unregistered) AcceleratorGate.jl package; it introduces no behavioural
+changes to the vendored entry points.
