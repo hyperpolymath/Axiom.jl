@@ -41,8 +41,11 @@ package submissions. The only thing that rebuilds that trust is honesty.
 - [x] All deps registered (after vendoring AcceleratorGate)
 - [x] OSI license (MPL-2.0), consistent, REUSE.toml
 - [x] Honest README with usage example + prior-art comparison
-- [x] `Pkg.test()` green (verify in CI)
-- [ ] Aqua.jl / JET.jl quality gate (in progress)
+- [x] `Pkg.test()` green (verified repeatedly, incl. post-relicense)
+- [x] Aqua.jl quality gate: unbound-params / undefined-exports /
+      project-extras pass; stale-deps **now clean** (orphaned
+      `src/integrations/huggingface.jl` + its sole-consumer dep `JSON3`
+      removed — they were unreachable dead code)
 - [ ] **Human maintainer track** — NOT a code task: genuine Julia
       community participation, engaging the registry maintainers as a
       person, and reducing org-wide package sprawl. This, not tooling, is
