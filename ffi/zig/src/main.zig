@@ -47,6 +47,9 @@ pub const Handle = struct {
     initialized: bool,
     // Registered runtime->host callback (raw fn pointer from the C side).
     callback: ?Callback = null,
+    // Last processed value: set by axiom_process (input) or
+    // axiom_process_array (byte checksum); rendered by axiom_get_string.
+    state: u32 = 0,
 };
 
 //==============================================================================
@@ -101,8 +104,8 @@ export fn axiom_process(handle: ?*Handle, input: u32) Result {
         return .@"error";
     }
 
-    // Example processing logic
-    _ = input;
+    // Record the input as the handle's current value.
+    h.state = input;
 
     clearError();
     return .ok;
@@ -125,8 +128,13 @@ export fn axiom_get_string(handle: ?*Handle) ?[*:0]const u8 {
         return null;
     }
 
-    // Example: allocate and return a string
-    const result = h.allocator.dupeZ(u8, "Example result") catch {
+    // Render the handle's current value (set by process / process_array).
+    const tmp = std.fmt.allocPrint(h.allocator, "axiom result: {d}", .{h.state}) catch {
+        setError("Failed to allocate string");
+        return null;
+    };
+    defer h.allocator.free(tmp);
+    const result = h.allocator.dupeZ(u8, tmp) catch {
         setError("Failed to allocate string");
         return null;
     };
@@ -169,11 +177,11 @@ export fn axiom_process_array(
         return .@"error";
     }
 
-    // Access the buffer
+    // Checksum the buffer (sum of bytes) and record it as the value.
     const data = buf[0..len];
-    _ = data;
-
-    // Process data here
+    var sum: u32 = 0;
+    for (data) |b| sum += b;
+    h.state = sum;
 
     clearError();
     return .ok;
