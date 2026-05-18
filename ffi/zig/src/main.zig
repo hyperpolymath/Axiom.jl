@@ -37,12 +37,19 @@ pub const Result = enum(c_int) {
     null_pointer = 4,
 };
 
-/// Library handle (opaque to prevent direct access)
-pub const Handle = opaque {
+/// Library handle. A real struct internally; exposed across the C ABI as
+/// an opaque pointer (the C header forward-declares it), so callers cannot
+/// touch its fields. `opaque{}` cannot have fields and cannot be `create`d,
+/// which is why this must be a `struct`.
+pub const Handle = struct {
     // Internal state hidden from C
     allocator: std.mem.Allocator,
     initialized: bool,
-    // Add your fields here
+    // Registered runtime->host callback (raw fn pointer from the C side).
+    callback: ?Callback = null,
+    // Last processed value: set by axiom_process (input) or
+    // axiom_process_array (byte checksum); rendered by axiom_get_string.
+    state: u32 = 0,
 };
 
 //==============================================================================
@@ -51,7 +58,7 @@ pub const Handle = opaque {
 
 /// Initialize the library
 /// Returns a handle, or null on failure
-export fn Axiom.jl_init() ?*Handle {
+export fn axiom_init() ?*Handle {
     const allocator = std.heap.c_allocator;
 
     const handle = allocator.create(Handle) catch {
@@ -70,7 +77,7 @@ export fn Axiom.jl_init() ?*Handle {
 }
 
 /// Free the library handle
-export fn Axiom.jl_free(handle: ?*Handle) void {
+export fn axiom_free(handle: ?*Handle) void {
     const h = handle orelse return;
     const allocator = h.allocator;
 
@@ -86,7 +93,7 @@ export fn Axiom.jl_free(handle: ?*Handle) void {
 //==============================================================================
 
 /// Process data (example operation)
-export fn Axiom.jl_process(handle: ?*Handle, input: u32) Result {
+export fn axiom_process(handle: ?*Handle, input: u32) Result {
     const h = handle orelse {
         setError("Null handle");
         return .null_pointer;
@@ -97,8 +104,8 @@ export fn Axiom.jl_process(handle: ?*Handle, input: u32) Result {
         return .@"error";
     }
 
-    // Example processing logic
-    _ = input;
+    // Record the input as the handle's current value.
+    h.state = input;
 
     clearError();
     return .ok;
@@ -110,7 +117,7 @@ export fn Axiom.jl_process(handle: ?*Handle, input: u32) Result {
 
 /// Get a string result (example)
 /// Caller must free the returned string
-export fn Axiom.jl_get_string(handle: ?*Handle) ?[*:0]const u8 {
+export fn axiom_get_string(handle: ?*Handle) ?[*:0]const u8 {
     const h = handle orelse {
         setError("Null handle");
         return null;
@@ -121,8 +128,13 @@ export fn Axiom.jl_get_string(handle: ?*Handle) ?[*:0]const u8 {
         return null;
     }
 
-    // Example: allocate and return a string
-    const result = h.allocator.dupeZ(u8, "Example result") catch {
+    // Render the handle's current value (set by process / process_array).
+    const tmp = std.fmt.allocPrint(h.allocator, "axiom result: {d}", .{h.state}) catch {
+        setError("Failed to allocate string");
+        return null;
+    };
+    defer h.allocator.free(tmp);
+    const result = h.allocator.dupeZ(u8, tmp) catch {
         setError("Failed to allocate string");
         return null;
     };
@@ -132,7 +144,7 @@ export fn Axiom.jl_get_string(handle: ?*Handle) ?[*:0]const u8 {
 }
 
 /// Free a string allocated by the library
-export fn Axiom.jl_free_string(str: ?[*:0]const u8) void {
+export fn axiom_free_string(str: ?[*:0]const u8) void {
     const s = str orelse return;
     const allocator = std.heap.c_allocator;
 
@@ -145,7 +157,7 @@ export fn Axiom.jl_free_string(str: ?[*:0]const u8) void {
 //==============================================================================
 
 /// Process an array of data
-export fn Axiom.jl_process_array(
+export fn axiom_process_array(
     handle: ?*Handle,
     buffer: ?[*]const u8,
     len: u32,
@@ -165,11 +177,11 @@ export fn Axiom.jl_process_array(
         return .@"error";
     }
 
-    // Access the buffer
+    // Checksum the buffer (sum of bytes) and record it as the value.
     const data = buf[0..len];
-    _ = data;
-
-    // Process data here
+    var sum: u32 = 0;
+    for (data) |b| sum += b;
+    h.state = sum;
 
     clearError();
     return .ok;
@@ -181,7 +193,7 @@ export fn Axiom.jl_process_array(
 
 /// Get the last error message
 /// Returns null if no error
-export fn Axiom.jl_last_error() ?[*:0]const u8 {
+export fn axiom_last_error() ?[*:0]const u8 {
     const err = last_error orelse return null;
 
     // Return C string (static storage, no need to free)
@@ -195,12 +207,12 @@ export fn Axiom.jl_last_error() ?[*:0]const u8 {
 //==============================================================================
 
 /// Get the library version
-export fn Axiom.jl_version() [*:0]const u8 {
+export fn axiom_version() [*:0]const u8 {
     return VERSION.ptr;
 }
 
 /// Get build information
-export fn Axiom.jl_build_info() [*:0]const u8 {
+export fn axiom_build_info() [*:0]const u8 {
     return BUILD_INFO.ptr;
 }
 
@@ -209,20 +221,18 @@ export fn Axiom.jl_build_info() [*:0]const u8 {
 //==============================================================================
 
 /// Callback function type (C ABI)
-pub const Callback = *const fn (u64, u32) callconv(.C) u32;
+pub const Callback = *const fn (u64, u32) callconv(.c) u32;
 
-/// Register a callback
-export fn Axiom.jl_register_callback(
+/// Register a runtime->host callback.
+///
+/// Matches the C header: the callback is passed as a raw pointer encoded in
+/// a `u64` (`uint64_t callback_ptr`), reinterpreted as an `axiom_callback_t`.
+export fn axiom_register_callback(
     handle: ?*Handle,
-    callback: ?Callback,
+    callback_ptr: u64,
 ) Result {
     const h = handle orelse {
         setError("Null handle");
-        return .null_pointer;
-    };
-
-    const cb = callback orelse {
-        setError("Null callback");
         return .null_pointer;
     };
 
@@ -231,8 +241,48 @@ export fn Axiom.jl_register_callback(
         return .@"error";
     }
 
-    // Store callback for later use
-    _ = cb;
+    if (callback_ptr == 0) {
+        setError("Null callback");
+        return .null_pointer;
+    }
+
+    h.callback = @ptrFromInt(callback_ptr);
+
+    clearError();
+    return .ok;
+}
+
+/// Invoke the previously registered callback (the bidirectional bridge).
+///
+/// Writes the callback's `u32` result through `out`. Returns `.@"error"` if
+/// no callback has been registered.
+export fn axiom_invoke_callback(
+    handle: ?*Handle,
+    ctx: u64,
+    input: u32,
+    out: ?*u32,
+) Result {
+    const h = handle orelse {
+        setError("Null handle");
+        return .null_pointer;
+    };
+
+    if (!h.initialized) {
+        setError("Handle not initialized");
+        return .@"error";
+    }
+
+    const cb = h.callback orelse {
+        setError("No callback registered");
+        return .@"error";
+    };
+
+    const o = out orelse {
+        setError("Null out pointer");
+        return .null_pointer;
+    };
+
+    o.* = cb(ctx, input);
 
     clearError();
     return .ok;
@@ -243,7 +293,7 @@ export fn Axiom.jl_register_callback(
 //==============================================================================
 
 /// Check if handle is initialized
-export fn Axiom.jl_is_initialized(handle: ?*Handle) u32 {
+export fn axiom_is_initialized(handle: ?*Handle) u32 {
     const h = handle orelse return 0;
     return if (h.initialized) 1 else 0;
 }
@@ -253,22 +303,22 @@ export fn Axiom.jl_is_initialized(handle: ?*Handle) u32 {
 //==============================================================================
 
 test "lifecycle" {
-    const handle = Axiom.jl_init() orelse return error.InitFailed;
-    defer Axiom.jl_free(handle);
+    const handle = axiom_init() orelse return error.InitFailed;
+    defer axiom_free(handle);
 
-    try std.testing.expect(Axiom.jl_is_initialized(handle) == 1);
+    try std.testing.expect(axiom_is_initialized(handle) == 1);
 }
 
 test "error handling" {
-    const result = Axiom.jl_process(null, 0);
+    const result = axiom_process(null, 0);
     try std.testing.expectEqual(Result.null_pointer, result);
 
-    const err = Axiom.jl_last_error();
+    const err = axiom_last_error();
     try std.testing.expect(err != null);
 }
 
 test "version" {
-    const ver = Axiom.jl_version();
+    const ver = axiom_version();
     const ver_str = std.mem.span(ver);
     try std.testing.expectEqualStrings(VERSION, ver_str);
 }
