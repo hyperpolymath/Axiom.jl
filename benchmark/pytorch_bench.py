@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 # PyTorch benchmark for Axiom.jl external comparison
 # Outputs JSON for consumption by framework_comparison.jl
 #

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 # Axiom.jl QPU Extension
 #
 # Provides quantum-inspired tensor operations for Quantum Processing Units.

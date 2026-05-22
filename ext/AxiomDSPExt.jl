@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 # Axiom.jl DSP Extension
 #
 # Provides FFT-based convolution and signal-processing-optimised operations

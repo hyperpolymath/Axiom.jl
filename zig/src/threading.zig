@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: PMPL-1.0-or-later
+// SPDX-License-Identifier: MPL-2.0
 //! Threading support for Axiom.jl Zig backend
 //!
 //! Provides parallel dispatch for element-wise operations on large arrays.

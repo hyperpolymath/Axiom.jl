@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 # Axiom.jl VPU Extension
 #
 # Provides SIMD-vector-optimised tensor operations for Vector/Vision

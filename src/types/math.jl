@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 # Axiom.jl Tensor Mathematics
 #
 # Element-wise operations and matrix algebra for Axiom tensor types

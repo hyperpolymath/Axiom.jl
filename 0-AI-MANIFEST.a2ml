@@ -1,4 +1,4 @@
-;; SPDX-License-Identifier: PMPL-1.0-or-later
+;; SPDX-License-Identifier: MPL-2.0
 ;; 0-AI-MANIFEST.a2ml - AI Agent Entry Point for Axiom.jl
 ;; Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 ;;
@@ -55,7 +55,7 @@
   ;; =========================================================================
   (invariants
     ("SCM files ONLY in .machine_readable/ - NEVER in repository root"
-     "SPDX header must be PMPL-1.0-or-later on all hyperpolymath-authored files"
+     "SPDX header must be MPL-2.0 on all hyperpolymath-authored files"
      "Author attribution: Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
      "Julia backend is always the reference implementation - other backends must match its behavior"
      "GPU backends are package extensions only - never hard dependencies"
