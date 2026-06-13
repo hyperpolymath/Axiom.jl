@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: MPL-2.0
+# git-private-farm.a2ml — .git-private-farm propagation directives for
+# Axiom.jl. Net-new at the 2026-06-13 governance checkpoint per the estate
+# bot_directives standard. Values below are read from the live workflow
+# .github/workflows/instant-sync.yml (secret NAME only; no token values).
+
+[metadata]
+repo = "Axiom.jl"
+last-updated = "2026-06-13"
+owner = "hyperpolymath"
+
+[propagation]
+enabled = true
+# Axiom.jl HAS .github/workflows/instant-sync.yml, so propagation is LIVE.
+# The keys below mirror that workflow exactly.
+workflow = ".github/workflows/instant-sync.yml"
+action = "peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697"   # SHA-pinned in the workflow
+target = "hyperpolymath/.git-private-farm"
+event-type = "propagate"
+secret-name = "FARM_DISPATCH_TOKEN"                  # secret NAME only; value lives in repo secrets
+presence-gated = true                                # gated on push to main/master or published release
+
+[never-propagate]
+items = [
+  "secrets",
+  "unmerged branches",
+  "work-in-progress",
+  "session/* and claude/* working branches",
+]
+
+[on-token-rotation]
+command = "gh secret set FARM_DISPATCH_TOKEN --repo hyperpolymath/Axiom.jl"   # name only; paste the new value when prompted
+note = "If propagation breaks after a rotation, the symptom is a silent no-op dispatch; check the instant-sync run logs, not Axiom.jl's build."

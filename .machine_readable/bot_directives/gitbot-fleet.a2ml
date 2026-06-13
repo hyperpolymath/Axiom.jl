@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: MPL-2.0
+# gitbot-fleet.a2ml — gitbot fleet directives for Axiom.jl.
+# Net-new at the 2026-06-13 governance checkpoint per the estate
+# bot_directives standard.
+
+[metadata]
+repo = "Axiom.jl"
+last-updated = "2026-06-13"
+owner = "hyperpolymath"
+
+[fleet]
+# Fleet roster derived from existing bot_directives methodology files
+# and hypatia-scan workflow. No per-bot *.a2ml files exist in this repo
+# as of 2026-06-13; this file documents the estate-standard fleet.
+bots = ["hypatia", "rhodibot", "sustainabot", "glambot", "robot-repo-automaton"]
+
+[fleet.roles]
+hypatia = "security scanning"
+rhodibot = "git operations"
+sustainabot = "dependency updates"
+glambot = "documentation"
+robot-repo-automaton = "repo automation / scaffolding"
+
+[branch-policy]
+working-branch-pattern = "<bot>/<topic>"     # human sessions use claude/<slug>; bots use their own prefix
+draft-PRs-only = true
+ci-green-before-merge = true
+never-touch = [
+  ".claude/CLAUDE.md",
+  "src/verification/",          # formal verification surface
+  "src/Abi/",                   # Idris2 ABI definitions
+  "zig/",                       # Zig compute layer
+  "packages/SMTLib.jl/",        # SMTLib subpackage
+  ".github/workflows/",         # CI hardening is review-gated, not bot-edited
+]
+
+# ============================================================
+# Per-bot constraints where Axiom.jl gives a specific reason;
+# defaults apply otherwise.
+# ============================================================
+
+[per-bot.rhodibot]
+deny = ["force-push to main", "branch deletion", "history rewrites on main"]
+note = "main is protected; superseded work is git-revert'd, not rewritten. A bot may force-with-lease ONLY its own session branch."
+
+[per-bot.sustainabot]
+allow = ["Julia dependency bumps via dependabot"]
+deny = ["bumping Zig toolchain pins without a green Zig build test run", "bumping Julia compat bounds without a green Pkg.test() run"]
+note = "dependabot-automerge.yml exists; the Julia test suite is the compatibility gate."
+
+[per-bot.glambot]
+deny = ["redefining framework semantics in docs", "contradicting README.adoc feature descriptions without a corresponding code change"]
+note = "Docs are AsciiDoc. Keep STATE/META/ECOSYSTEM currency honest (Landed/Partial/Open). README.adoc is canonical."
+
+[per-bot.robot-repo-automaton]
+note = "Scaffolding/standardisation follows the 06-12 estate standard (flat contractiles, self-validating/, bot_directives/), NOT the template's stale Mustfile (which still checks the old nested layout). Report template drift via issue."

@@ -1,14 +1,79 @@
 # SPDX-License-Identifier: MPL-2.0
-# STATE.a2ml — Project state checkpoint
-# Converted from STATE.scm on 2026-03-15
+# STATE.a2ml — Project state checkpoint for Axiom.jl
+# Converted from STATE.scm on 2026-03-15; refreshed 2026-06-13
 
 [metadata]
 project = "Axiom.jl"
 version = "1.0.0"
-last-updated = "2026-03-15"
+last-updated = "2026-06-13"
 status = "active"
 
 [project-context]
 name = "Axiom.jl"
-completion-percentage = 88
 phase = "Beta"
+description = "Provably Correct Machine Learning — Julia-native ML framework with compile-time shape verification, formal verification workflows, Zig compute layer, and coprocessor acceleration"
+
+[build]
+language = "Julia 1.10+"
+compute-layer = "Zig (zig/build.zig; matmul, conv, attention, pool, norm, activations kernels)"
+abi-layer = "Idris2 ABI definitions (src/Abi/)"
+subpackage = "packages/SMTLib.jl"
+license = "MPL-2.0"
+
+[test-suite]
+runner = "julia --project=. -e 'using Pkg; Pkg.test()'"
+testsets = [
+  "Tensor Types",
+  "Dense Layer",
+  "Conv2d Layer",
+  "Activations",
+  "Normalization Layers",
+  "Pooling Layers",
+  "Pipeline/Sequential",
+  "Optimizers",
+  "Coprocessor Backends",
+  "Loss Functions",
+  "Data Utilities",
+  "Serving APIs",
+  "Interop APIs",
+  "Verification",
+  "Ensure Macro",
+  "SMT Runner",
+  "SMT Cache",
+]
+notes = "SMT Runner / SMT Cache skip gracefully when no solver is available. Coprocessor tests use ENV mocks for hardware-absent CI."
+
+[features]
+core = [
+  "Tensor types (Tensor, DynamicTensor, axiom_zeros, axiom_randn)",
+  "Layer library (Dense, Conv2d, BatchNorm, LayerNorm, MaxPool2d, AvgPool2d, GlobalAvgPool, Flatten, ReLU, Softmax, Sequential)",
+  "Optimizers (SGD, Adam, AdamW)",
+  "Loss functions (mse_loss, crossentropy, binary_crossentropy)",
+  "DataLoader with batching and train/test split",
+  "Coprocessor detection + compilation (TPU/NPU/DSP/FPGA/GPU extension paths)",
+  "Serving APIs: REST (serve_rest), GraphQL (serve_graphql), gRPC (serve_grpc, binary wire)",
+  "Model interop: PyTorch import (from_pytorch), ONNX export (to_onnx)",
+  "Formal verification: @axiom macro, @ensure macro, ValidProbabilities property, certificate workflow",
+  "SMT integration: get_smt_solver, smt_proof, ParsedProperty",
+]
+extensions = [
+  "AxiomCUDAExt (CUDA.jl)",
+  "AxiomAMDGPUExt (AMDGPU.jl)",
+  "AxiomMetalExt (Metal.jl)",
+  "AxiomTPUExt (TPUCompute)",
+  "AxiomNPUExt (NPUAccel)",
+  "AxiomDSPExt (DSPLibs)",
+  "AxiomFPGAExt (FPGASynthesis)",
+  "AxiomPPUExt (PPUCompute)",
+  "AxiomQPUExt (QPUInterface)",
+  "AxiomVPUExt (VPURuntime)",
+  "AxiomMathExt (MathAccel)",
+  "AxiomCryptoExt (CryptoAccel)",
+  "AxiomPyTorchExt (PyCall)",
+]
+
+[governance]
+machine-readable-layout = "06-12 estate standard (flat contractiles, bot_directives trio, self-validating/)"
+contractiles = "Adjust/Bust/Dust/Intent/Must/Trust .a2ml + Justfile — all flat under .machine_readable/contractiles/"
+bot-directives = "hypatia + gitbot-fleet + git-private-farm trio added 2026-06-13"
+instant-sync = "LIVE — .github/workflows/instant-sync.yml → hyperpolymath/.git-private-farm via FARM_DISPATCH_TOKEN"
