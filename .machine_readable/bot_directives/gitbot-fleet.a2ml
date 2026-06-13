@@ -4,6 +4,9 @@
 # bot_directives standard.
 
 [metadata]
+name = "Axiom.jl-gitbot-fleet"
+project = "Axiom.jl"
+schema_version = "1.0"
 repo = "Axiom.jl"
 last-updated = "2026-06-13"
 owner = "hyperpolymath"

@@ -1,6 +1,10 @@
+# SPDX-License-Identifier: MPL-2.0
 # ⚓ ANCHOR: Axiom.jl
 # This is the canonical authority for the Axiom.jl repository.
 
+name: "Axiom.jl-anchor"
+project: "Axiom.jl"
+schema_version: "1.0"
 id: "org.hyperpolymath.Axiom.jl"
 version: "1.0.0"
 clade: "unknown"

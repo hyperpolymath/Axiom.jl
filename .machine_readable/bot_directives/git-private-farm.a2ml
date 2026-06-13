@@ -5,6 +5,9 @@
 # .github/workflows/instant-sync.yml (secret NAME only; no token values).
 
 [metadata]
+name = "Axiom.jl-git-private-farm"
+project = "Axiom.jl"
+schema_version = "1.0"
 repo = "Axiom.jl"
 last-updated = "2026-06-13"
 owner = "hyperpolymath"

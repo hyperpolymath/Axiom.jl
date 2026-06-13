@@ -6,8 +6,9 @@ K9!
 
 {
   pedigree = {
+    name = "template-yard",
     schema_version = "1.0.0",
-    component_type = "REQUIRED: describe component type (e.g., 'validated-config', 'schema')",
+    component_type = "yard-template",
     security = {
       leash = 'Yard,
       trust_level = "validated-config",
@@ -16,9 +17,9 @@ K9!
       allow_subprocess = false,
     },
     metadata = {
-      name = "REQUIRED: component-name",
+      name = "template-yard",
       version = "1.0.0",
-      description = "REQUIRED: Brief description with validation details",
+      description = "K9 Yard-level template: configuration with Nickel validation contracts",
       author = "Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>",
     },
   },

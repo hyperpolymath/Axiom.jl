@@ -6,6 +6,7 @@ K9!
 
 {
   pedigree = {
+    name = "template-hunt",
     schema_version = "1.0.0",
     component_type = "library-build",
     security = {

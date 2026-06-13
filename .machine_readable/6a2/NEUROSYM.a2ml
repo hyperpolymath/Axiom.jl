@@ -5,6 +5,9 @@
 # Configuration for Hypatia scanning and symbolic reasoning.
 
 [metadata]
+name = "Axiom.jl-neurosym"
+project = "Axiom.jl"
+schema_version = "1.0"
 version = "0.1.0"
 last-updated = "2026-03-16"
 

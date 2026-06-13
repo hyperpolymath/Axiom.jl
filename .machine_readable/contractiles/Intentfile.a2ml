@@ -17,6 +17,11 @@
 # carried was the un-substituted rsr-template-repo Intentfile (its intents
 # were "repo-initialization / contractile-completeness for the template").
 
+[metadata]
+name = "Axiom.jl-intentfile"
+project = "Axiom.jl"
+schema_version = "1.0"
+
 @abstract:
 North-star for Axiom.jl: Provably Correct Machine Learning — a Julia-native
 ML framework where shape errors, invariant violations, and model-integrity
