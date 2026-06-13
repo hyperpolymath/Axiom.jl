@@ -1,4 +1,6 @@
 # SPDX-License-Identifier: MPL-2.0
+# hypatia:ignore cicd_rules/banned_language_file
+# (intentional: PyTorch external-comparison benchmark — PyTorch is Python-only; emits JSON for framework_comparison.jl)
 # PyTorch benchmark for Axiom.jl external comparison
 # Outputs JSON for consumption by framework_comparison.jl
 #
