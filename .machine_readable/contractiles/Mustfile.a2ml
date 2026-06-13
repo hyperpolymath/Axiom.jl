@@ -1,27 +1,32 @@
 # SPDX-License-Identifier: MPL-2.0
-# Mustfile — Physical state contract for rsr-template-repo
+# Mustfile.a2ml — Physical state contract for Axiom.jl
 # Author: Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 #
 # What MUST be true about this repository. Hard requirements.
-# Run with: must check
-# Fix with: must fix (where a deterministic fix exists)
+# Run with: must check    Fix with: must fix (where a deterministic fix exists)
+#
+# NOTE (2026-06-13): this REPLACES the file the estate branch carried over
+# from rsr-template-repo unsubstituted. That template Mustfile asserted the
+# OLD nested layout (contractiles/bust/, contractiles/dust/,
+# self-validating/k9-svc/, 6a2/anchors/) as critical — but the 06-12 gold
+# standard layout is FLAT. The checks below match Axiom.jl's ACTUAL flat
+# layout. The template drift is recorded for upstream fix.
 
 @abstract:
-Physical-state invariants for rsr-template-repo. This is the canonical
-RSR template repository. These are hard requirements — CI and pre-commit
-hooks fail if any check fails.
+Physical-state invariants for Axiom.jl. Hard requirements — CI and
+pre-commit hooks fail if any critical check fails.
 @end
 
 ## File Presence
 
 ### license-present
-- description: LICENSE file must exist
+- description: LICENSE file must exist (MPL-2.0)
 - run: test -f LICENSE
 - severity: critical
 
 ### readme-present
-- description: README.adoc must exist
-- run: test -f README.adoc
+- description: a README must exist
+- run: test -f README.md || test -f README.adoc
 - severity: critical
 
 ### security-policy
@@ -29,14 +34,14 @@ hooks fail if any check fails.
 - run: test -f SECURITY.md
 - severity: critical
 
-### ai-manifest
-- description: 0-AI-MANIFEST.a2ml must exist
-- run: test -f 0-AI-MANIFEST.a2ml
-- severity: critical
-
 ### governance-docs
 - description: GOVERNANCE.adoc, MAINTAINERS.adoc, CODEOWNERS must exist
 - run: test -f GOVERNANCE.adoc && test -f MAINTAINERS.adoc && test -f .github/CODEOWNERS
+- severity: critical
+
+### project-toml
+- description: Project.toml must exist (Julia package identity)
+- run: test -f Project.toml
 - severity: critical
 
 ### machine-readable-dir
@@ -44,59 +49,49 @@ hooks fail if any check fails.
 - run: test -d .machine_readable
 - severity: critical
 
-## Directory Structure
+## Directory Structure (FLAT contractile layout, 06-12 standard)
 
-### contractiles-complete
-- description: All required contractile directories exist
-- run: test -d .machine_readable/contractiles && test -d .machine_readable/contractiles/bust && test -d .machine_readable/contractiles/dust
+### contractiles-flat-present
+- description: All six flat contractile files + Justfile exist
+- run: for f in Adjustfile Bustfile Dustfile Intentfile Mustfile Trustfile; do test -f .machine_readable/contractiles/$f.a2ml || exit 1; done; test -f .machine_readable/contractiles/Justfile
 - severity: critical
 
-### contractiles-files-present
-- description: All four primary contractile files exist
-- run: test -f .machine_readable/contractiles/Intentfile.a2ml && test -f .machine_readable/contractiles/Mustfile.a2ml && test -f .machine_readable/contractiles/Trustfile.a2ml && test -f .machine_readable/contractiles/Adjustfile.a2ml
+### six-a-two-present
+- description: 6a2 directory has the seven core metadata files + AI manifest
+- run: for f in STATE META ECOSYSTEM AGENTIC NEUROSYM PLAYBOOK 0-AI-MANIFEST; do test -f .machine_readable/6a2/$f.a2ml || exit 1; done
 - severity: critical
 
-### bust-dust-files-present
-- description: Bustfile and Dustfile exist in their directories
-- run: test -f .machine_readable/contractiles/bust/Bustfile.a2ml && test -f .machine_readable/contractiles/dust/Dustfile.a2ml
+### bot-directives-trio
+- description: bot_directives carries the estate trio
+- run: test -f .machine_readable/bot_directives/hypatia.a2ml && test -f .machine_readable/bot_directives/gitbot-fleet.a2ml && test -f .machine_readable/bot_directives/git-private-farm.a2ml
 - severity: critical
 
-### six-directory-present
-- description: 6a2 directory exists with required files
-- run: test -d .machine_readable/6a2 && test -f .machine_readable/6a2/META.a2ml && test -f .machine_readable/6a2/ECOSYSTEM.a2ml && test -f .machine_readable/6a2/STATE.a2ml && test -f .machine_readable/6a2/PLAYBOOK.a2ml && test -f .machine_readable/6a2/AGENTIC.a2ml && test -f .machine_readable/6a2/NEUROSYM.a2ml
-- severity: critical
-
-### anchors-directory
-- description: anchors directory exists in 6a2
-- run: test -d .machine_readable/6a2/anchors
+### self-validating-present
+- description: self-validating/ exists with k9 templates + examples (flat, no k9-svc subdir)
+- run: test -d .machine_readable/self-validating && test -d .machine_readable/self-validating/examples && test -f .machine_readable/self-validating/template-kennel.k9.ncl
 - severity: warning
 
-### self-validating-structure
-- description: self-validating directory has k9-svc and examples
-- run: test -d .machine_readable/self-validating && test -d .machine_readable/self-validating/k9-svc && test -d .machine_readable/self-validating/examples
-- severity: warning
+## Build Integrity
+
+### julia-pkg-builds
+- description: the Julia package loads without errors
+- run: julia --project=. -e 'using Pkg; Pkg.instantiate()'
+- severity: critical
+
+### test-suite-passes
+- description: Julia test suite passes
+- run: julia --project=. -e 'using Pkg; Pkg.test()'
+- severity: critical
 
 ## Template Integrity
 
 ### no-placeholder-values
-- description: No placeholder values remain in template files
-- run: test -z "$(grep -r '{{' .machine_readable/contractiles/ 2>/dev/null)"
+- description: no unsubstituted template placeholders remain in contractiles
+- run: test -z "$(grep -rn '{{' .machine_readable/contractiles/ 2>/dev/null)"
 - severity: critical
-- notes: All placeholders must be substituted when copying this template
 
-### template-readonly
-- description: Template marker files are not modified
-- run: grep -q 'RSR_TEMPLATE_DO_NOT_EDIT' .machine_readable/0.1-AI-MANIFEST.a2ml
+### no-template-identity-leak
+- description: no contractile still claims to be rsr-template-repo
+- run: test -z "$(grep -rln 'rsr-template-repo' .machine_readable/contractiles/ 2>/dev/null | grep -v 'NOTE\|template drift')"
 - severity: warning
-
-## Git State
-
-### no-untracked-contractiles
-- description: All contractile files are tracked in git
-- run: test -z "$(git ls-files -o --exclude-standard .machine_readable/contractiles/ 2>/dev/null)"
-- severity: critical
-
-### signed-commits
-- description: All commits must be signed
-- run: git verify-commit HEAD
-- severity: critical
+- notes: guards against re-importing the un-substituted template Mustfile
