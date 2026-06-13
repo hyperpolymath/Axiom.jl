@@ -1,0 +1,85 @@
+(* SPDX-License-Identifier: MPL-2.0 *)
+(* Example: Using SafeDOM for formally verified DOM mounting *)
+(* AffineScript — affine-typed, compiles to typed-wasm or Deno-ESM *)
+(* Ported from SafeDOMExample.res (ReScript, removed per estate policy). *)
+(* Build: affine build --target wasm32-web examples/SafeDOMExample.affine *)
+
+open SafeDOM
+
+(* Example 1: Basic mounting with error handling *)
+let mount_app : Effect[DOM] Unit =
+  mountSafe
+    "#app"
+    "<div><h1>Hello, World!</h1><p>Mounted safely with proofs.</p></div>"
+    ~on_success:(fun el ->
+      Console.log "✓ App mounted successfully!";
+      Console.log "Element:" el)
+    ~on_error:(fun err ->
+      Console.error "✗ Mount failed:" err)
+
+(* Example 2: Wait for DOM ready before mounting *)
+let mount_when_dom_ready : Effect[DOM] Unit =
+  mountWhenReady
+    "#app"
+    "<div class='container'><h1>App Title</h1></div>"
+    ~on_success:(fun _ -> Console.log "✓ Mounted after DOM ready")
+    ~on_error:(fun err -> Console.error "✗ Failed:" err)
+
+(* Example 3: Batch mounting — atomic: all or nothing *)
+let mount_multiple : Effect[DOM] Unit =
+  let specs = [
+    { selector = "#header"; html = "<header><h1>Site Title</h1></header>" };
+    { selector = "#nav";    html = "<nav><a href='/'>Home</a></nav>" };
+    { selector = "#main";   html = "<main><p>Content here</p></main>" };
+    { selector = "#footer"; html = "<footer>© 2026</footer>" }
+  ] in
+  match mountBatch specs with
+  | Ok elements ->
+      Console.log ("✓ Successfully mounted " ++ show (List.length elements) ++ " elements");
+      List.iter (fun el -> Console.log "  -" el) elements
+  | Error err ->
+      Console.error "✗ Batch mount failed:" err;
+      Console.error "  (None were mounted — atomic operation)"
+
+(* Example 4: Explicit validation before mounting *)
+let mount_with_validation : Effect[DOM] Unit =
+  match ProvenSelector.validate "#my-app" with
+  | Error e -> Console.error ("Invalid selector: " ++ e)
+  | Ok valid_selector ->
+      match ProvenHTML.validate "<div>Content</div>" with
+      | Error e -> Console.error ("Invalid HTML: " ++ e)
+      | Ok valid_html ->
+          match mount valid_selector valid_html with
+          | Mounted el          -> Console.log "✓ Mounted with validated inputs:" el
+          | MountPointNotFound s -> Console.error ("✗ Element not found: " ++ s)
+          | InvalidSelector _   -> Console.error "Impossible — already validated"
+          | InvalidHTML _       -> Console.error "Impossible — already validated"
+
+(* Example 5: Integration with TEA (The Elm Architecture) *)
+type model = { message : String }
+type msg = NoOp
+
+let init : model = { message = "Hello from TEA" }
+let update (m : model) (_ : msg) : model = m
+let view (m : model) : String = "<div><h1>" ++ m.message ++ "</h1></div>"
+
+let mount_tea_app : Effect[DOM] Unit =
+  let model = init in
+  let html  = view model in
+  mountWhenReady
+    "#tea-app"
+    html
+    ~on_success:(fun _ ->
+      Console.log "✓ TEA app mounted"
+      (* Set up event handlers and subscriptions here *))
+    ~on_error:(fun err ->
+      Console.error ("✗ TEA mount failed: " ++ err))
+
+(* Entry point *)
+let main : Effect[DOM] Unit =
+  Console.log "SafeDOM Examples";
+  Console.log "================\n";
+  mount_when_dom_ready  (* Run on DOM ready *)
+
+(* Auto-execute when module loads *)
+let () = main

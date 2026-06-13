@@ -1,11 +1,32 @@
 # SPDX-License-Identifier: MPL-2.0
 # External framework benchmark: Axiom.jl vs Flux.jl vs PyTorch
-# Usage:
-#   1. pip install torch --index-url https://download.pytorch.org/whl/cpu
-#   2. python3 benchmark/pytorch_bench.py
-#   3. julia --project=benchmark benchmark/framework_comparison.jl
 #
-# Requires: PyTorch results at /tmp/pytorch-bench-results.json
+# PyTorch comparison (out-of-tree — Python is estate-banned in tracked files):
+#   The benchmark/pytorch_bench.py script was removed from the tracked tree
+#   (estate policy: Python fully banned). To produce the PyTorch numbers:
+#
+#   Option A — run from a checkout of the last version that had the script
+#              (see git history for benchmark/pytorch_bench.py):
+#     pip install torch --index-url https://download.pytorch.org/whl/cpu
+#     python3 pytorch_bench.py   # save to /tmp/pytorch-bench-results.json
+#
+#   Option B — write an equivalent script manually:
+#     Emit JSON to /tmp/pytorch-bench-results.json matching the schema:
+#       { "framework": "PyTorch", "version": "...", "device": "cpu",
+#         "results": { "<key>": { "median_us": <float>, "min_us": ..., "max_us": ... } } }
+#     Keys: matmul_NxN, relu_1K/100K/1M, sigmoid_*, gelu_*, softmax_BxC,
+#           layernorm_BxH, rmsnorm_BxH, batchnorm_BxF  (warmup=3, iters=50, median).
+#
+#   Then: julia --project=benchmark benchmark/framework_comparison.jl
+#
+# Without PyTorch results the script runs and prints N/A in the PyTorch column.
+#
+# PyTorch checkpoint → Axiom descriptor conversion:
+#   scripts/pytorch_to_axiom_descriptor.py was also removed. Retrieve it from
+#   git history, or port the heuristic (2D weight-matrix → Linear layer inference)
+#   to Julia/Rust as needed.
+#
+# Requires: PyTorch results at /tmp/pytorch-bench-results.json (optional)
 
 using Axiom
 using Flux
@@ -64,7 +85,7 @@ if isfile("/tmp/pytorch-bench-results.json")
     end
     println("✓ PyTorch $pytorch_version results loaded ($(length(pytorch_data)) benchmarks)")
 else
-    println("✗ No PyTorch results — run benchmark/pytorch_bench.py first")
+    println("✗ No PyTorch results — see header comment for out-of-tree instructions")
 end
 
 function pt_time(key)
