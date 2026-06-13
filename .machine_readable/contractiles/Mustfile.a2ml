@@ -12,6 +12,11 @@
 # standard layout is FLAT. The checks below match Axiom.jl's ACTUAL flat
 # layout. The template drift is recorded for upstream fix.
 
+[metadata]
+name = "Axiom.jl-mustfile"
+project = "Axiom.jl"
+schema_version = "1.0"
+
 @abstract:
 Physical-state invariants for Axiom.jl. Hard requirements — CI and
 pre-commit hooks fail if any critical check fails.

@@ -6,6 +6,7 @@ K9!
 
 {
   pedigree = {
+    name = "project-metadata-example",
     schema_version = "1.0.0",
     component_type = "project-metadata",
     security = {

@@ -10,6 +10,11 @@
 # "maximal" with template-files-readonly scope; the invariants below are
 # kept and apply to Axiom.jl.
 
+[metadata]
+name = "Axiom.jl-trustfile"
+project = "Axiom.jl"
+schema_version = "1.0"
+
 @abstract:
 Trust boundaries and integrity checks for Axiom.jl. Defines what AI agents
 may do autonomously and what requires human approval, plus checks that

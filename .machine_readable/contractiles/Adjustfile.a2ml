@@ -9,6 +9,11 @@
 # NOTE (2026-06-13): rewritten for Axiom.jl. The estate-carried file was the
 # rsr-template-repo Adjustfile (drift checks about "template placeholders").
 
+[metadata]
+name = "Axiom.jl-adjustfile"
+project = "Axiom.jl"
+schema_version = "1.0"
+
 @abstract:
 Drift tolerances and corrective actions for Axiom.jl. Unlike MUST (hard
 gate), ADJUST tracks cumulative drift against tolerance bands and proposes

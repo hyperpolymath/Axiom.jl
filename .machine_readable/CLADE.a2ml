@@ -3,6 +3,9 @@
 # See: https://github.com/hyperpolymath/gv-clade-index
 
 [identity]
+name = "Axiom.jl-clade"
+project = "Axiom.jl"
+schema_version = "1.0"
 uuid = "0dc4455a-08c8-57ed-9fdb-f7931c23526f"
 primary-forge = "github"
 primary-owner = "hyperpolymath"

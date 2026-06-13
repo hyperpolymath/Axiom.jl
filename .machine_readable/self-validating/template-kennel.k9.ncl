@@ -6,8 +6,9 @@ K9!
 
 {
   pedigree = {
+    name = "template-kennel",
     schema_version = "1.0.0",
-    component_type = "REQUIRED: describe component type (e.g., 'build-config', 'metadata')",
+    component_type = "kennel-template",
     security = {
       leash = 'Kennel,
       trust_level = "data-only",
@@ -16,9 +17,9 @@ K9!
       allow_subprocess = false,
     },
     metadata = {
-      name = "REQUIRED: component-name",
+      name = "template-kennel",
       version = "1.0.0",
-      description = "REQUIRED: Brief description of what this component contains",
+      description = "K9 Kennel-level template: pure data configuration",
       author = "Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>",
     },
   },
