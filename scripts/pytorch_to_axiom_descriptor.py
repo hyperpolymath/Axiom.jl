@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# hypatia:ignore cicd_rules/banned_language_file
+# (intentional: PyTorch checkpoint converter — PyTorch is Python-only)
 """
 Convert a PyTorch checkpoint/model (.pt/.pth/.ckpt) into
 Axiom's canonical JSON descriptor format:

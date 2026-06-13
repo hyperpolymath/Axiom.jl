@@ -1,22 +1,23 @@
 # SPDX-License-Identifier: MPL-2.0
 # ⚓ ANCHOR: Axiom.jl
 # This is the canonical authority for the Axiom.jl repository.
+# Format: TOML-A2ML (parses with tomllib; matches the estate a2ml standard
+# used by every other .a2ml in this repo and the a2ml-validate-action).
 
-name: "Axiom.jl-anchor"
-project: "Axiom.jl"
-schema_version: "1.0"
-id: "org.hyperpolymath.Axiom.jl"
-version: "1.0.0"
-clade: "unknown"
-status: "active"
+name = "Axiom.jl-anchor"
+project = "Axiom.jl"
+schema_version = "1.0"
+id = "org.hyperpolymath.Axiom.jl"
+version = "1.0.0"
+clade = "unknown"
+status = "active"
 
 # SSG Configuration (Unified boj-server build)
-ssg:
-  engine: "casket"
-  output_dir: "public"
-  boj_trigger: true
-  cartridge: "ssg-mcp"
+[ssg]
+engine = "casket"
+output_dir = "public"
+boj_trigger = true
+cartridge = "ssg-mcp"
 
 # Relationships
-parents:
-  - "org.hyperpolymath.boj-server"
+parents = ["org.hyperpolymath.boj-server"]

@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: MPL-2.0
-// hypatia:ignore cicd_rules/banned_language_file
 // Example: Using SafeDOM for formally verified DOM mounting
 // ReScript is the primary application language for this repo (see CLAUDE.md).
 
