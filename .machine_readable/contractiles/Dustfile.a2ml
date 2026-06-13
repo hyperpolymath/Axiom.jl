@@ -1,0 +1,75 @@
+# SPDX-License-Identifier: MPL-2.0
+# Dustfile.a2ml — cleanup, hygiene & recovery contract for Axiom.jl
+#
+# Format: TOML-A2ML (parses with tomllib; `#` comments, [section], key = "value")
+#
+# Provenance: flat-contractile completion of the estate layout (the estate
+# branch supplied no flat Dustfile; the pre-estate nested contractiles/dust/
+# has been removed in this pass). Added 2026-06-13.
+
+[dustfile]
+version = "1.0.0"
+format = "a2ml"
+repo = "Axiom.jl"
+last-updated = "2026-06-13"
+
+# ============================================================
+# Recovery & rollback tasks
+# ============================================================
+
+[[tasks]]
+name = "source-rollback"
+doc = "Revert all uncommitted source changes to last commit."
+tag = "rollback"
+cmd = "git checkout HEAD -- ."
+
+[[tasks]]
+name = "clean-build"
+doc = "Remove Julia + Zig build artifacts."
+tag = "clean"
+cmd = "rm -rf zig-out && julia --project=. -e 'using Pkg; Pkg.gc()'"
+
+[[tasks]]
+name = "clean-docs"
+doc = "Remove Documenter.jl build output."
+tag = "clean"
+cmd = "rm -rf docs/build"
+
+[[tasks]]
+name = "rebuild"
+doc = "Cold rebuild + full test."
+tag = "verify"
+cmd = "julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.test()'"
+
+# ============================================================
+# Cleanup policy
+# ============================================================
+
+[cleanup]
+build-artifacts = "zig-out/ (Zig build); docs/build/ (Documenter.jl); .julia/ depot cache (managed by Julia itself)"
+generated-dirs = "zig-out/ and docs/build/ are gitignored; safe to delete at any time"
+stale-branch-policy = "session/* and claude/* branches are dispositioned (landing / superseded / abandoned) at checkpoint; bots never delete branches"
+artifact-retention = "not-applicable"
+artifact-retention-reason = "Axiom.jl publishes no long-lived build artifacts; everything is rebuilt from source; .eclb / .wasm / .ll analogues are test temporaries (cleaned by runtests.jl via tempname())"
+cache-policy = "CI caches the Julia depot; invalidation follows the workflow definitions in .github/workflows/ci.yml"
+
+# ============================================================
+# Hygiene
+# ============================================================
+
+[hygiene]
+code-hygiene = "Julia: standard style (no explicit formatter enforced yet); Zig: zig fmt"
+dead-code-rule = "unused extension modules are template-only skeletons in templates/; they are not dead code — they are shipped as user-facing templates"
+todo-tracking = "repo-wide TODOs go to GitHub issues; inline TODOs are scoped to a tracked issue"
+linting = "Julia: no standalone linter wired in core CI (as of 2026-06-13); Zig: zig build check"
+formatting = "Julia: pending; Zig: zig fmt"
+
+# ============================================================
+# Reversibility
+# ============================================================
+
+[reversibility]
+backup-before-destructive = true
+rollback-mechanism = "git-revert (main is append-only; superseded docs get banners, not deletion)"
+data-retention-policy = "not-applicable"
+data-retention-reason = "Axiom.jl holds no runtime data under version control; test fixtures are generated at test time via tempname()"

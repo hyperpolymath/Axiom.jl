@@ -1,9 +1,41 @@
 # SPDX-License-Identifier: MPL-2.0
-# META.a2ml — Project meta-information
-# Converted from META.scm on 2026-03-15
+# META.a2ml — Project meta-information for Axiom.jl
+# Converted from META.scm on 2026-03-15; refreshed 2026-06-13
 
 [metadata]
 project = "Axiom.jl"
 author = "Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
 license = "MPL-2.0"
 standard = "RSR 2026"
+last-updated = "2026-06-13"
+
+[repository]
+owner = "hyperpolymath"
+name = "Axiom.jl"
+url = "https://github.com/hyperpolymath/Axiom.jl"
+language = "Julia"
+min-julia = "1.10"
+
+[architecture]
+pattern = "Julia package with Zig compute layer + Idris2 ABI + optional GPU/coprocessor extensions"
+core-module = "src/Axiom.jl"
+compute-substrate = "zig/ (Zig SIMD kernels: matmul, conv, attention, pool, norm, activations, bench, threading)"
+abi-layer = "src/Abi/ (Idris2 ABI interface definitions)"
+extensions-dir = "ext/ (13 coprocessor/accelerator Julia package extensions)"
+subpackages = ["packages/SMTLib.jl"]
+verification-surface = ["src/verification/certificates.jl", "src/verification/checker.jl", "src/verification/properties.jl", "src/verification/serialization.jl", "src/verification/verification.jl"]
+formal-spec = "ResourceTracking.agda (referenced in CLAUDE.md)"
+
+[key-decisions]
+kd-1 = "Julia as primary language (not Python); Zig as performance substrate; Idris2 for ABI formal spec"
+kd-2 = "Optional coprocessors as weakdeps (pkg extensions), not hard deps"
+kd-3 = "Serving APIs (REST/GraphQL/gRPC) are first-class, not afterthoughts"
+kd-4 = "SMTLib.jl is a subpackage (packages/), not an extension — it has its own Project.toml"
+kd-5 = "MPL-2.0 (Palimpsest) license throughout; REUSE-compliant SPDX headers"
+
+[dev-practices]
+branch-policy = "main is protected; working branches are claude/<slug> or session/<topic>; draft PRs only; CI green before merge"
+commit-style = "conventional commits (chore/docs/feat/fix)"
+test-command = "julia --project=. -e 'using Pkg; Pkg.test()'"
+zig-build = "zig build -p zig-out --build-file zig/build.zig"
+contractile-layout = "06-12 estate standard (flat)"

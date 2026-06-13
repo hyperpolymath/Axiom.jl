@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: MPL-2.0
+# hypatia.a2ml — Hypatia scanner directives for Axiom.jl.
+# Net-new at the 2026-06-13 governance checkpoint per the estate
+# bot_directives standard (hypatia / gitbot-fleet / git-private-farm trio).
+
+[metadata]
+repo = "Axiom.jl"
+last-updated = "2026-06-13"
+owner = "hyperpolymath"
+
+[scanner]
+workflow = ".github/workflows/hypatia-scan.yml"
+ignore-file = ".hypatia-ignore"   # ABSENT as of 2026-06-13; created on first real adjudication, each entry carrying a verified rationale
+
+# ============================================================
+# Pre-adjudicated finding classes.
+#
+# These are grounded in documented repo facts (Project.toml, test/runtests.jl,
+# README.adoc); they are NOT live suppressions.
+# When the scanner first raises one, materialise it into .hypatia-ignore
+# with the EXACT rule-id from the scan output — do not invent rule-ids here.
+# ============================================================
+
+[[accepted-findings]]
+class = "julia/unsafe-ccall"
+path = "src/**"
+status = "justified"
+reason = """
+Axiom.jl uses ccall for Zig FFI and coprocessor ABI bridges (src/Abi/).
+These are intentional foreign-function boundaries documented in the Idris2
+ABI layer (src/Abi/). Do not raise as unsafe-ffi defects; if a NEW ccall
+appears outside an established ABI boundary, that IS a finding.
+"""
+
+[[accepted-findings]]
+class = "julia/env-read-in-test"
+path = "test/**"
+status = "test-infrastructure"
+reason = """
+test/runtests.jl reads ENV for coprocessor detection (AXIOM_TPU_AVAILABLE,
+AXIOM_TPU_DEVICE_COUNT, etc.) and restores ENV in finally blocks. This is
+the approved test isolation pattern for hardware-absent CI.
+"""
+
+# ============================================================
+# Prohibited actions
+# ============================================================
+
+[prohibited-actions]
+auto-delete-branches = false
+auto-merge = false
+modify-workflows = false        # CI hardening goes through review, not bot edits
+escalation = "open an issue, do not spam PR comments"

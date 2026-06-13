@@ -1,0 +1,85 @@
+# SPDX-License-Identifier: MPL-2.0
+# Bustfile.a2ml — breakage contract for Axiom.jl: what counts as a busted
+# state, how it is detected, and how to respond.
+#
+# Format: TOML-A2ML (parses with tomllib; `#` comments, [section], key = "value")
+#
+# Provenance: flat-contractile completion of the estate layout (the estate
+# branch supplied Adjustfile/Intentfile/Justfile/Mustfile/Trustfile but no
+# flat Bustfile; the pre-estate nested contractiles/bust/ has been removed
+# in this pass). Detection commands below are the repo's own existing gates,
+# not new policy. Added 2026-06-13.
+
+[bustfile]
+version = "1.0.0"
+format = "a2ml"
+repo = "Axiom.jl"
+last-updated = "2026-06-13"
+
+# ============================================================
+# Busted-state definition (any one of these means the repo is busted)
+# ============================================================
+
+[definition]
+busted-states = [
+  "julia --project=. -e 'using Pkg; Pkg.test()' fails (any testset in runtests.jl red)",
+  "Zig build fails (zig/build.zig does not compile)",
+  "a coprocessor backend (TPU/NPU/DSP/FPGA/GPU extension) regresses in test/ci/",
+  "a Serving API (REST/GraphQL/gRPC) testset regresses",
+  "a model interoperability testset (PyTorch import / ONNX export) regresses",
+  "main is red on ci.yml / governance / hypatia-scan / scorecard workflows",
+]
+
+# ============================================================
+# Detection (run these to decide whether the repo is busted)
+# ============================================================
+
+[[detection]]
+name = "julia-test"
+doc = "Full Julia test suite via Pkg.test()."
+run = "julia --project=. -e 'using Pkg; Pkg.test()'"
+severity = "critical"
+
+[[detection]]
+name = "zig-build"
+doc = "Zig compute layer compiles."
+run = "zig build -p zig-out --build-file zig/build.zig"
+severity = "high"
+
+[[detection]]
+name = "julia-instantiate"
+doc = "Package environment resolves cleanly."
+run = "julia --project=. -e 'using Pkg; Pkg.instantiate()'"
+severity = "critical"
+
+# ============================================================
+# Response ladder (in order; stop at the first step that restores green)
+# ============================================================
+
+[response]
+step-1 = "Do not merge anything while a critical detection fails on main; CI green precedes merge."
+step-2 = "If the breakage is uncommitted local work: run the Dustfile source-rollback task (git checkout HEAD -- .), re-detect."
+step-3 = "If the breakage landed on a branch: fix forward on that branch or close it superseded; never force-push over another session's work without re-fetching."
+step-4 = "If the breakage landed on main: git revert the offending commit (main is append-only; no force-push to main)."
+step-5 = "Record the incident: open an issue with the failing command + output."
+
+[escalation]
+owner = "hyperpolymath"
+contact = "MAINTAINERS.adoc"
+bot-rule = "automated agents open an issue and stop; they do not auto-revert main, do not auto-merge fixes, and do not spam PR comments"
+
+# ============================================================
+# Known exceptions (NOT busted states; do not 'fix' these)
+# ============================================================
+
+[[known-exceptions]]
+name = "coprocessor-env-deps"
+detail = "Coprocessor tests (TPU/NPU/DSP/FPGA) rely on ENV hints (AXIOM_TPU_AVAILABLE etc.); the runtests.jl 'Coprocessor Backends' testset mocks these via ENV. Hardware-absent CI is expected to exercise the mock path, not real hardware."
+
+[[known-exceptions]]
+name = "smt-solver-optional"
+detail = "SMT Runner / SMT Cache testsets skip gracefully when no SMT solver is available (get_smt_solver() returns nothing). Not a breakage."
+
+[[known-exceptions]]
+name = "weakdeps-absent"
+detail = "weakdeps (CUDA, AMDGPU, Metal, etc.) are optional extensions; their absence does not bust the core package. Only the extension-specific CI jobs test them."
