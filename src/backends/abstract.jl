@@ -559,8 +559,14 @@ end
 function backend_batchnorm(::JuliaBackend, x::Array{Float32}, gamma::Vector{Float32},
                            beta::Vector{Float32}, running_mean::Vector{Float32},
                            running_var::Vector{Float32}, eps::Float32, training::Bool)
-    μ = reshape(running_mean, ones(Int, ndims(x)-1)..., :)
-    σ² = reshape(running_var, ones(Int, ndims(x)-1)..., :)
+    if training
+        dims = collect(1:ndims(x)-1)
+        μ = mean(x, dims=dims)
+        σ² = var(x, dims=dims, corrected=false)
+    else
+        μ = reshape(running_mean, ones(Int, ndims(x)-1)..., :)
+        σ² = reshape(running_var, ones(Int, ndims(x)-1)..., :)
+    end
     x_norm = (x .- μ) ./ sqrt.(σ² .+ eps)
     γ = reshape(gamma, ones(Int, ndims(x)-1)..., :)
     β = reshape(beta, ones(Int, ndims(x)-1)..., :)
