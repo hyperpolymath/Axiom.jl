@@ -5,7 +5,7 @@
 
 using Libdl
 using LinearAlgebra: I
-using AcceleratorGate: select_backend as ag_select_backend,
+using .AcceleratorGateVendored: select_backend as ag_select_backend,
     fits_on_device as ag_fits_on_device, estimate_cost as ag_estimate_cost,
     DeviceCapabilities, device_capabilities, PlatformInfo, detect_platform
 
@@ -2264,8 +2264,11 @@ function fits_on_device(backend::AbstractBackend, model)
     model_bytes = estimate_model_memory(model)
     required = model_bytes * 2  # 2x overhead for activations/gradients
 
-    # Try AcceleratorGate device capabilities first
-    caps = device_capabilities(backend)
+    # Try AcceleratorGate device capabilities first. The vendored module's
+    # backend hierarchy is disjoint from Axiom's AbstractBackend, so it has no
+    # method for Axiom backends; fall through to Axiom's own resource queries
+    # in that case (matches the documented fallback behaviour).
+    caps = applicable(device_capabilities, backend) ? device_capabilities(backend) : nothing
     if caps !== nothing
         return caps.memory_available >= required
     end

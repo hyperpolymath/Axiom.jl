@@ -110,6 +110,7 @@ include("verification/serialization.jl")
 include("proof_export.jl")  # Issue #19 - Proof assistant integration
 
 # Backend abstraction
+include("vendored/AcceleratorGateVendored.jl")  # vendored AcceleratorGate (upstream is unregistered)
 include("backends/abstract.jl")
 include("backends/julia_backend.jl")
 include("backends/gpu_hooks.jl")  # GPU backend interface (issue #12)

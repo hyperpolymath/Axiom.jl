@@ -77,7 +77,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
 
       - name: Install Zig
-        uses: goto-bus-stop/setup-zig@7ab2955eb728f5440978d7a4f7b08092032d2a5c # v2
+        uses: goto-bus-stop/setup-zig@abea47f85e598557f500fa1fd2ab7464fcb39406 # v2.2.1
         with:
           version: '0.15.2'
 
@@ -107,7 +107,7 @@ jobs:
       - uses: julia-actions/cache@e33b4bfa0ea7cd9caedd7cb82b0e36956ef40285 # v2
 
       - name: Install Zig
-        uses: goto-bus-stop/setup-zig@7ab2955eb728f5440978d7a4f7b08092032d2a5c # v2
+        uses: goto-bus-stop/setup-zig@abea47f85e598557f500fa1fd2ab7464fcb39406 # v2.2.1
         with:
           version: '0.15.2'
 
