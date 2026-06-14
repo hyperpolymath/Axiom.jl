@@ -31,7 +31,6 @@ pub fn conv2d(
 ) void {
     const input_hw = h_in * w_in;
     const output_hw = h_out * w_out;
-    const kernel_size = kh * kw * c_in;
 
     // Process each batch
     var n: usize = 0;
@@ -42,7 +41,8 @@ pub fn conv2d(
         // Process each output channel
         var oc: usize = 0;
         while (oc < c_out) : (oc += 1) {
-            const weight_oc = weight + oc * kernel_size;
+            // weight is (kH, kW, C_in, C_out) row-major: C_out (oc) is the contiguous axis,
+            // so oc is folded into the inner weight index below rather than a base offset.
             const bias_val: f32 = if (bias) |b| b[oc] else 0;
 
             // Process each output position
@@ -69,8 +69,8 @@ pub fn conv2d(
                             var ic: usize = 0;
                             while (ic < c_in) : (ic += 1) {
                                 const in_idx = ih_actual * w_in * c_in + iw_actual * c_in + ic;
-                                const w_idx = ki * kw * c_in + kj * c_in + ic;
-                                sum += input_batch[in_idx] * weight_oc[w_idx];
+                                const w_idx = ((ki * kw + kj) * c_in + ic) * c_out + oc;
+                                sum += input_batch[in_idx] * weight[w_idx];
                             }
                         }
                     }
