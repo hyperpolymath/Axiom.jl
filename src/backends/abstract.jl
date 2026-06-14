@@ -1997,7 +1997,7 @@ function coprocessor_capability_report()
 
     Dict(
         "generated_at" => Dates.format(now(Dates.UTC), "yyyy-mm-ddTHH:MM:SS.sssZ"),
-        "strategy_order" => ["TPU", "NPU", "PPU", "MATH", "FPGA", "DSP", "VPU", "QPU", "CRYPTO"],
+        "strategy_order" => ["TPU", "NPU", "PPU", "MATH", "FPGA", "DSP"],
         "selected_backend" => selected === nothing ? nothing : string(typeof(selected)),
         "runtime_diagnostics" => coprocessor_runtime_diagnostics(),
         "backends" => backends,
