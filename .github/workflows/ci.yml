@@ -81,13 +81,17 @@ jobs:
         with:
           version: '0.15.2'
 
-      - name: Build Zig backend (ReleaseFast)
+      - name: Check formatting
         working-directory: zig
-        run: zig build -Doptimize=ReleaseFast
+        run: zig fmt --check src/
 
       - name: Run Zig tests
         working-directory: zig
         run: zig build test
+
+      - name: Build Zig backend (ReleaseFast)
+        working-directory: zig
+        run: zig build -Doptimize=ReleaseFast
 
   backend-parity-zig:
     name: CPU vs Zig parity + accelerated smoke
@@ -527,30 +531,6 @@ jobs:
           name: proof-bundle-evidence
           path: build/proof_bundle_evidence.json
           if-no-files-found: warn
-
-  zig-build:
-    name: Zig Backend
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
-
-      - name: Setup Zig
-        uses: goto-bus-stop/setup-zig@abea47f85e598557f500fa1fd2ab7464fcb39406 # v2
-        with:
-          version: 0.13.0
-
-      - name: Check formatting
-        working-directory: zig
-        run: zig fmt --check src/
-
-      - name: Run tests
-        working-directory: zig
-        run: zig build test
-
-      - name: Build release
-        working-directory: zig
-        run: zig build -Doptimize=ReleaseFast
 
   docs-sanity:
     name: Documentation sanity
