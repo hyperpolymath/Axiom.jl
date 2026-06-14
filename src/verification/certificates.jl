@@ -58,7 +58,7 @@ function generate_certificate(
         model_hash,
         model_name,
         [prop for (prop, passed) in result.properties_checked if passed],
-        result.mode !== nothing ? result.mode : STANDARD,
+        STANDARD,  # VerificationResult carries no mode field; certificates default to STANDARD
         test_data_hash,
         proof_type,
         time(),

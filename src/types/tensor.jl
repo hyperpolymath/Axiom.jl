@@ -242,6 +242,11 @@ Base.size(t::Tensor{T, N, Shape}) where {T, N, Shape} = Shape
 Returns the runtime `size` of the underlying `data` array for a `DynamicTensor`.
 """
 Base.size(t::DynamicTensor) = size(t.data)
+
+# Dimensional size. AbstractTensor wraps its shape tuple but is not <: AbstractArray,
+# so the 2-arg `size(t, dim)` form must be provided explicitly (mirrors Base semantics:
+# dimensions beyond ndims report 1).
+Base.size(t::AbstractTensor, dim::Integer) = dim <= length(size(t)) ? size(t)[dim] : 1
 """
     Base.length(t::AbstractTensor)
 
