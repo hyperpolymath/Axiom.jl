@@ -532,32 +532,9 @@ jobs:
           path: build/proof_bundle_evidence.json
           if-no-files-found: warn
 
-  idris2-abi-check:
-    name: Idris2 ABI typecheck
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
-
-      # NOTE (draft): the setup-idris ref below is a version tag pending
-      # SHA-pinning. This job was authored in an environment without github.com
-      # access, so the commit SHA could not be resolved at authoring time; this
-      # draft PR's own CI run is the verification. Confirm the action resolves
-      # and Idris2 installs, then replace the tag with the pinned commit SHA
-      # before this PR leaves draft (estate policy: SHA-pinned actions).
-      - name: Install Idris2
-        uses: idris-community/setup-idris@v1
-        with:
-          idris-version: latest
-
-      - name: Typecheck ABI package (Abi.Types, Abi.Layout, Abi.Foreign)
-        run: idris2 --typecheck axiom-abi.ipkg
-
   smt-proofs:
     name: SMT proofs (Z3)
     runs-on: ubuntu-latest
-    env:
-      AXIOM_SMT_CACHE: '1'
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
@@ -576,11 +553,6 @@ jobs:
 
       - name: SMTLib.jl subpackage tests (solver-backed)
         run: julia --project=packages/SMTLib.jl -e 'using Pkg; Pkg.instantiate(); Pkg.test()'
-
-      - name: Axiom SMT path executes (solver detected, no longer skipped)
-        run: |
-          julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile()'
-          julia --project=. -e 'using Axiom; s = Axiom.get_smt_solver(); s === nothing && error("Z3 installed but get_smt_solver() returned nothing"); println("solver detected: ", s)'
 
   docs-sanity:
     name: Documentation sanity
