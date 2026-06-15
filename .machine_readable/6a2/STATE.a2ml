@@ -5,7 +5,7 @@
 [metadata]
 project = "Axiom.jl"
 version = "1.0.0"
-last-updated = "2026-06-13"
+last-updated = "2026-06-15"
 status = "active"
 
 [project-context]
@@ -50,7 +50,7 @@ core = [
   "Optimizers (SGD, Adam, AdamW)",
   "Loss functions (mse_loss, crossentropy, binary_crossentropy)",
   "DataLoader with batching and train/test split",
-  "Coprocessor detection + compilation (TPU/NPU/DSP/FPGA/GPU extension paths)",
+  "Coprocessor detection: env-probed strategy (TPU/NPU/PPU/MATH/FPGA/DSP); GPU acceleration via CUDA/AMDGPU/Metal extensions",
   "Serving APIs: REST (serve_rest), GraphQL (serve_graphql), gRPC (serve_grpc, binary wire)",
   "Model interop: PyTorch import (from_pytorch), ONNX export (to_onnx)",
   "Formal verification: @axiom macro, @ensure macro, ValidProbabilities property, certificate workflow",
@@ -60,17 +60,12 @@ extensions = [
   "AxiomCUDAExt (CUDA.jl)",
   "AxiomAMDGPUExt (AMDGPU.jl)",
   "AxiomMetalExt (Metal.jl)",
-  "AxiomTPUExt (TPUCompute)",
-  "AxiomNPUExt (NPUAccel)",
-  "AxiomDSPExt (DSPLibs)",
-  "AxiomFPGAExt (FPGASynthesis)",
-  "AxiomPPUExt (PPUCompute)",
-  "AxiomQPUExt (QPUInterface)",
-  "AxiomVPUExt (VPURuntime)",
-  "AxiomMathExt (MathAccel)",
-  "AxiomCryptoExt (CryptoAccel)",
   "AxiomPyTorchExt (PyCall)",
+  "AxiomSMTExt (SMTLib)",
 ]
+# NOTE 2026-06-15: the 9 placeholder-UUID accelerator extensions
+# (TPU/NPU/DSP/FPGA/PPU/QPU/VPU/Math/Crypto) were removed; AxiomSMTExt was
+# wired into [extensions] (was a dormant ext/ file). 5 real extensions now.
 
 [governance]
 machine-readable-layout = "06-12 estate standard (flat contractiles, bot_directives trio, self-validating/)"

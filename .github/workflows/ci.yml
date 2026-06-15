@@ -532,6 +532,18 @@ jobs:
           path: build/proof_bundle_evidence.json
           if-no-files-found: warn
 
+  idris2-abi-check:
+    name: Idris2 ABI typecheck
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/stefan-hoeck/idris2-pack@sha256:de9781906050dc44704ec6de0108c86f899ef17b2642932b79e00245d613b8ad
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
+
+      - name: Typecheck ABI package (Abi.Types, Abi.Layout, Abi.Foreign)
+        run: idris2 --typecheck axiom-abi.ipkg
+
   smt-proofs:
     name: SMT proofs (Z3)
     runs-on: ubuntu-latest
@@ -553,6 +565,11 @@ jobs:
 
       - name: SMTLib.jl subpackage tests (solver-backed)
         run: julia --project=packages/SMTLib.jl -e 'using Pkg; Pkg.instantiate(); Pkg.test()'
+
+      - name: AxiomSMTExt loads (extension wiring) + report Axiom SMT solver
+        run: |
+          julia --project=. -e 'using Pkg; Pkg.develop(path="packages/SMTLib.jl"); Pkg.instantiate(); Pkg.build(); Pkg.precompile()'
+          julia --project=. -e 'using Axiom, SMTLib; ext = Base.get_extension(Axiom, :AxiomSMTExt); ext === nothing && error("AxiomSMTExt did not load after wiring"); println("AxiomSMTExt loaded: ", ext); println("Axiom.get_smt_solver() => ", Axiom.get_smt_solver())'
 
   docs-sanity:
     name: Documentation sanity
