@@ -8,7 +8,7 @@ name = "Axiom.jl-gitbot-fleet"
 project = "Axiom.jl"
 schema_version = "1.0"
 repo = "Axiom.jl"
-last-updated = "2026-06-13"
+last-updated = "2026-06-18"
 owner = "hyperpolymath"
 
 [fleet]
@@ -36,6 +36,27 @@ never-touch = [
   "packages/SMTLib.jl/",        # SMTLib subpackage
   ".github/workflows/",         # CI hardening is review-gated, not bot-edited
 ]
+
+# ============================================================
+# Adjudicated modifications to never-touch surfaces.
+# These surfaces are bot-off-limits, but were intentionally modified by
+# maintainer-authorised human sessions (claude/<slug>) and merged after
+# CI-green. Bots must treat them as SETTLED — do not flag as drift or
+# attempt to revert / relitigate.
+# ============================================================
+
+[[adjudications]]
+surfaces = ["zig/", ".github/workflows/", "src/verification/"]
+prs = ["#32", "#33", "#34", "#35"]
+date = "2026-06-18"
+reason = """
+PRs #32-#35 modified these never-touch surfaces under maintainer
+authorisation and merged CI-green: zig/src/conv.zig (conv2d weight-layout
+fix + BatchNorm parity), src/verification/certificates.jl (result.mode
+default), and .github/workflows/ci.yml (zig-build de-dup, Idris2 ABI
+typecheck + SMT gates). Settled, not bot drift. src/Abi/ and
+packages/SMTLib.jl/ were NOT modified.
+"""
 
 # ============================================================
 # Per-bot constraints where Axiom.jl gives a specific reason;

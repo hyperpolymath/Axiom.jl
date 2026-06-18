@@ -8,7 +8,7 @@ name = "Axiom.jl-hypatia"
 project = "Axiom.jl"
 schema_version = "1.0"
 repo = "Axiom.jl"
-last-updated = "2026-06-13"
+last-updated = "2026-06-18"
 owner = "hyperpolymath"
 
 [scanner]
@@ -40,9 +40,11 @@ class = "julia/env-read-in-test"
 path = "test/**"
 status = "test-infrastructure"
 reason = """
-test/runtests.jl reads ENV for coprocessor detection (AXIOM_TPU_AVAILABLE,
-AXIOM_TPU_DEVICE_COUNT, etc.) and restores ENV in finally blocks. This is
-the approved test isolation pattern for hardware-absent CI.
+test/runtests.jl AND the test/ci/*.jl smoke suites (e.g.
+coprocessor_strategy.jl) read ENV for coprocessor detection
+(AXIOM_TPU_AVAILABLE, AXIOM_TPU_DEVICE_COUNT, AXIOM_SMT_CACHE, etc.) and
+restore ENV in finally blocks. This is the approved test isolation pattern
+for hardware-absent CI; path test/** already covers both locations.
 """
 
 # ============================================================
