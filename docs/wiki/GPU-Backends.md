@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: MPL-2.0 -->
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
 # GPU Backend Support
 
 Axiom.jl provides GPU acceleration through package extensions for CUDA (NVIDIA), ROCm (AMD), and Metal (Apple Silicon).

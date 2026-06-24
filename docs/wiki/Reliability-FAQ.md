@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: MPL-2.0 -->
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
 # Reliability FAQ (Self-Healing, Fault Tolerance, Self-Diagnostics)
 
 This FAQ is a quick reference for the reliability concepts we discussed.

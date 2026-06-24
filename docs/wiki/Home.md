@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: MPL-2.0 -->
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
 <div align="center">
 
 # Axiom.jl
@@ -7,7 +7,7 @@
 
 [![Julia](https://img.shields.io/badge/Julia-1.9+-purple.svg)](https://julialang.org/)
 [![Rust](https://img.shields.io/badge/Rust-Backend-orange.svg)](https://www.rust-lang.org/)
-[![License](https://img.shields.io/badge/License-PMPL--1.0-blue.svg)](../../LICENSE)
+[![License](https://img.shields.io/badge/License-MPL--2.0-blue.svg)](../../LICENSE)
 
 **The ML framework where bugs are caught before runtime, not after deployment.**
 

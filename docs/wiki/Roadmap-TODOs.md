@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: MPL-2.0 -->
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
 # Roadmap and TODOs
 
 This page consolidates planned work and in-code TODOs for Axiom.jl. It is a living snapshot; see the referenced files for detail.

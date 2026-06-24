@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: MPL-2.0 -->
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
 # PyTorch to Axiom.jl Migration Guide
 
 > *"Your models, but better."*

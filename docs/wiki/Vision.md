@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: MPL-2.0 -->
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
 # The Axiom.jl Vision
 
 > *"What if your ML model couldn't have bugs?"*

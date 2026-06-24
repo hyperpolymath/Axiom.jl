@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: MPL-2.0 -->
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
 # Roadmap and Tracked Commitments
 
 This page tracks roadmap commitments for Axiom.jl and records what is already shipped versus what remains to reach full production scope.

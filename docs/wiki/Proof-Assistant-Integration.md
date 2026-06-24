@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: MPL-2.0 -->
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
 # Formal Proof Assistant Integration
 
 Axiom.jl provides bridges to external proof assistants for long-term formalization of ML correctness properties.
