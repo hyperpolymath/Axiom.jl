@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: MPL-2.0 -->
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
 # Frequently Asked Questions
 
 > *"There are no stupid questions, only stupid bugs that weren't caught at compile time."*

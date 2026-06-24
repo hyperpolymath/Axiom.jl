@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: MPL-2.0 -->
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
 # Performance Tuning and Benchmarking
 
 Axiom.jl provides comprehensive benchmarking infrastructure to track performance across Julia and Zig backends (plus optional GPU accelerator paths where available).

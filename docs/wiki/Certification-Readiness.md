@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: MPL-2.0 -->
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
 # Certification Readiness Checklist
 
 > Mapping Axiom.jl features to industry certification requirements

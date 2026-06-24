@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: CC-BY-SA-4.0
 = Universal Repo Standard (Must / Intend / Like)
 
 This document is designed as a reusable baseline for *every* repository (Julia and non-Julia).
