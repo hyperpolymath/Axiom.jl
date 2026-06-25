@@ -1,36 +1,39 @@
-[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink?logo=github)](https://github.com/sponsors/hyperpolymath)
+<!--
+SPDX-License-Identifier: CC-BY-SA-4.0
+SPDX-FileCopyrightText: 2025-2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+-->
 
-// SPDX-License-Identifier: CC-BY-SA-4.0
-// (MPL-2.0 preferred; MPL-2.0 required for Julia General registry)
-= Axiom.jl
-:toc: macro
-:toclevels: 2
-:icons: font
-:source-highlighter: rouge
+[![OpenSSF Best Practices](https://img.shields.io/badge/OpenSSF-Best_Practices-green?logo=opensourcesecurity)](https://www.bestpractices.dev/en/projects/new?repo_url=https://github.com/hyperpolymath/Axiom.jl)
+[![License: MPL-2.0](https://img.shields.io/badge/License-MPL--2.0-blue.svg)](https://www.mozilla.org/en-US/MPL/2.0/) <embed
+src="https://api.thegreenwebfoundation.org/greencheckimage/github.com"
+data-link="https://www.thegreenwebfoundation.org/green-web-check/?url=github.com" />
+image:<a href="https://img.shields.io/badge/Julia-1.10+-9558B2?logo=julia"
+data-link="https://julialang.org/">Julia</a>
+[![Zig](https://img.shields.io/badge/Zig-Backend-F7A41D?logo=zig)](https://ziglang.org/)
 
-image:https://img.shields.io/badge/OpenSSF-Best_Practices-green?logo=opensourcesecurity[OpenSSF Best Practices,link="https://www.bestpractices.dev/en/projects/new?repo_url=https://github.com/hyperpolymath/Axiom.jl"]
-image:https://img.shields.io/badge/License-MPL--2.0-blue.svg[License: MPL-2.0,link="https://www.mozilla.org/en-US/MPL/2.0/"]
-image:https://api.thegreenwebfoundation.org/greencheckimage/github.com[Green Web,link="https://www.thegreenwebfoundation.org/green-web-check/?url=github.com"]
-image:https://img.shields.io/badge/Julia-1.10+-9558B2?logo=julia[Julia,link="https://julialang.org/"]
-image:https://img.shields.io/badge/Zig-Backend-F7A41D?logo=zig[Zig,link="https://ziglang.org/"]
+**Provably Correct Machine Learning**
 
-*Provably Correct Machine Learning*
+*Machine learning where bugs are caught at compile time, not in
+production.*
 
-_Machine learning where bugs are caught at compile time, not in production._
+<div id="toc">
 
-toc::[]
+</div>
 
-== What is Axiom.jl?
+# What is Axiom.jl?
 
-Axiom.jl is a *next-generation ML framework* that combines:
+Axiom.jl is a **next-generation ML framework** that combines:
 
-* *Compile-time verification* - Shape errors caught before runtime
-* *Formal guarantees* - Verification checks and certificate workflows
-* *Optional acceleration* - Zig/GPU backend paths with explicit fallback behavior
-* *Julia elegance* - Express models as mathematical specifications
+- **Compile-time verification** - Shape errors caught before runtime
 
-[source,julia]
-----
+- **Formal guarantees** - Verification checks and certificate workflows
+
+- **Optional acceleration** - Zig/GPU backend paths with explicit
+  fallback behavior
+
+- **Julia elegance** - Express models as mathematical specifications
+
+```julia
 using Axiom
 
 model = Sequential(
@@ -43,14 +46,13 @@ x = Tensor(randn(Float32, 16, 784))
 y = model(x)
 result = verify(model, properties=[ValidProbabilities(), FiniteOutput()], data=[(x, nothing)])
 @assert result.passed
-----
+```
 
-== Features
+# Features
 
-=== Compile-Time Shape Verification
+## Compile-Time Shape Verification
 
-[source,julia]
-----
+```julia
 # PyTorch: Runtime error after hours of training
 # Axiom.jl: Compile error in milliseconds
 
@@ -60,12 +62,11 @@ result = verify(model, properties=[ValidProbabilities(), FiniteOutput()], data=[
     output = features |> Dense(10)  # COMPILE ERROR!
     # "Shape mismatch: Conv output is (222,222,64), Dense expects vector"
 end
-----
+```
 
-=== Formal Verification
+## Formal Verification
 
-[source,julia]
-----
+```julia
 @axiom SafeClassifier begin
     # ...
     @ensure valid_probabilities(output)    # Runtime assertion
@@ -75,12 +76,11 @@ end
 # Generate verification certificates
 cert = verify(model) |> generate_certificate
 save_certificate(cert, "fda_submission.cert")
-----
+```
 
-=== Model Interoperability
+## Model Interoperability
 
-[source,julia]
-----
+```julia
 # Import from a PyTorch checkpoint (.pt/.pth/.ckpt) via built-in Python bridge
 # (requires python3 + torch in the selected runtime)
 model = from_pytorch("model.pt")
@@ -90,39 +90,39 @@ model2 = from_pytorch("model.pytorch.json")
 
 # Export supported models to ONNX
 to_onnx(model, "model.onnx", input_shape=(1, 3, 224, 224))
-----
+```
 
 Current scope:
 
-* `from_pytorch(...)`: canonical descriptor import + direct `.pt/.pth/.ckpt` bridge.
-* `to_onnx(...)`: export for `Sequential`/`Pipeline` models built from Dense/Conv/Norm/Pool + common activations.
+- `from_pytorch(…)`: canonical descriptor import + direct
+  `.pt/.pth/.ckpt` bridge.
 
-=== High Performance
+- `to_onnx(…)`: export for `Sequential`/`Pipeline` models built from
+  Dense/Conv/Norm/Pool + common activations.
 
-[source,julia]
-----
+## High Performance
+
+```julia
 # Development: Julia backend
 model = Sequential(Dense(784, 128, relu), Dense(128, 10))
 
 # Production path: optional Zig backend
 prod_model = compile(model, backend=ZigBackend("/path/to/libaxiom_zig.so"), optimize=:aggressive)
-----
+```
 
-=== Coprocessor Targets
+## Coprocessor Targets
 
-[source,julia]
-----
+```julia
 # Non-GPU accelerator targets with self-healing fallback
 cop = detect_coprocessor()  # TPU/NPU/VPU/QPU/PPU/MATH/CRYPTO/FPGA/DSP or nothing
 if cop !== nothing
     model_accel = compile(model, backend=cop, verify=false)
 end
-----
+```
 
-=== Model Packaging + Registry Manifests
+## Model Packaging + Registry Manifests
 
-[source,julia]
-----
+```julia
 metadata = create_metadata(
     model;
     name="my-model",
@@ -134,22 +134,20 @@ verify_and_claim!(metadata, "FiniteOutput", "verified=true; source=ci")
 bundle = export_model_package(model, metadata, "build/model_package")
 entry = build_registry_entry(bundle["manifest"]; channel="stable")
 export_registry_entry(entry, "build/model_package/registry-entry.json")
-----
+```
 
-=== Verification Telemetry
+## Verification Telemetry
 
-[source,julia]
-----
+```julia
 reset_verification_telemetry!()
 result = verify(model, properties=[FiniteOutput()], data=[(x, nothing)])
 run_payload = verification_result_telemetry(result; source="inference-gate")
 summary = verification_telemetry_report()
-----
+```
 
-=== Serving APIs
+## Serving APIs
 
-[source,julia]
-----
+```julia
 # REST
 rest_server = serve_rest(model; host="0.0.0.0", port=8080, background=true)
 
@@ -161,34 +159,31 @@ graphql_server = serve_graphql(model; host="0.0.0.0", port=8081, background=true
 # - JSON bridge mode (`application/grpc+json`)
 grpc_server = serve_grpc(model; host="0.0.0.0", port=50051, background=true)
 generate_grpc_proto("axiom_inference.proto")
-----
+```
 
-=== Interop APIs
+## Interop APIs
 
-[source,julia]
-----
+```julia
 # PyTorch import (checkpoint bridge or canonical descriptor JSON)
 model = from_pytorch("model.pt")
 model = from_pytorch("model.pytorch.json")
 
 # ONNX export (Dense/Conv/Norm/Pool + common activations)
 to_onnx(model, "model.onnx", input_shape=(1, 3, 224, 224))
-----
+```
 
-== Quick Start
+# Quick Start
 
-=== Installation
+## Installation
 
-[source,julia]
-----
+```julia
 using Pkg
 Pkg.add("Axiom")
-----
+```
 
-=== Hello World
+## Hello World
 
-[source,julia]
-----
+```julia
 using Axiom
 
 # Define a simple classifier
@@ -206,12 +201,11 @@ predictions = model(x)
 
 # Verify properties
 @ensure all(sum(predictions, dims=2) .≈ 1.0)
-----
+```
 
-=== With @axiom DSL
+## With @axiom DSL
 
-[source,julia]
-----
+```julia
 using Axiom
 
 @axiom MNISTClassifier begin
@@ -227,142 +221,163 @@ using Axiom
 end
 
 model = MNISTClassifier()
-----
+```
 
-== Why Axiom.jl?
+# Why Axiom.jl?
 
-=== The Problem
+## The Problem
 
 ML models are deployed in critical applications:
 
-* Medical diagnosis
-* Autonomous vehicles
-* Financial systems
-* Criminal justice
+- Medical diagnosis
+
+- Autonomous vehicles
+
+- Financial systems
+
+- Criminal justice
 
 Yet our tools allow bugs to slip through to production.
 
-=== The Solution
+## The Solution
 
-Axiom.jl catches bugs *before* they cause harm:
+Axiom.jl catches bugs **before** they cause harm:
 
-[cols="1,1,1",options="header"]
-|===
-| Issue | PyTorch | Axiom.jl
+| Issue | PyTorch | Axiom.jl |
+|----|----|----|
+| Shape mismatch | Runtime crash | Compile error |
+| NaN in output | Silent failure | Detected/proven |
+| Invalid probabilities | Undetected | Checkable with verification properties |
+| Adversarial fragility | Unknown | Roadmap / partial |
 
-| Shape mismatch
-| Runtime crash
-| Compile error
+# Documentation
 
-| NaN in output
-| Silent failure
-| Detected/proven
+- [Home](docs/wiki/Home.md) - Start here
 
-| Invalid probabilities
-| Undetected
-| Checkable with verification properties
+- [User Guide](docs/wiki/User-Guide.md) - Install, infer, verify
 
-| Adversarial fragility
-| Unknown
-| Roadmap / partial
-|===
+- [Developer Guide](docs/wiki/Developer-Guide.md) - Build/test/release
+  workflow
 
-== Documentation
+- [Release Checklist](RELEASE-CHECKLIST.adoc) - Pre-release and
+  release-day gates
 
-* link:docs/wiki/Home.md[Home] - Start here
-* link:docs/wiki/User-Guide.md[User Guide] - Install, infer, verify
-* link:docs/wiki/Developer-Guide.md[Developer Guide] - Build/test/release workflow
-* link:RELEASE-CHECKLIST.adoc[Release Checklist] - Pre-release and release-day gates
-* link:docs/wiki/Vision.md[Vision] - Why we built this
-* link:docs/wiki/Axiom-DSL.md[@axiom DSL] - Model definition guide
-* link:docs/wiki/Verification.md[Verification] - @ensure and @prove
-* link:docs/wiki/Migration-Guide.md[Migration Guide] - From PyTorch
-* link:docs/wiki/FAQ.md[FAQ] - Common questions
-* link:ROADMAP.md[Roadmap] - Tracked commitments and delivery criteria
+- [Vision](docs/wiki/Vision.md) - Why we built this
 
-== Project Structure
+- [@axiom DSL](docs/wiki/Axiom-DSL.md) - Model definition guide
 
-[source]
-----
-Axiom.jl/
-├── src/                 # Julia source
-│   ├── Axiom.jl        # Main module
-│   ├── types/          # Tensor type system
-│   ├── layers/         # Neural network layers
-│   ├── dsl/            # @axiom macro system
-│   ├── verification/   # @ensure, @prove
-│   ├── training/       # Optimizers, loss functions
-│   └── backends/       # Backend abstraction (15 backends)
-├── zig/                # Zig native backend
-│   └── src/           # matmul, conv, norm, attention, etc.
-├── ext/                # GPU package extensions (CUDA, ROCm, Metal)
-├── test/               # Test suite
-├── examples/           # Example models
-└── docs/               # Documentation & wiki
-----
+- [Verification](docs/wiki/Verification.md) - @ensure and @prove
 
-== Roadmap
+- [Migration Guide](docs/wiki/Migration-Guide.md) - From PyTorch
 
-* [x] *v0.1* - Core framework, DSL, verification basics
-* [ ] *v0.2* - Full Zig backend, GPU support
-* [ ] *v0.3* - Hugging Face integration, model zoo
-* [ ] *v0.4* - Advanced proofs, SMT integration
-* [ ] *v1.0* - Production ready, industry certifications
+- [FAQ](docs/wiki/FAQ.md) - Common questions
 
-== Contributing
+- [Roadmap](ROADMAP.md) - Tracked commitments and delivery criteria
 
-We welcome contributions! See link:CONTRIBUTING.md[CONTRIBUTING.md].
+# Project Structure
 
-* Bug reports and feature requests
-* Documentation improvements
-* New layers and operations
-* Performance optimizations
-* Verification methods
+    Axiom.jl/
+    ├── src/                 # Julia source
+    │   ├── Axiom.jl        # Main module
+    │   ├── types/          # Tensor type system
+    │   ├── layers/         # Neural network layers
+    │   ├── dsl/            # @axiom macro system
+    │   ├── verification/   # @ensure, @prove
+    │   ├── training/       # Optimizers, loss functions
+    │   └── backends/       # Backend abstraction (15 backends)
+    ├── zig/                # Zig native backend
+    │   └── src/           # matmul, conv, norm, attention, etc.
+    ├── ext/                # GPU package extensions (CUDA, ROCm, Metal)
+    ├── test/               # Test suite
+    ├── examples/           # Example models
+    └── docs/               # Documentation & wiki
 
-== Julia-First Verification
+# Roadmap
 
-Axiom's proof system is *Julia-native by default*. SMT solving runs through
-`packages/SMTLib.jl` with no native backend dependency. The Zig SMT runner is an optional
-backend you can enable for hardened subprocess control.
+- [x] **v0.1** - Core framework, DSL, verification basics
+
+- [ ] **v0.2** - Full Zig backend, GPU support
+
+- [ ] **v0.3** - Hugging Face integration, model zoo
+
+- [ ] **v0.4** - Advanced proofs, SMT integration
+
+- [ ] **v1.0** - Production ready, industry certifications
+
+# Contributing
+
+We welcome contributions! See
+<a href="CONTRIBUTING.md" class="md">CONTRIBUTING</a>.
+
+- Bug reports and feature requests
+
+- Documentation improvements
+
+- New layers and operations
+
+- Performance optimizations
+
+- Verification methods
+
+# Julia-First Verification
+
+Axiom’s proof system is **Julia-native by default**. SMT solving runs
+through `packages/SMTLib.jl` with no native backend dependency. The Zig
+SMT runner is an optional backend you can enable for hardened subprocess
+control.
 
 Julia-native example:
 
-[source,julia]
-----
+```julia
 @prove ∃x. x > 0
-----
+```
 
 Optional Zig runner:
 
-[source,bash]
-----
+```bash
 export AXIOM_SMT_RUNNER=zig
 export AXIOM_ZIG_LIB=/path/to/libaxiom_zig.so
 export AXIOM_SMT_SOLVER=z3
-----
+```
 
-[source,julia]
-----
+```julia
 @prove ∃x. x > 0
-----
+```
 
-== License
+# License
 
-Licensed under the https://www.mozilla.org/en-US/MPL/2.0/[Mozilla Public License 2.0 (MPL-2.0)].
+Licensed under the [Mozilla Public License 2.0
+(MPL-2.0)](https://www.mozilla.org/en-US/MPL/2.0/).
 
-This project's philosophy of sharing is guided by the https://github.com/hyperpolymath/palimpsest-license[Palimpsest License (PMPL-1.0)] -- a next-generation, quantum-safe, AI-aware copyleft license designed for the post-quantum era, with built-in provisions for machine learning model governance, reproducible builds, and ethical compute. The Palimpsest License is currently in development and undergoing community review. Until it achieves full SPDX recognition, Axiom.jl is distributed under MPL-2.0, on which the Palimpsest License is based. The spirit is the same: share improvements, keep the ecosystem open, and give downstream users the freedom to build on verified foundations.
+This project’s philosophy of sharing is guided by the [Palimpsest
+License
+(PMPL-1.0)](https://github.com/hyperpolymath/palimpsest-license) — a
+next-generation, quantum-safe, AI-aware copyleft license designed for
+the post-quantum era, with built-in provisions for machine learning
+model governance, reproducible builds, and ethical compute. The
+Palimpsest License is currently in development and undergoing community
+review. Until it achieves full SPDX recognition, Axiom.jl is distributed
+under MPL-2.0, on which the Palimpsest License is based. The spirit is
+the same: share improvements, keep the ecosystem open, and give
+downstream users the freedom to build on verified foundations.
 
-== Acknowledgments
+# Acknowledgments
 
 Axiom.jl builds on the shoulders of giants:
 
-* https://julialang.org/[Julia] - The language
-* https://fluxml.ai/[Flux.jl] - Inspiration for Julia ML
-* https://ziglang.org/[Zig] - Native performance backend
-* https://pytorch.org/[PyTorch] - Ecosystem compatibility
+- [Julia](https://julialang.org/) - The language
 
-'''
+- <a href="https://fluxml.ai/" class="jl">Flux</a> - Inspiration for
+  Julia ML
 
-_The future of ML is verified._
+- [Zig](https://ziglang.org/) - Native performance backend
 
-link:docs/wiki/Home.md[Get Started] | link:RELEASE-CHECKLIST.adoc[Release Checklist] | link:ROADMAP.md[Roadmap] | https://github.com/hyperpolymath/Axiom.jl[Star on GitHub]
+- [PyTorch](https://pytorch.org/) - Ecosystem compatibility
+
+------------------------------------------------------------------------
+
+*The future of ML is verified.*
+
+[Get Started](docs/wiki/Home.md) \| [Release
+Checklist](RELEASE-CHECKLIST.adoc) \| [Roadmap](ROADMAP.md) \| [Star on
+GitHub](https://github.com/hyperpolymath/Axiom.jl)
