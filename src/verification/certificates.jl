@@ -1,11 +1,20 @@
 # SPDX-License-Identifier: MPL-2.0
 # Axiom.jl Verification Certificates
 #
-# Tamper-evidence certificates for model properties. The certificate carries a
-# SHA-256 content digest over its public fields — this detects accidental or
-# naive tampering but is NOT a keyed/authenticating signature (anyone can
-# recompute the digest). Authenticating hybrid Ed448+Dilithium5 signatures (per
-# the estate Trustfile) are tracked in ROADMAP.adoc.
+# Tamper-evidence certificates for model properties. By default, the
+# certificate carries a SHA-256 content digest over its public fields — this
+# detects accidental or naive tampering but is NOT a keyed/authenticating
+# signature (anyone can recompute the digest); this default,
+# `authenticated=false` behavior is unchanged by the rest of this file.
+#
+# An OPT-IN authenticating path is also provided: `sign_certificate_hybrid`
+# computes a real hybrid Ed448 (classical) + Dilithium5/ML-DSA-87
+# (post-quantum) signature over the certificate content (per the estate
+# Trustfile scheme; see `signing.jl` and `crypto/README.md`), and
+# `verify_certificate_hybrid` requires BOTH components to verify. This is the
+# authenticating-signature half of G01. Certificates produced by the plain
+# `generate_certificate`/`save_certificate` path are untouched — callers must
+# explicitly opt in to hybrid signing.
 
 using SHA
 
@@ -174,6 +183,81 @@ function verify_certificate(cert::Certificate)
     cert.signature == expected_signature
 end
 
+# ============================================================================
+# Hybrid Ed448+Dilithium5 authenticating signatures (opt-in; G01)
+# ============================================================================
+
+"""
+Canonical certificate content string used as the hybrid-signature message.
+Includes the properties list (unlike the SHA-256 tamper-evidence digest
+above) so a forger cannot add/remove a claimed property without also
+invalidating the authenticating signature.
+"""
+function canonical_certificate_content(cert::Certificate)
+    string(
+        cert.model_hash,
+        "|", cert.model_name,
+        "|", cert.verification_mode,
+        "|", join(sort([string(typeof(p).name.name) for p in cert.properties]), ","),
+        "|", cert.test_data_hash === nothing ? "" : cert.test_data_hash,
+        "|", cert.proof_type,
+        "|", cert.created_at,
+        "|", cert.axiom_version,
+        "|", cert.verifier_id,
+    )
+end
+
+"""
+    sign_certificate_hybrid(cert::Certificate, keys::HybridKeyPair) -> HybridSignature
+
+Compute a real, authenticating hybrid Ed448+Dilithium5 signature over `cert`'s
+canonical content (via its SHA3-512 digest — see `signing.jl`). This is
+opt-in: it does not modify `cert` or its (SHA-256 digest, `authenticated =
+false`) `signature` field. Pair with `verify_certificate_hybrid` and/or
+`save_certificate_hybrid`.
+
+Throws the standard "crypto shim not built" error if `crypto/target/.../
+libaxiom_crypto.*` has not been compiled (see `just build-crypto`).
+"""
+function sign_certificate_hybrid(cert::Certificate, keys::HybridKeyPair)
+    hybrid_sign(canonical_certificate_content(cert), keys)
+end
+
+"""
+    verify_certificate_hybrid(cert::Certificate, sig::HybridSignature, pubkeys::HybridPublicKeys) -> Bool
+
+Verify a hybrid Ed448+Dilithium5 signature over `cert`'s canonical content.
+Returns `true` only if BOTH the Ed448 and the Dilithium5 signature verify.
+Unlike `verify_certificate` (SHA-256 content digest), a forger without the
+private keys cannot produce a signature that passes this check, even if they
+know the exact certificate content and recompute the SHA3-512 digest
+themselves.
+"""
+function verify_certificate_hybrid(cert::Certificate, sig::HybridSignature, pubkeys::HybridPublicKeys)
+    hybrid_verify(canonical_certificate_content(cert), sig, pubkeys)
+end
+
+"""
+    save_certificate_hybrid(cert::Certificate, keys::HybridKeyPair, path::String)
+
+Save `cert` to `path` as JSON with a real hybrid Ed448+Dilithium5 signature in
+place of the default SHA-256 content-digest `signature` block. The written
+JSON is self-contained for verification: it carries `algorithm =
+"Ed448+Dilithium5"`, `authenticated = true`, both signature values, and both
+PUBLIC keys (hex-encoded) — never the private keys.
+"""
+function save_certificate_hybrid(cert::Certificate, keys::HybridKeyPair, path::String)
+    sig = sign_certificate_hybrid(cert, keys)
+    data = _certificate_json_data(cert)
+    data["signature"] = hybrid_signature_to_dict(sig, public_keys(keys))
+
+    open(path, "w") do f
+        JSON.print(f, data, 2)
+    end
+    @info "Hybrid-signed certificate saved to $path"
+    nothing
+end
+
 """
     save_certificate(cert::Certificate, path::String; format=:auto)
 
@@ -196,8 +280,14 @@ function save_certificate(cert::Certificate, path::String; format::Symbol=:auto)
     @info "Certificate saved to $path"
 end
 
-function _save_certificate_json(cert::Certificate, path::String)
-    data = Dict(
+"""
+Build the certificate JSON `Dict`, shared by the default (SHA-256
+content-digest) and hybrid-signed (`save_certificate_hybrid`) save paths.
+The default `signature` block is set here and may be overridden by callers
+that want a different (e.g. hybrid) signature block.
+"""
+function _certificate_json_data(cert::Certificate)
+    Dict(
         "format" => "axiom-verification-certificate",
         "version" => "2.0",
         "model" => Dict(
@@ -224,9 +314,14 @@ function _save_certificate_json(cert::Certificate, path::String)
             "note" => "Unkeyed SHA-256 digest over public certificate fields: " *
                       "detects naive tampering but does NOT authenticate authorship " *
                       "(a forger can recompute it). Authenticating hybrid " *
-                      "Ed448+Dilithium5 signatures are planned; see ROADMAP.adoc."
+                      "Ed448+Dilithium5 signatures are available opt-in via " *
+                      "sign_certificate_hybrid/save_certificate_hybrid; see ROADMAP.adoc."
         )
     )
+end
+
+function _save_certificate_json(cert::Certificate, path::String)
+    data = _certificate_json_data(cert)
 
     open(path, "w") do f
         JSON.print(f, data, 2)

@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: MPL-2.0
+# Rust build output — never commit compiled artifacts or private key material.
+target/
+Cargo.lock.bak
+
+# Defence-in-depth: this crate must never see a private key on disk during
+# normal use (keys are generated in-memory by tests, or out-of-band by an
+# HSM/offline process for real signing), but block common accidental paths
+# just in case.
+*.pem
+*.key
+secrets/
