@@ -122,8 +122,9 @@ requiring `PyCall`).
   `CpuFeatures` struct for backend capability assessment at startup.
 
 | `AcceleratorGate.jl`
-| Direct dependency; Axiom's 15-backend dispatch architecture extends
-  AcceleratorGate's type hierarchy with ML-specific operations.
+| Vendored (`src/vendored/AcceleratorGateVendored.jl`; upstream is unregistered)
+  — NOT a `Project.toml` dependency. Axiom's 15-backend dispatch architecture
+  extends AcceleratorGate's type hierarchy with ML-specific operations.
 
 | `QuantumCircuit.jl`
 | Shares the backend dispatch pattern (JuliaBackend → hardware fallthrough).
@@ -225,12 +226,23 @@ requiring `PyCall`).
   interop, serving endpoints, model packaging, proof export, backend detection.
 
 | `packages/SMTLib.jl`
-| Internal Julia-native SMT library consumed by the `@prove` default backend.
+| Internal Julia-native SMT library consumed by the `@prove` SMT backend. It is
+  a monorepo-only, *unregistered* package (resolvable only via the workspace/dev
+  path inside this repo), and it is wired as the `AxiomSMTExt` weak-dependency
+  extension. Consequence: outside the monorepo the extension does not load, so
+  the SMT path is unavailable — `@prove` then degrades gracefully (returns
+  `:unknown` rather than proving) and the SMT-runner tests log
+  `Skipping SMT runner test; no solver available` instead of failing. This is a
+  deliberate, logged fallback, NOT a silent skip. Registering SMTLib in General
+  would remove the monorepo restriction (tracked; out of scope here).
 
 | `Project.toml`
-| Package identity (uuid `bbd403f8...`), v1.0.0, `AcceleratorGate`/`HTTP`/`SHA`/
-  `JSON`/`JSON3`/`Zygote`/`Libdl` hard dependencies, 13 weak dependencies for
-  GPU and coprocessor extensions.
+| Package identity (uuid `bbd403f8...`), v1.0.0. Hard dependencies (10):
+  `Dates`/`HTTP`/`JSON`/`Libdl`/`LinearAlgebra`/`Random`/`SHA`/`Serialization`/
+  `Statistics`/`Zygote` — AcceleratorGate is vendored (not a dependency) and
+  JSON3 was removed. 6 weak dependencies
+  (`AMDGPU`/`CUDA`/`Metal`/`KernelAbstractions`/`PyCall`/`SMTLib`) driving 5
+  extensions for GPU / PyTorch / SMT.
 
 | `docs/wiki/`
 | Markdown wiki: Home, User-Guide, Developer-Guide, Vision, Axiom-DSL,

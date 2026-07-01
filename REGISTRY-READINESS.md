@@ -19,7 +19,7 @@ package submissions. The only thing that rebuilds that trust is honesty.
 | `generate_certificate` threw `FieldError` (`result.mode` nonexistent) — broke the shipped example | ✅ Fixed (`verification_mode` kwarg) |
 | `sum(::Tensor; dims)` undefined — documented usage failed | ✅ Fixed |
 | Licensing self-contradictory: `Project.toml` MPL-2.0 vs source headers PMPL-1.0 (non-OSI) | ✅ Relicensed consistently to **MPL-2.0** (OSI), REUSE.toml added |
-| LLM-tell files in package root (`0-AI-MANIFEST.a2ml`, `llm-warmup-*.md`) | ✅ Removed |
+| LLM-tell files in package root | ⚠ Corrected (were NOT removed): `0-AI-MANIFEST.a2ml` is a **required** RSR machine-readable manifest — kept, not an LLM-tell to remove. `llm-warmup-*.md` remain in root as the estate LLM-warmup convention (same as sibling repos, e.g. `julia-professional-registry`). |
 
 ## Honest current limitations (NOT hidden)
 
