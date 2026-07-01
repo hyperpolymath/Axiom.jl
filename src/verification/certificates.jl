@@ -1,7 +1,11 @@
 # SPDX-License-Identifier: MPL-2.0
 # Axiom.jl Verification Certificates
 #
-# Cryptographically signed certificates proving model properties.
+# Tamper-evidence certificates for model properties. The certificate carries a
+# SHA-256 content digest over its public fields — this detects accidental or
+# naive tampering but is NOT a keyed/authenticating signature (anyone can
+# recompute the digest). Authenticating hybrid Ed448+Dilithium5 signatures (per
+# the estate Trustfile) are tracked in ROADMAP.adoc.
 
 using SHA
 
@@ -117,7 +121,12 @@ function compute_data_hash(data)
 end
 
 """
-Sign a certificate (simplified - production would use proper PKI).
+Attach a tamper-evidence digest to a certificate.
+
+NOTE: this computes an unkeyed SHA-256 content digest, NOT a keyed or asymmetric
+signature — it detects naive tampering but does not authenticate authorship (a
+forger can recompute the digest). Authenticating hybrid Ed448+Dilithium5
+signatures are planned; see ROADMAP.adoc.
 """
 function sign_certificate(cert::Certificate)
     # Concatenate certificate fields
@@ -209,7 +218,13 @@ function _save_certificate_json(cert::Certificate, path::String)
         ),
         "signature" => Dict(
             "value" => cert.signature,
-            "algorithm" => "SHA256-HMAC"
+            "algorithm" => "SHA-256",
+            "kind" => "content-digest",
+            "authenticated" => false,
+            "note" => "Unkeyed SHA-256 digest over public certificate fields: " *
+                      "detects naive tampering but does NOT authenticate authorship " *
+                      "(a forger can recompute it). Authenticating hybrid " *
+                      "Ed448+Dilithium5 signatures are planned; see ROADMAP.adoc."
         )
     )
 
