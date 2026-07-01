@@ -273,6 +273,7 @@ Axiom.jl catches bugs *before* they cause harm:
 * link:docs/wiki/Verification.md[Verification] — @ensure and @prove
 * link:docs/wiki/Migration-Guide.md[Migration Guide] — from PyTorch
 * link:docs/wiki/FAQ.md[FAQ] — common questions
+* link:docs/testing-taxonomy.adoc[Testing Taxonomy] — how the suite is classified (proven-tests categories + provenance tiers)
 * link:ROADMAP.adoc[Roadmap] — tracked commitments and delivery criteria
 
 == Project Structure
