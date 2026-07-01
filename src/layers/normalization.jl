@@ -87,6 +87,22 @@ mutable struct LayerNorm{T, S} <: AbstractLayer
     normalized_shape::S
     eps::Float32
     elementwise_affine::Bool
+
+    # Explicit inner constructor (Aqua G07): both `γ` and `β` are
+    # `Union{_, Nothing}`-typed, so Julia's auto-generated default
+    # positional constructor leaves `T` unbound (passing `nothing` for
+    # both pins no concrete `T`). This constructor takes `T`/`S` from the
+    # `{T, S}` type application itself, so `T`/`S` are always bound
+    # regardless of whether `γ`/`β` are `nothing`.
+    function LayerNorm{T, S}(
+        γ::Union{Array{T}, Nothing},
+        β::Union{Array{T}, Nothing},
+        normalized_shape::S,
+        eps::Float32,
+        elementwise_affine::Bool,
+    ) where {T, S}
+        new{T, S}(γ, β, normalized_shape, eps, elementwise_affine)
+    end
 end
 
 function LayerNorm(
@@ -168,6 +184,21 @@ mutable struct InstanceNorm{T} <: AbstractLayer
     eps::Float32
     affine::Bool
     num_features::Int
+
+    # Explicit inner constructor (Aqua G07): see LayerNorm's constructor
+    # comment above -- `γ`/`β` being `Union{_, Nothing}` leaves `T`
+    # unbound in the auto-generated default constructor. Taking `T` from
+    # the `{T}` type application keeps it bound even when both are
+    # `nothing` (affine=false).
+    function InstanceNorm{T}(
+        γ::Union{Vector{T}, Nothing},
+        β::Union{Vector{T}, Nothing},
+        eps::Float32,
+        affine::Bool,
+        num_features::Int,
+    ) where T
+        new{T}(γ, β, eps, affine, num_features)
+    end
 end
 
 function InstanceNorm(
@@ -228,6 +259,22 @@ mutable struct GroupNorm{T} <: AbstractLayer
     num_channels::Int
     eps::Float32
     affine::Bool
+
+    # Explicit inner constructor (Aqua G07): see LayerNorm's constructor
+    # comment above -- `γ`/`β` being `Union{_, Nothing}` leaves `T`
+    # unbound in the auto-generated default constructor. Taking `T` from
+    # the `{T}` type application keeps it bound even when both are
+    # `nothing` (affine=false).
+    function GroupNorm{T}(
+        γ::Union{Vector{T}, Nothing},
+        β::Union{Vector{T}, Nothing},
+        num_groups::Int,
+        num_channels::Int,
+        eps::Float32,
+        affine::Bool,
+    ) where T
+        new{T}(γ, β, num_groups, num_channels, eps, affine)
+    end
 end
 
 function GroupNorm(

@@ -1,0 +1,86 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Axiom.jl Contributors
+= Software Development Approach — Axiom.jl
+:toc: left
+:toclevels: 2
+
+This is the operating policy for software development on Axiom.jl, a Julia
+ML/numerics framework with a Zig compute layer, an Idris2-specified ABI, and
+a Rust cdylib crypto shim implementing hybrid post-quantum certificate
+signing.
+
+Machine-readable companion: `.machine_readable/policies/SOFTWARE-DEVELOPMENT-APPROACH.a2ml`.
+
+== Core Sequence
+
+Always run work in this order:
+
+. Scope first (Axis 1)
+. Maintenance second (Axis 2)
+. Audit third (Axis 3)
+
+== Axis Definitions
+
+=== Axis 1: Scope
+
+Priority order: `must > intend > like`
+
+Axis 1 output is a scoped assembly of work based on:
+
+* `README.md`, `ROADMAP.adoc`, `REGISTRY-READINESS.md`, `TEST-NEEDS.md`, CI/security workflow definitions
+* marker scans (`TODO`, `FIXME`, `XXX`, `HACK`, `STUB`, `PARTIAL`)
+* Idris2 unsoundness scan against `src/Abi/*.idr`, `packages/SMTLib.jl/src/abi/*.idr`, `ffi/idris/*.idr` (`believe_me`, `assert_total`)
+* docs-honesty check (intent vs. actual implementation) — Axiom.jl's `ROADMAP.adoc` has previously drifted from shipped reality (e.g. the hybrid signing capability landing before the roadmap was updated); re-check this on every pass
+
+=== Axis 2: Maintenance
+
+Priority order: `corrective > adaptive > perfective`
+
+* Corrective: fix defects, regressions, breakage, security/safety failures — including breakage at either FFI seam (`crypto/`, `zig/`) or the Idris2 ABI seam (`src/Abi/`)
+* Adaptive: reconcile scope changes, remove stale references, cull obsolete work
+* Perfective: improve quality/clarity/performance only from the honest Axis 1 state
+
+=== Axis 3: Audit
+
+Priority order: `systems > compliance > effects`
+
+* Systems: required mechanisms exist and are operating — CI workflows (`.github/workflows/`), `k9iser.toml` constraints, `Justfile` recipes (`just assail`, `just build-crypto`, `just build-zig`)
+* Compliance: seams/compromises/exceptions are explicit, bounded, and do not drift. Axiom.jl's two load-bearing seams are:
+** the Idris2 ABI (`src/Abi/{Types,Layout,Foreign}.idr` <-> `axiom-abi.ipkg`, typechecked in CI via `idris2-abi-check`)
+** the `crypto/` Rust cdylib FFI boundary (hybrid Ed448 + Dilithium5/ML-DSA-87 signing, `crypto/src/lib.rs` <-> `src/verification/signing.jl`)
+* Effects: benchmark and operational impact evidence is captured and reviewed (`benchmark/` — `framework_comparison.jl`, `threaded_benchmark.jl`, `gpu_performance_baseline.json`, dated `results_*.md` snapshots)
+
+Compliance scanner baseline: `panic-attack` (see `.github/workflows/static-analysis-gate.yml` and `docs/governance/MAINTENANCE-CHECKLIST.adoc` for the latest ground-truthed finding counts).
+
+== Generic Cleanup And Finish-Off
+
+At cycle end:
+
+* reduce root clutter to required control/entry files
+* archive/remove stale or superseded work
+* synchronize human and machine docs (`docs/governance/*.adoc` <-> `.machine_readable/policies/*.a2ml`)
+* run compliance and effects audits with evidence capture
+* produce Must/Should/Could summary and immediate next-actions list
+
+== Collaboration Rule
+
+Effects review must include explicit maintainer dialogue:
+
+* what changed
+* why it changed
+* what risks remain
+
+== Formal-Verification Tier
+
+Axiom.jl runs at safety-tier `fv` (formal verification) in `k9iser.toml`,
+distinct from a plain numerics package, because it carries:
+
+* a genuine Idris2 ABI specification (not just documentation) that is
+  typechecked in CI;
+* a genuine post-quantum cryptographic signing implementation
+  (`crypto/`), not a placeholder or a policy aspiration — see
+  `docs/legal/EXHIBIT-B-QUANTUM-SAFE.txt`.
+
+Both surfaces widen the attack surface (FFI boundaries, `unsafe` blocks) in
+ways that are expected and audited, not accidental — see the Latest Assail
+Baseline in `docs/governance/MAINTENANCE-CHECKLIST.adoc`.

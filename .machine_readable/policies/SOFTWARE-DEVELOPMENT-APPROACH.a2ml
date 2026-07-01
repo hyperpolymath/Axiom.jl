@@ -1,0 +1,65 @@
+# SPDX-License-Identifier: MPL-2.0
+# SPDX-FileCopyrightText: 2026 Axiom.jl Contributors
+#
+# General software development approach (machine-readable) — Axiom.jl
+
+[metadata]
+version = "1.0.0"
+last-updated = "2026-07-01"
+scope = "repo"
+repo = "Axiom.jl"
+source-human = "docs/governance/SOFTWARE-DEVELOPMENT-APPROACH.adoc"
+
+[execution]
+order = ["axis-1", "axis-2", "axis-3"]
+
+[axis-1]
+name = "scope"
+priority = "must > intend > like"
+inputs = [
+  "README",
+  "ROADMAP.adoc",
+  "REGISTRY-READINESS.md",
+  "ci-and-security-workflows",
+]
+marker-scan = ["TODO", "FIXME", "XXX", "HACK", "STUB", "PARTIAL"]
+idris-unsound-scan = ["believe_me", "assert_total"]
+idris-unsound-scan-paths = ["src/Abi/", "packages/SMTLib.jl/src/abi/", "ffi/idris/"]
+output = "scoped-work-assembly"
+
+[axis-2]
+name = "maintenance"
+priority = "corrective > adaptive > perfective"
+corrective = "defect/regression/safety/security fixes"
+adaptive = "scope reconciliation, stale-reference removal, obsolete-work culling"
+perfective = "improve quality/clarity/performance only from the honest Axis 1 state"
+
+[axis-3]
+name = "audit"
+priority = "systems > compliance > effects"
+systems = "required mechanisms exist and are operating (CI workflows, k9iser.toml, Justfile recipes)"
+compliance = "seams/compromises/exceptions are explicit, bounded, and do not drift — the crypto/ FFI cdylib boundary and the Idris2 ABI seam are the two load-bearing seams in this repo"
+effects = "benchmark and operational impact evidence is captured and reviewed (benchmark/ directory)"
+compliance-tooling = "panic-attack"
+effects-tooling = "benchmark/framework_comparison.jl, benchmark/threaded_benchmark.jl, benchmark/gpu_performance_baseline.json"
+
+[cleanup-finish-off]
+root-cleanup = true
+stale-work-cull = true
+docs-sync-human-machine = true
+compliance-audit = true
+effects-audit = true
+release-summary = ["must", "should", "could"]
+next-actions = ["corrective", "adaptive", "perfective"]
+
+[collaboration]
+maintainer-dialogue-required = true
+dialogue-topics = ["what changed", "why", "remaining risks"]
+
+[axiom-specific]
+formal-verification-tier = "fv"
+load-bearing-seams = [
+  "src/Abi/{Types,Layout,Foreign}.idr <-> axiom-abi.ipkg (Idris2 ABI, typechecked in CI: idris2-abi-check)",
+  "zig/src/*.zig <-> src/backends/zig_ffi.jl (Zig compute layer FFI)",
+  "crypto/src/lib.rs <-> src/verification/signing.jl (Rust cdylib, hybrid Ed448 + Dilithium5/ML-DSA-87 signing)",
+]

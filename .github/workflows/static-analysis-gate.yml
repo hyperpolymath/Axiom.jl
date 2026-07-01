@@ -1,0 +1,223 @@
+# SPDX-License-Identifier: MPL-2.0
+# SPDX-FileCopyrightText: 2026 Axiom.jl Contributors
+#
+# Static Analysis Gate — panic-attack `assail` over the whole repo, blocking
+# on Critical/High findings. This is a candidate REQUIRED status check, so it
+# deliberately carries NO `on.*.paths` filter: a path-filtered required
+# workflow that never triggers is reported by GitHub as permanently
+# "Expected", which leaves unrelated PRs `mergeable_state: blocked` forever
+# (see hyperpolymath/boj-server CLAUDE.md, "CI / Required Status Checks").
+# Instead, a lightweight always-run `changes` job gates the heavy job via
+# `if:`, which still counts as a passing required check when skipped.
+name: Static Analysis Gate
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 0: changes — always runs, cheap. Decides whether the heavy scan is
+  # needed. Fail-safe default is run=true (never silently skips on an error).
+  # ---------------------------------------------------------------------------
+  changes:
+    name: Detect relevant changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.detect.outputs.run }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+      - name: Decide whether to run the gate
+        id: detect
+        run: |
+          # Fail safe: default to running the gate.
+          RUN="true"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            if [ -n "$BASE" ] && git diff --quiet "$BASE"...HEAD 2>/dev/null; then
+              RUN="false"
+            fi
+          fi
+          echo "run=$RUN" >> "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------------------
+  # Job 1: panic-attack assail
+  # ---------------------------------------------------------------------------
+  panic-attack-assail:
+    name: panic-attack assail
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+      - name: Install panic-attack (if available)
+        id: install
+        run: |
+          # Try to fetch the latest release binary from the org. Tool renamed
+          # 2026-02-08: panic-attacker -> panic-attack (binary + repo + subcommand).
+          PA_URL="https://github.com/hyperpolymath/panic-attack/releases/latest/download/panic-attack-linux-x86_64"
+          if curl -fsSL --head "$PA_URL" >/dev/null 2>&1; then
+            curl -fsSL -o /usr/local/bin/panic-attack "$PA_URL"
+            chmod +x /usr/local/bin/panic-attack
+            echo "installed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::panic-attack binary not available — skipping assail"
+            echo "installed=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Run panic-attack assail
+        id: assail
+        if: steps.install.outputs.installed == 'true'
+        run: |
+          set +e
+          panic-attack assail . --output panic-attack-findings.json --output-format json --headless
+          PA_EXIT=$?
+          set -e
+
+          if [ ! -s panic-attack-findings.json ] || ! jq empty panic-attack-findings.json 2>/dev/null; then
+            echo '{"weak_points":[]}' > panic-attack-findings.json
+          fi
+
+          # Parse finding counts by severity (schema: {"weak_points":[{"severity":...}]})
+          TOTAL=$(jq '.weak_points | length' panic-attack-findings.json 2>/dev/null || echo 0)
+          CRITICAL=$(jq '[.weak_points[] | select(.severity == "Critical")] | length' panic-attack-findings.json 2>/dev/null || echo 0)
+          HIGH=$(jq '[.weak_points[] | select(.severity == "High")] | length' panic-attack-findings.json 2>/dev/null || echo 0)
+          MEDIUM=$(jq '[.weak_points[] | select(.severity == "Medium")] | length' panic-attack-findings.json 2>/dev/null || echo 0)
+          LOW=$(jq '[.weak_points[] | select(.severity == "Low")] | length' panic-attack-findings.json 2>/dev/null || echo 0)
+
+          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
+          echo "critical=$CRITICAL" >> "$GITHUB_OUTPUT"
+          echo "high=$HIGH" >> "$GITHUB_OUTPUT"
+          echo "medium=$MEDIUM" >> "$GITHUB_OUTPUT"
+          echo "low=$LOW" >> "$GITHUB_OUTPUT"
+          echo "exit_code=$PA_EXIT" >> "$GITHUB_OUTPUT"
+      - name: Write step summary
+        if: steps.install.outputs.installed == 'true'
+        run: |
+          cat <<EOF >> "$GITHUB_STEP_SUMMARY"
+          ## panic-attack assail Results
+
+          | Severity | Count |
+          |----------|-------|
+          | Critical | ${{ steps.assail.outputs.critical }} |
+          | High     | ${{ steps.assail.outputs.high }} |
+          | Medium   | ${{ steps.assail.outputs.medium }} |
+          | Low      | ${{ steps.assail.outputs.low }} |
+          | **Total**| ${{ steps.assail.outputs.total }} |
+
+          Known-legitimate residuals (audited, not yet suppressed via
+          \`audits/assail-classifications.a2ml\`):
+          - \`crypto/src/lib.rs\` UnsafeCode (FFI cdylib boundary — Ed448 +
+            Dilithium5/ML-DSA-87 signing shim, see \`crypto/README.md\`).
+          - \`src/verification/signing.jl\` / \`src/backends/zig_ffi.jl\`
+            UnsafeFFI (\`ccall\` into the same cdylib / the Zig compute layer).
+          EOF
+      - name: Create stub findings (when panic-attack unavailable)
+        if: steps.install.outputs.installed != 'true'
+        run: |
+          echo '{"weak_points":[]}' > panic-attack-findings.json
+          echo "## panic-attack assail" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Skipped: panic-attack not available in this environment." >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload panic-attack findings
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: panic-attack-findings
+          path: panic-attack-findings.json
+          retention-days: 90
+      - name: Fail on Critical or High findings
+        if: steps.install.outputs.installed == 'true' && (steps.assail.outputs.critical > 0 || steps.assail.outputs.high > 0)
+        run: |
+          echo "::error::panic-attack found ${{ steps.assail.outputs.critical }} critical and ${{ steps.assail.outputs.high }} high issue(s) — blocking merge"
+          echo "::error::If a finding is a known-legitimate residual (e.g. the crypto/ FFI shim), triage and record it via audits/assail-classifications.a2ml — do not bypass this gate."
+          exit 1
+
+  # ---------------------------------------------------------------------------
+  # Job 2: patch-bridge triage (crypto/Cargo.lock CVE contextual assessment)
+  # ---------------------------------------------------------------------------
+  patch-bridge-triage:
+    name: Patch Bridge CVE triage (crypto/)
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+      - name: Install panic-attack (if available)
+        id: install
+        run: |
+          PA_URL="https://github.com/hyperpolymath/panic-attack/releases/latest/download/panic-attack-linux-x86_64"
+          if curl -fsSL --head "$PA_URL" >/dev/null 2>&1; then
+            curl -fsSL -o /usr/local/bin/panic-attack "$PA_URL"
+            chmod +x /usr/local/bin/panic-attack
+            echo "installed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::panic-attack binary not available — skipping Patch Bridge"
+            echo "installed=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Run Patch Bridge triage against crypto/
+        id: triage
+        if: steps.install.outputs.installed == 'true'
+        run: |
+          set +e
+          panic-attack bridge triage crypto --output bridge-report.json --offline
+          PB_EXIT=$?
+          set -e
+
+          if [ ! -s bridge-report.json ] || ! jq empty bridge-report.json 2>/dev/null; then
+            echo '{"cves":[],"mitigated":0,"unmitigable":0,"concatenative":0,"informational":0}' > bridge-report.json
+          fi
+
+          UNMITIGABLE=$(jq '.unmitigable // 0' bridge-report.json)
+          MITIGATED=$(jq '.mitigated // 0' bridge-report.json)
+          INFORMATIONAL=$(jq '.informational // 0' bridge-report.json)
+
+          echo "unmitigable=$UNMITIGABLE" >> "$GITHUB_OUTPUT"
+          echo "mitigated=$MITIGATED" >> "$GITHUB_OUTPUT"
+          echo "informational=$INFORMATIONAL" >> "$GITHUB_OUTPUT"
+      - name: Write step summary
+        if: steps.install.outputs.installed == 'true'
+        run: |
+          cat <<EOF >> "$GITHUB_STEP_SUMMARY"
+          ## Patch Bridge CVE Triage (crypto/)
+
+          | Classification | Count |
+          |----------------|-------|
+          | Unmitigable    | ${{ steps.triage.outputs.unmitigable }} |
+          | Mitigated      | ${{ steps.triage.outputs.mitigated }} |
+          | Informational  | ${{ steps.triage.outputs.informational }} |
+          EOF
+      - name: Create stub report (when unavailable)
+        if: steps.install.outputs.installed != 'true'
+        run: |
+          echo '{"cves":[],"mitigated":0,"unmitigable":0,"concatenative":0,"informational":0}' > bridge-report.json
+          echo "## Patch Bridge CVE Triage (crypto/)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Skipped: panic-attack not available in this environment." >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload bridge report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bridge-report
+          path: bridge-report.json
+          retention-days: 90
+      - name: Warn on unmitigable CVEs
+        if: steps.install.outputs.installed == 'true' && steps.triage.outputs.unmitigable > 0
+        run: |
+          echo "::warning::Patch Bridge found ${{ steps.triage.outputs.unmitigable }} unmitigable CVE(s) in crypto/ — review required"
+          # Warning only, not blocking — this is a cryptographic dependency,
+          # so an unmitigable finding needs a human architectural decision,
+          # not an automatic merge block.

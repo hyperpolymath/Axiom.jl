@@ -1,0 +1,80 @@
+# SPDX-License-Identifier: MPL-2.0
+# SPDX-FileCopyrightText: 2026 Axiom.jl Contributors
+#
+# Estate Rules — enforces hyperpolymath estate-wide conventions relevant to a
+# Julia numerics package: no-Python (banned estate-wide, replacement is
+# Julia/Rust/AffineScript), AsciiDoc-by-default under docs/ (excluding the
+# docs/wiki/ GitHub-wiki mirror, which is legitimately Markdown because
+# GitHub's wiki renderer consumes .md, not .adoc), and no V-lang (vlang.io)
+# references — NOT a ban on Zig. Zig is the current estate default for
+# APIs/FFI/gateways (hyperpolymath/standards CLAUDE.md, "Estate default
+# 2026-05-28"), and Axiom.jl legitimately ships a Zig compute layer
+# (zig/, ffi/zig/); a same-named check adapted from an older template
+# repo had inverted this (banning the string "zig" itself, seemingly from a
+# botched V-lang-ban rename) — do not repeat that mistake here.
+#
+# Checks are inlined (no external scripts/ dependency) because this repo's
+# .github/workflows/ ownership does not include a scripts/ directory of its
+# own for these checks.
+name: Estate Rules
+on:
+  push:
+    branches: [main]
+  pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  estate-rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: No Python anywhere (estate-banned; Julia/Rust/AffineScript only)
+        run: |
+          HITS=$(find . -type f \( -name '*.py' -o -name '*.pyi' \) \
+            -not -path './crypto/target/*' \
+            -not -path './.git/*' \
+            2>/dev/null || true)
+          if [ -n "$HITS" ]; then
+            echo "::error::Python files found — Python is fully banned estate-wide:"
+            echo "$HITS"
+            exit 1
+          fi
+          echo "PASS: no Python files found"
+
+      - name: AsciiDoc by default under docs/ (excluding docs/wiki/ GitHub-wiki mirror)
+        run: |
+          HITS=$(find docs -name '*.md' -type f -not -path 'docs/wiki/*' 2>/dev/null || true)
+          if [ -n "$HITS" ]; then
+            echo "::error::.md files found under docs/ outside the docs/wiki/ mirror (estate rule: AsciiDoc by default):"
+            echo "$HITS"
+            exit 1
+          fi
+          echo "PASS: no disallowed .md files under docs/ (docs/wiki/ is the GitHub-wiki Markdown mirror, exempt by design)"
+
+      - name: No V-lang references (Zig is the estate default — do not confuse the two)
+        run: |
+          # V-lang (vlang.io) was banned 2026-04-10, superseded by Zig. This
+          # check must NOT match "zig" — Zig is the estate default for
+          # APIs/FFI/gateways and Axiom.jl ships a legitimate Zig compute
+          # layer under zig/ and ffi/zig/.
+          PATTERNS='vlang|v-lang|V-lang|asdf-vlang'
+          HITS=$(grep -rniE "$PATTERNS" . \
+            --exclude-dir=.git \
+            --exclude-dir=node_modules \
+            --exclude-dir=target \
+            --include='*.jl' --include='*.rs' --include='*.toml' \
+            --include='*.zig' --include='*.idr' --include='*.adoc' \
+            --include='*.a2ml' --include='Justfile' \
+            2>/dev/null || true)
+          if [ -n "$HITS" ]; then
+            echo "::error::V-lang reference(s) found (estate rule: V-lang is banned, replaced by Zig):"
+            echo "$HITS"
+            exit 1
+          fi
+          echo "PASS: no V-lang references found"

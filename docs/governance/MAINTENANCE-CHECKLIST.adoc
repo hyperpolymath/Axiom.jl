@@ -1,0 +1,202 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Axiom.jl Contributors
+= Maintenance Checklist — Axiom.jl
+:toc: left
+:toclevels: 2
+
+Repeatable maintenance runbook for Axiom.jl.
+
+Companion policy:
+
+* `.machine_readable/policies/MAINTENANCE-CHECKLIST.a2ml` (machine-readable, canonical)
+* `docs/governance/SOFTWARE-DEVELOPMENT-APPROACH.adoc` (human-readable)
+* `.machine_readable/policies/SOFTWARE-DEVELOPMENT-APPROACH.a2ml` (machine-readable)
+
+== Three-Axis Default Model
+
+* Axis 1 (scope priority, runs first): `must > intend > like`
+* Axis 2 (maintenance priority): `corrective > adaptive > perfective`
+* Axis 3 (audit priority): `systems > compliance > effects`
+* Perfective items are derived from Axis 1 honest state (not started independently).
+
+== Axis 1 — Scoping Pass (Mandatory)
+
+Before Axis 2/3 execution, assemble a scoped worklist from evidence:
+
+* Read and reconcile: `README.md`, `ROADMAP.adoc`, `REGISTRY-READINESS.md`, `TEST-NEEDS.md`, and current CI/security workflow definitions under `.github/workflows/`.
+* Scan for unfinished markers: `TODO`, `FIXME`, `XXX`, `HACK`, `STUB`, `PARTIAL`.
+* Scan Idris2 unsoundness markers in `src/Abi/*.idr`, `packages/SMTLib.jl/src/abi/*.idr`, and `ffi/idris/*.idr`: `believe_me`, `assert_total`.
+* Identify declared intent vs. actual implementation (docs-honesty check) — e.g. does `ROADMAP.adoc` still list the hybrid Ed448+Dilithium5 signing as a TODO after `crypto/` shipped it?
+* Produce a scope-assembly artefact with prioritized entries under `must` / `intend` / `like`.
+
+== Axis 2 — Maintenance Execution Rules
+
+* Corrective first: fix breakage, defects, regressions, safety issues (e.g. a broken `ccall` signature into `crypto/` or `zig/`).
+* Adaptive second: reconcile changed scope, remove stale references, cull no-longer-relevant work.
+* Perfective third: only from the current honest state established by Axis 1 and updated by corrective/adaptive actions.
+
+== Axis 3 — Audit Rules
+
+* Verify systems are in place and actually operating: CI workflows run green, `k9iser.toml` constraints are satisfiable, Justfile recipes work.
+* Verify documentation explains the real/current state (not aspirational-only), including documented exceptions.
+* Verify safety and security controls are present, active, and evidenced — notably the two load-bearing seams in this repo:
+** The Idris2 ABI (`src/Abi/`, `axiom-abi.ipkg`), typechecked in CI (`idris2-abi-check`).
+** The `crypto/` Rust cdylib FFI boundary (hybrid Ed448 + Dilithium5/ML-DSA-87 signing), loaded via `Libdl`/`ccall` from `src/verification/signing.jl`.
+* Verify observed effects/impacts are captured and reviewed:
+** benchmark execution and recorded results (`benchmark/results_*.md`, `benchmark/gpu_performance_baseline.json`)
+** explicit maintainer dialogue/status review on what changed, why, and next risks
+* Audit compliance seams/compromises explicitly:
+** policy exceptions are recorded with rationale, scope, and expiry/review
+** exception does not silently broaden into general policy drift
+** run `panic-attack assail` as the compliance-audit scanner (see `.github/workflows/static-analysis-gate.yml`)
+
+== Panic/Safety/Security Pass
+
+* Run `just assail` (wraps `panic-attack assail .`).
+* Triage findings by severity: Critical/High block, Medium/Low get scheduled.
+* Fix High first, then Medium.
+* Re-run until acceptable.
+
+[source,bash]
+----
+panic-attack assail /path/to/Axiom.jl --output /tmp/axiom-assail.json --verbose
+jq -r '.weak_points | length' /tmp/axiom-assail.json
+jq -r '.weak_points[] | "\(.severity)|\(.category)|\(.file)"' /tmp/axiom-assail.json
+----
+
+=== Latest Assail Baseline (2026-07-01)
+
+Ground-truthed by actually running the tool (not a status-doc claim):
+
+[cols="1,1,3"]
+|===
+| Severity | Count | Notes
+
+| Critical
+| 0
+| None found.
+
+| High
+| 2
+| `UnsafeCode` in `crypto/src/lib.rs` (21 `unsafe` blocks — the C-ABI `extern "C"` surface itself, expected for a cdylib boundary); `ProofDrift` in `test/verification/proof_export_tests.jl` (a `# sorry`/`# TODO: prove`-style proof-substitute comment).
+
+| Medium
+| 16
+| Mostly `ProofDrift` (12× type-only `@test x isa Y` assertions across `test/` and `packages/SMTLib.jl/test/`, which stand in for unwritten formal theorems), 2× `UnsafeFFI` (`ccall` sites in `src/verification/signing.jl` and `src/backends/zig_ffi.jl` — the same FFI boundary as the High UnsafeCode finding, viewed from the Julia side), 2× `InputBoundary` (`JSON3.read`/`JSON.parse` without `try`/`catch` in `src/verification/serialization.jl` and its test), 1× `MutationGap` (`test/ci/backend_parity.jl` has only type-only assertions).
+
+| Low
+| 0
+| None found.
+|===
+
+**Known-legitimate residuals** (audited but not yet formally suppressed — that
+suppression step is a separate P5 phase, see `panic-attack`'s
+User-Classification Registry convention): the `crypto/` `UnsafeCode` finding
+and both `UnsafeFFI` findings are the expected shape of a Rust-cdylib +
+Zig-compute-layer FFI boundary loaded via `ccall`. They are flagged here for
+future audit-file authorship (`audits/assail-classifications.a2ml`), not
+suppressed in this pass.
+
+Full JSON report from this run: `/tmp/axiom-assail.json` (not committed —
+regenerate via `just assail` or the command above).
+
+== Language-Specific Validation
+
+=== Julia
+
+* Format/lint (project convention).
+* `julia --project=. -e 'using Pkg; Pkg.test()'` (unit + property + e2e suites under `test/`).
+* Benchmark smoke: `benchmark/threaded_benchmark.jl`.
+
+=== Rust (crypto/)
+
+[source,bash]
+----
+cd crypto
+cargo fmt --all --check
+cargo clippy --all-targets -- -D warnings
+cargo test
+----
+
+=== Zig (zig/, ffi/zig/)
+
+[source,bash]
+----
+cd zig && zig build test
+cd ffi/zig && zig build test
+----
+
+=== Idris2 (src/Abi/)
+
+[source,bash]
+----
+idris2 --typecheck axiom-abi.ipkg
+----
+
+== Final QA and Release Hygiene
+
+* Re-run full relevant checks one final time.
+* Confirm no unintended file changes.
+* Commit scoped changes with a clear message.
+* Push and capture the commit SHA.
+
+== Maintenance Report Template
+
+Copy this block per maintenance run:
+
+[source,text]
+----
+Repo: Axiom.jl
+Branch:
+Start UTC:
+End UTC:
+
+Scope:
+- Corrective:
+- Adaptive:
+- Perfective:
+
+Checks Run:
+- TODO/FIXME scan:
+- panic-attack assail:
+- Julia/Rust/Zig/Idris2 checks:
+- Benchmark checks:
+
+Findings:
+- Critical:
+- High:
+- Medium:
+- Low:
+
+Fixes Applied:
+1.
+2.
+
+Validation Results:
+- Tests:
+- Benchmarks:
+- panic-attack rerun:
+
+Artifacts:
+- assail report:
+- benchmark output:
+
+Commit(s):
+- SHA:
+
+Remaining Risks / Follow-ups:
+1.
+2.
+----
+
+== AI Execution Integrity Contract
+
+Use this when delegating maintenance to any AI agent working on this repo.
+
+* Do not claim any step is complete unless it actually ran.
+* Do not silently skip checklist items — state SKIPPED plus the exact reason.
+* For every check, provide evidence: command executed, pass/fail/warn, key output summary, artifact/log path.
+* If a command fails, stop claiming success and report the failure clearly.
+* After each fix, re-run the relevant failing check and report the rerun result.
+* Never mark "all done" while any fail/warn remains unexplained.
+* Fail closed: if evidence is missing for any checklist item, treat that item as NOT DONE.

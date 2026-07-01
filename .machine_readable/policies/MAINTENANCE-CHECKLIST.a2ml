@@ -1,0 +1,161 @@
+# SPDX-License-Identifier: MPL-2.0
+# SPDX-FileCopyrightText: 2026 Axiom.jl Contributors
+#
+# Maintenance baseline (machine-readable canonical) — Axiom.jl
+
+[metadata]
+version = "1.0.0"
+last-updated = "2026-07-01"
+scope = "repo"
+repo = "Axiom.jl"
+source-human = "docs/governance/MAINTENANCE-CHECKLIST.adoc"
+companion-human = "docs/governance/SOFTWARE-DEVELOPMENT-APPROACH.adoc"
+companion-machine = ".machine_readable/policies/SOFTWARE-DEVELOPMENT-APPROACH.a2ml"
+
+[policy]
+single-source = true
+notes = "Use this file as canonical machine policy and keep docs/governance/MAINTENANCE-CHECKLIST.adoc synchronized."
+
+[maintenance-axes]
+scoping-first = true
+execution-order = ["scoping", "axis-1", "axis-2", "axis-3"]
+axis-1 = "must > intend > like"
+axis-2 = "corrective > adaptive > perfective"
+axis-3 = "systems > compliance > effects"
+
+[scoping]
+inputs_required = [
+  "README",
+  "ROADMAP.adoc",
+  "REGISTRY-READINESS.md",
+  "TEST-NEEDS.md",
+  "ci-and-security-workflows",
+]
+
+marker_scan_required = [
+  "TODO",
+  "FIXME",
+  "XXX",
+  "HACK",
+  "STUB",
+  "PARTIAL",
+]
+
+idris_unsound_scan_required = [
+  "believe_me",
+  "assert_total",
+]
+
+scope_assembly_buckets = ["must", "intend", "like"]
+
+[axis-2-maintenance-rules]
+corrective-first = true
+adaptive-second = true
+adaptive_examples = [
+  "scope-change reconciliation",
+  "stale-reference removal",
+  "obsolete-work culling",
+]
+perfective-third = true
+perfective_source = "axis-1 honest state after corrective/adaptive updates"
+
+[axis-3-audit-rules]
+systems-check = true
+documentation-honesty-check = true
+safety-security-accounted-check = true
+effects-review-check = true
+benchmark-evidence-required = true
+maintainer-dialogue-review-required = true
+compliance-seams-check = true
+exception-register-required = true
+exception-bounded-scope-required = true
+policy-drift-contamination-check = true
+compliance-tooling = "panic-attack"
+effects-tooling = "benchmark/ (framework_comparison.jl, gpu_performance_baseline.json, threaded_benchmark.jl)"
+
+[generic-cleanup-finish-off]
+root-cleanup-required = true
+stale-work-cull-required = true
+docs-parity-required = true
+machine-human-sync-required = true
+compliance-finish-off-required = true
+effects-finish-off-required = true
+release-prep-summary-required = true
+next-actions-required = ["corrective", "adaptive", "perfective"]
+
+[must]
+root_control_files = [
+  ".editorconfig",
+  "guix.scm",
+  "setup.sh",
+  "Justfile",
+  "Mustfile",
+]
+
+ownership_files = [
+  "MAINTAINERS.adoc",
+]
+
+machine_readable_required = [
+  ".machine_readable/anchors/ANCHOR.a2ml",
+  ".machine_readable/contractiles/",
+  ".machine_readable/bot_directives/",
+  ".machine_readable/policies/",
+]
+
+contractiles_required = [
+  ".machine_readable/contractiles/Mustfile.a2ml",
+  ".machine_readable/contractiles/Trustfile.a2ml",
+  ".machine_readable/contractiles/Intentfile.a2ml",
+]
+
+security_required = [
+  ".well-known/security.txt",
+  ".github/workflows/hypatia-scan.yml",
+  ".github/workflows/secret-scanner.yml",
+  ".github/workflows/static-analysis-gate.yml",
+]
+
+quality_gate_required = [
+  "format",
+  "lint",
+  "unit-tests (test/runtests.jl)",
+  "property-tests (test/property_test.jl)",
+  "e2e-tests (test/e2e_test.jl)",
+  "bench-smoke (benchmark/threaded_benchmark.jl)",
+  "docs-check",
+  "security-scan (hypatia-scan.yml, secret-scanner.yml, static-analysis-gate.yml)",
+]
+
+abi_ffi_policy = [
+  "ABI Idris2 in src/Abi/*.idr (Types.idr, Layout.idr, Foreign.idr), typechecked via axiom-abi.ipkg",
+  "FFI Zig in zig/src/*.zig + ffi/zig/src/main.zig",
+  "Crypto FFI Rust cdylib in crypto/src/lib.rs (axiom_crypto), loaded via Libdl/ccall",
+]
+
+[should]
+docs_primary_format = "adoc (docs/governance/, docs/legal/, docs/compliance/); docs/wiki/ remains Markdown as the GitHub-wiki mirror"
+docs_structure = [
+  "docs/legal",
+  "docs/governance",
+  "docs/compliance",
+  "docs/accessibility",
+  "docs/design-diary",
+  "docs/wiki",
+]
+
+root_minimization = true
+well_known_metadata = true
+roadmap_honesty_with_dates = true
+ci_doc_format_policy = true
+
+[could]
+generate_human_from_machine = true
+mode_aware_bots = ["corrective", "adaptive", "perfective", "audit"]
+exception_registry = "audits/assail-classifications.a2ml (planned, not yet authored — P5 phase per panic-attack CLAUDE.md User-Classification Registry)"
+
+[latest-execution-record]
+date = "2026-07-01"
+repo = "Axiom.jl"
+branch = "claude/axiom-jl-registry-infra-kr7t4a"
+notes = "Tier-2 compliance gates added: k9iser.toml, static-analysis-gate.yml, estate-rules.yml, docs/legal/{EXHIBIT-A,EXHIBIT-B}, docs/governance/{MAINTENANCE-CHECKLIST,SOFTWARE-DEVELOPMENT-APPROACH}.adoc, .machine_readable/policies/*. panic-attack assail run: 18 weak points (0 Critical, 2 High, 16 Medium), see docs/governance/MAINTENANCE-CHECKLIST.adoc Sec 'Latest Assail Baseline' for the full breakdown. No suppressions authored in this pass (P5 triage phase is separate)."
