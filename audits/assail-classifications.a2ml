@@ -1,9 +1,30 @@
 # SPDX-License-Identifier: MPL-2.0
-# Audited legitimate residuals for `panic-attack assail`.
+# Audited legitimate residuals for `panic-attack assail` — Axiom.jl.
 # Companion audit (rationale + review): audits/audit-ffi-unsafe.adoc
+#
+# Format: TOML-A2ML (parses with tomllib; matches the estate a2ml standard
+# used by every other .a2ml in this repo and hyperpolymath/a2ml-validate-action).
+# The panic-attack user-classification registry uses an S-expression dialect,
+# so its payload is carried below as a TOML literal multiline string (''' … ''',
+# no escape processing). This keeps the file valid TOML-A2ML *and* parseable by
+# panic-attack, whose loader reads the raw file text scanning for classification
+# forms — it does not TOML-parse, and ignores everything outside a form.
+#
 # Per the user-classification protocol this registry lives separately from the
 # code under scan, so a newly-added unsafe block cannot self-suppress — the
 # suppression only holds while the cited audit is kept current.
+
+[metadata]
+name = "axiom-assail-classifications"
+project = "Axiom.jl"
+schema_version = "1.0"
+last-updated = "2026-07-01"
+scope = "repo"
+repo = "Axiom.jl"
+
+[payload]
+# panic-attack user-classification payload (S-expression dialect).
+sexpr = '''
 (assail-classifications
   (classification
     (file "crypto/src/lib.rs")
@@ -20,3 +41,4 @@
     (category "UnsafeFFI")
     (audit "audits/audit-ffi-unsafe.adoc §3")
     (rationale "Julia ccall/Libdl into the Zig compute backend; availability checked before dispatch; memory-safety-critical logic lives Zig-side")))
+'''
