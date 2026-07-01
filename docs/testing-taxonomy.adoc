@@ -1,0 +1,72 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= Axiom.jl Testing Taxonomy
+:toc: macro
+:toclevels: 2
+
+Axiom.jl classifies its test suite using the estate-canonical *proven-tests*
+taxonomy (`hyperpolymath/proven-tests-and-benches`, MIT). This is a
+*documentation convention* only — Axiom does not take a code dependency on
+proven-tests (which is Idris2); it adopts the two classification axes as a
+shared vocabulary so Axiom's tests are legible against the rest of the estate.
+
+toc::[]
+
+== The two axes
+
+*Axis 1 — category* (what kind of test). proven-tests numbers fourteen:
+`01-unit`, `02-p2p`, `03-e2e`, `04-build`, `05-runtime`, `06-reflexive`,
+`07-lifecycle`, `08-smoke`, `09-property`, `10-mutation`, `11-fuzz`,
+`12-contract`, `13-regression`, `14-chaos` (plus a `TypeSafeTests` track for
+type-system properties). Axiom uses the subset that applies to a numerics/ML
+library; categories with no Axiom tests today are listed as gaps below.
+
+*Axis 2 — provenance tier* (how strongly the result is established):
+
+* *Actually-Proven* — a machine checks the property soundly (static analysis
+  that proves absence, or a cryptographic/decidable check).
+* *Provisionally-Proven* — a proof *path* runs but may degrade (e.g. the SMT
+  backend returns `:unknown` when no solver is present).
+* *Unproven* — empirical assertion: the test exercises behaviour and checks
+  outputs, but establishes no formal guarantee.
+
+Reporting the tier honestly is the point: an `@test` that merely runs a function
+is *Unproven*, and must not be described as a proof.
+
+== Axiom's suite mapped
+
+[cols="2,1,1,3",options="header"]
+|===
+| Test file | Category | Tier | Notes
+
+| `runtests.jl` (tensor/layer testsets) | 01-unit | Unproven | Shape, dtype, forward-pass behaviour.
+| `test_invertible.jl` | 01-unit / 09-property | Unproven | Reversible-layer round-trips.
+| `property_test.jl` | 09-property | Unproven | Randomised property checks.
+| `e2e_test.jl` | 03-e2e | Unproven | Build → infer → verify → package flow.
+| `ci/runtime_smoke.jl` | 08-smoke / 05-runtime | Unproven | Loads + runs on the default backend.
+| `ci/gpu_hardware_smoke.jl`, `ci/interop_smoke.jl` | 08-smoke | Unproven | Availability-gated smoke.
+| `ci/backend_parity.jl` | 12-contract | Unproven | Backends must agree numerically (cross-backend contract).
+| `ci/{gpu_fallback,gpu_resilience,coprocessor_resilience}.jl` | 14-chaos | Unproven | Graceful degradation when a device is absent/faulty.
+| `ci/{dsp,math,npu,tpu}_required_mode.jl`, `ci/coprocessor_strategy.jl` | 05-runtime | Unproven | Backend-selection behaviour.
+| `ci/optimization_passes.jl` | 05-runtime | Unproven | Optimisation-pass effects.
+| `ci/model_package_registry.jl`, `ci/certificate_integrity.jl` | 12-contract | Unproven | Manifest / certificate shape contracts.
+| `ci/verification_telemetry.jl` | 05-runtime | Unproven | Telemetry accounting.
+| `ci/proof_bundle_reconciliation.jl`, `verification/proof_export_tests.jl` | 12-contract | Provisionally-Proven | Proof-bundle export/round-trip (export works; downstream proof-assistant check is external).
+| `verification/serialization_tests.jl` | 12-contract | Unproven | Certificate serialisation round-trip.
+| `verification/soundness_tests.jl` | 13-regression | Actually-Proven | Regression guards that the P1 soundness holes never silently reopen.
+| `verification/hybrid_signing_tests.jl` | 12-contract | Actually-Proven | Ed448+Dilithium5 forgery-rejection — a cryptographic (decidable) check.
+| `integrations/huggingface_tests.jl` | 12-contract | Unproven | Offline HF import: config → architecture → Pipeline.
+| `aqua.jl` | 06-reflexive | Actually-Proven | Aqua proves absence of ambiguities / unbound params / stale deps / piracy.
+| `jet.jl` | 06-reflexive | Actually-Proven | JET proves no method/type errors in Axiom-owned code (scoped).
+|===
+
+== Gaps (categories with no Axiom tests yet)
+
+* `02-p2p`, `04-build`, `07-lifecycle` — not applicable to a single library today.
+* `10-mutation` — no `cargo-mutants`-style mutation testing wired (tracked; the
+  Julia-library flagship rubric scores this dimension).
+* `11-fuzz` — no fuzz harness yet.
+
+These are recorded honestly rather than hidden: the suite's strength is
+concentrated in unit/contract/reflexive, and the `Actually-Proven` tier is
+carried by JET, Aqua, the soundness regression guards, and the hybrid-signing
+forgery check — not by the empirical majority.
