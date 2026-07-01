@@ -1,0 +1,179 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= ULTRAPLAN — Axiom.jl Estate Julia Flagship Initiative
+Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+:toc: left
+:sectnums:
+:revdate: 2026-07-01
+
+Produced by an 8-agent understand+research workflow (4 Sonnet deep audits, 1
+Haiku mechanical inventory, 2 Sonnet web-research agents, 1 Opus synthesis;
+~1.0M tokens, 340 tool calls). Every finding below was verified by reading the
+actual code/greps, not by trusting status docs. Branch for all work:
+`claude/axiom-jl-registry-infra-kr7t4a`.
+
+== Executive summary (ground-truthed)
+
+*Axiom.jl* is a substantial, genuinely-tested Julia ML framework — 97 `.jl`
+files, 642 passing tests, a 3-OS × Julia 1.10/1.11 CI matrix, a real Zig
+backend with 36 exported kernels, strong invertible-layer round-trip tests.
+It is **not** flagship-ready: it ships **three confirmed soundness holes** plus
+a high-severity dead-code/doc-drift knot.
+
+* *Forgeable "signed" certificate* — `certificates.jl` hashes public fields with
+  a bare, unkeyed `SHA.sha256`, then labels the output `"SHA256-HMAC"` and
+  markets it for `fda_submission.cert`. Anyone can forge it.
+* *Vacuous NoNaN proof* — `checker.jl::has_safe_operations()` is a bare `true`,
+  so every NoNaN request on the static path is "proven safe" regardless of
+  div/log ops.
+* *Fake proof verification* — Lean/Coq/Isabelle "verification" is regex-absence
+  of `sorry`/`Admitted`; an empty file "passes". `@prove` is `contains(string(expr),"relu")`
+  substring matching, docstring'd as "symbolic execution / formal verification".
+* *Dead-code/doc knot* — `huggingface.jl` (825 lines) is not in the include
+  chain; `JSON3` is a hard dep serving only it; `TOPOLOGY` says "Done 80%",
+  `REGISTRY-READINESS` says "removed" — both false.
+
+*julia-professional-registry* (37 packages, correct wire format) has **two
+critical Pkg-resolution breakers**: (1) `Registry.toml` `repo` points at a stale
+`HyperpolymathRegistry.git` while the real remote is `julia-professional-registry`,
+and the `name` is a *third* variant; (2) `H/Hyperpolymath/Deps.toml` calls UUID
+`c1c96f90-…` "JuliaKids" while `Registry.toml` binds it to "JuliaForChildren" —
+`Pkg.add Hyperpolymath` breaks. No RegistryCI/AutoMerge/TagBot/CompatHelper. The
+`NOTICE` falsely claims PMPL-1.0 (flag-only — owner-manual).
+
+*julianiser* is a working Rust CLI (33/33 tests, clean clippy) with **two
+critical codegen bugs** (no bracket-depth tracking → emits unparseable
+`collect([1)`; local-var/library-alias conflation → generated "drop-in" modules
+throw `error()` on first DataFrame call) and an entire Idris2-ABI + Zig-FFI layer
+that is unwired dead scaffolding (the Rust binary never `dlopen`s it) — a
+"wire-first" violation. The three repos cross-reference each other **zero** times
+despite julianiser existing to emit registrable Julia.
+
+*Shape of the work:* holes first → reconcile docs to reality → panic-attack all
+three + audited suppressions → wire estate tooling (Aqua/JET/Documenter/
+RegistryCI/k9/squabble/RSR gates) → formalise the flagship measuring-stick rubric.
+
+== Orchestration model (the agentic-design demonstration)
+
+* *Opus (me)* — decompose, synthesise, and **adjudicate every "proven"/"done"
+  claim** via an independent fresh-context adversarial verify pass
+  ("assume false until proven", re-run the stated command, diff vs exit
+  criteria). No self-grading.
+* *Sonnet* — per-repo audits, builds, fixes, tests.
+* *Haiku* — mechanical sweeps (marker inventory, birth-SPDX headers, name-drift
+  find/replace under Sonnet review).
+* Durable external memory: this ULTRAPLAN + `GAP-REGISTER.md` + the Pepys diary,
+  surviving context resets. Condensed 1–2k-token hand-off reports, not raw dumps.
+
+== Gap register (33 confirmed, by repo)
+
+See `GAP-REGISTER.md` for the machine-readable form. Severity ∈
+{critical,high,medium,low}; kind ∈ {system,compliance,effect,corrective,adaptive,perfective}.
+
+=== Axiom.jl
+. *[critical/system]* Forgeable cert falsely labelled SHA256-HMAC → relabel `tamper_evidence_hash` + strip marketing (or real Ed25519); forgery test rejects.
+. *[critical/system]* `has_safe_operations()==true` vacuous NoNaN → remove from `:proven`; unsafe-op model must not be `:proven`.
+. *[high/system]* Proof-import "verify" = regex-absence → require ≥1 theorem + no admit; empty file → `:incomplete`.
+. *[high/compliance]* `@prove` substring match mislabelled formal → relabel experimental heuristic, default `:unknown`.
+. *[high/system]* Idris2 ABI declares generic FFI ≠ 36 real zig exports → connect to real exports OR relabel illustrative; kill orphan `ffi/zig/`.
+. *[high/perfective]* `huggingface.jl` dead + `JSON3` hard dep only for it; docs contradict → wire+test OR delete + drop JSON3; fix docs.
+. *[medium/adaptive]* No Aqua/JET (readiness doc claims Aqua "passed") → add both + CI jobs.
+. *[medium/corrective]* Weakdeps lack `[compat]`; Zygote pinned 0.6; KernelAbstractions orphan weakdep → bound all, fix.
+. *[medium/system]* `SMTLib` weakdep resolves only in-monorepo → register SMTLib.jl OR document monorepo-only (this is why the SMT test silently skipped).
+. *[medium/perfective]* Root LLM-tell files present despite "Removed"; dangling README.adoc ref → remove or correct.
+. *[medium/perfective]* EXPLAINME calls AcceleratorGate a hard dep though vendored → correct.
+. *[medium/compliance]* README coprocessor section overclaims (kernels are skeleton) → add qualifier.
+. *[medium/adaptive]* No `docs/make.jl` Documenter/doctests → add + Documentation CI.
+. *[medium/adaptive]* No `static-analysis-gate.yml`; Justfile `assail` points at pre-rename `panic-attacker` → add gate + fix name.
+. *[medium/adaptive]* No project `k9iser.toml` → author (safety-tier=fv).
+. *[medium/adaptive]* Missing RSR required files → copy from template + validate.
+. *[low/compliance]* Some `.idr`/`.zig` lack SPDX → birth-author MPL-2.0 headers (no sweep).
+. *[low/compliance]* No `audits/assail-classifications.a2ml` → author after first assail (audited residuals only).
+. *[low/perfective]* proven-tests taxonomy not applied (AGPL repo → no code dep) → adopt as doc convention.
+
+=== julia-professional-registry
+[start=20]
+. *[critical/system]* `Registry.toml repo` ≠ git remote → fix URL + CI equality check.
+. *[critical/system]* Hyperpolymath `Deps/Compat.toml` JuliaKids vs Registry JuliaForChildren → rename + CI name↔UUID cross-validation (all 37).
+. *[high/perfective]* Third name variant; ~20 stale-name files → rename sweep (canonical fork FIRST) + CLADE aliases.
+. *[high/system]* No RegistryCI/AutoMerge/TagBot/CompatHelper; only test is Idris2 string-match (asserts a nonexistent README.adoc) → add RegistryCI.
+. *[high/compliance]* `NOTICE` falsely claims PMPL-1.0 → **FLAG-ONLY to owner** (no auto-edit).
+. *[medium/adaptive]* No semver/AutoMerge guideline; compat lower-bounds only → write policy + enforce.
+. *[medium/perfective]* Doc-map drift (claims README.adoc/deno.json/flake.nix; STATE 0% vs shipped v1.0.0) → reconcile.
+. *[medium/perfective]* No julianiser↔registry integration docs → document the pipeline.
+. *[low/corrective]* stapeln/guix copy-paste; copilot `npx` (self-banned); duplicate `secrets:inherit`; malformed curl → fix/exempt.
+. *[low/perfective]* GOVERNANCE references `docs/decisions/` that doesn't exist → create ADR dir.
+
+=== julianiser
+[start=30]
+. *[critical/system]* `extract_parenthesised_args` tracks only `()` → unparseable `collect([1)` → track `[]`/`{}`/strings + parse test.
+. *[critical/system]* No scope model; local `var.method()` → `error("Unmapped call")` → gate on import-alias table + test.
+. *[critical/system]* Zig FFI stubs; Rust never dlopens; whole ABI/FFI dead → wire OR relabel (no overclaim).
+. *[high/corrective]* `build.zig` fails on Zig 0.13 (`addInstallHeader` gone; missing header/bench); CI hides it via `zig test` → fix + `zig build test`.
+. *[high/compliance]* `.idr` never typechecked in CI (regex only) → add `idris2 --build` job.
+. *[high/system]* R `%>%` multi-line pipes mis-parsed; README claims "via AST" → multi-line join + relabel "line-based scan".
+. *[high/adaptive]* `verification/` + `src/{core,aspects,bridges,contracts,definitions,errors}/` 100% empty scaffolding → populate minimal fuzz/coverage OR remove + fix STATE.
+. *[medium/corrective]* Containerfile/guix.scm/THREAT-MODEL unrendered `{{PLACEHOLDER}}` → render or remove.
+. *[medium/perfective]* README claims sklearn→MLJ/broadcasting with no mappings → implement or mark planned.
+. *[medium/compliance]* README `cargo install julianiser` fails (unpublished); some `.rs`/`.zig` lack SPDX → mark planned/publish + birth SPDX.
+
+=== estate
+[start=40]
+. *[medium/adaptive]* No `standards/julia-ci-reusable.yml` → author; Axiom CI wraps it by SHA.
+. *[low/adaptive]* squabble v0.1 diagnose-only → add `just squabble-diagnose` (diagnostic only; no apply plumbing exists upstream).
+
+== Phased plan (holes first)
+
+* *P0 — Toolchain verification & ground-truth harness.* DONE this session:
+  Julia 1.10.11 LTS, Z3 4.8.12, cvc5 1.3.4, Zig 0.13.0, Coq 8.18, Agda 2.6.3,
+  Lean(elan) installed; Idris2 absent (flagged, CI-only or source build). Axiom
+  instantiates + 642/642 tests pass. Remaining: build panic-attack; stand up
+  durable gap-register files; define hand-off schema.
+* *P1 — Axiom soundness-hole closure.* Cert, has_safe_operations, proof-import,
+  @prove relabel, Idris2 ABI. Exit: no false SHA256-HMAC; forged-cert rejected;
+  unsafe-op not `:proven`; empty proof `:incomplete`; no "symbolic execution"
+  claim for `@prove`; ABI symbols match zig OR marked illustrative; full suite green.
+* *P2 — Registry resolution-breaker closure.* Canonical identity (fork) → repo
+  URL + name↔UUID fix + rename sweep. Exit: `repo == git remote`; name↔UUID
+  cross-check passes; CI `Pkg.Registry.add + Pkg.add Hyperpolymath` green.
+* *P3 — julianiser codegen-hole closure.* Bracket depth, scope model, R pipes,
+  FFI wire-or-relabel, `zig build test`, idris2 build job. Exit: generated `.jl`
+  parses + no `error("Unmapped call")` for local chains; `zig build test` green;
+  no "via AST"/working-FFI claim unless true.
+* *P4 — Doc/claim reconciliation.* Every honesty doc consistent with the tree.
+* *P5 — panic-attack integration & audited suppression.* Assail all three;
+  triage into register; author only audited `assail-classifications.a2ml`; wire
+  `static-analysis-gate.yml`. Exit: zero unaudited critical/high; gate in CI.
+* *P6 — Estate tooling wiring.* Aqua/JET/Documenter/RegistryCI/k9/squabble/RSR +
+  `standards/julia-ci-reusable.yml` + feedback-o-tron loop. Unwired ≠ done.
+* *P7 — Licensing verification (FLAG-ONLY).* Confirm MPL-2.0/CC-BY-SA-4.0;
+  FLAG the NOTICE PMPL drift; birth-SPDX on new files only; no header sweeps.
+* *P8 — Flagship measuring-stick rubric.* Machine-checkable rubric in `standards`;
+  grade Axiom as the exemplar; Opus adversarial verify of any "meets rubric".
+
+Pilot before fan-out (risk mitigation): run the orchestrator→worker→verify→
+gap-register loop on a small slice first (Axiom P1 cert-hole + registry P2
+repo-URL), shake out the hand-off schema and scope boundaries, then scale.
+
+== Decision forks (see chat — 4 asked; 2 defaulted)
+
+. Registry canonical identity → *recommend `julia-professional-registry`*.
+. Planned-features scope → *recommend Middle (holes+honesty+tooling; settle HuggingFace; coprocessor/ONNX labelled skeleton)*.
+. Certificate signing → *recommend relabel now + schedule Ed25519 follow-up*.
+. CI real-prover gating → *recommend Hybrid (real required checks scoped to where tools exist; ban string-match proxies)*.
+. Diary/ADR home → *default: BOTH per-repo `docs/decisions/` + `standards` index*.
+. Julia matrix → *default: 1.10 LTS floor + `1` stable + nightly(non-blocking); `[compat] julia = "1.10"`*.
+
+== Key risks
+
+* Self-graded "done"/"proven" is the top failure mode → mandatory independent
+  adversarial verify pass per claim.
+* Idris2/some tools absent locally → mark those exit criteria CI-only; forbid
+  string-match proxies from counting as verification.
+* Licence tripwire (neurophone#99 precedent) → NOTICE PMPL drift stays
+  flag-only; scope every diff to exclude LICENSES/, NOTICE, SPDX-only lines
+  except birth-authoring on new files.
+* Registry fixes are outward-facing (real Pkg resolution) → stop-first on the
+  identity fork; verify `Pkg.add` end-to-end in CI before claiming resolved.
+* Concurrent-worker file conflicts → disjoint file-sets + explicit no-touch boundaries.
+* Scope creep into planned features → enforce holes-first ordering.
+* Honesty-doc drift recurrence → P4 is a gated exit criterion + a rubric check.

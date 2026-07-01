@@ -4,9 +4,35 @@
 """
     @prove [quantifier] property
 
-The `@prove` macro is used to formally verify properties of Julia expressions.
-It attempts to prove or disprove a given property using a combination of
-symbolic execution, SMT solving, and other formal methods.
+The `@prove` macro attempts to prove or disprove a property of a Julia
+expression by dispatching, in order, to up to three strategies:
+
+1. `symbolic_prove`: an **experimental heuristic**, not symbolic execution.
+   It stringifies the property's AST and does a literal substring match for
+   `"true"`/`"false"` tokens. It does not interpret, simplify, or evaluate
+   the expression in any principled way.
+2. **SMT solving** (real, sound within solver limits): only runs when
+   `SMTLib.jl` is loaded (`using SMTLib`) and the `AxiomSMTExt` extension is
+   active. This is the only strategy in `@prove` that performs genuine
+   automated theorem proving.
+3. `heuristic_prove`: another **experimental heuristic**, not a theorem
+   prover. It matches known textual patterns (e.g. `contains(string(expr),
+   "relu")`) against the stringified AST to recognize a fixed list of common
+   neural-network properties (softmax sums to 1, ReLU is non-negative,
+   etc.) and reports them `:proven` by convention, not by proof.
+
+If none of these strategies can decide the property, `@prove` returns
+`ProofResult(:unknown, ...)` -- this is the honest default for anything the
+heuristics don't recognize and SMT is unavailable or inconclusive for.
+
+**Strategies 1 and 3 are NOT symbolic execution and NOT formal verification.**
+They are literal substring matches on `string(expr)`. A `:proven` result from
+either heuristic path means "this expression's printed form matched a known
+textual pattern", not "this property was formally proved". For an actual
+formal-methods result, load `SMTLib.jl` (strategy 2) or export the property
+to Lean/Coq/Isabelle via `proof_export.jl` and complete the proof
+interactively -- see `docs/wiki/Verification.md` and
+`docs/wiki/AdvancedSMT.md`.
 
 ## Arguments:
 - `quantifier`: Optional. Specifies the quantifier for the property.
@@ -215,7 +241,8 @@ end
 Dispatches to the appropriate proving strategy based on the property.
 """
 function prove_property(property::ParsedProperty)::ProofResult
-    # Strategy 1: Symbolic execution with simplification
+    # Strategy 1: Experimental heuristic -- literal substring match on the
+    # stringified AST. NOT symbolic execution (see symbolic_prove docstring).
     result = symbolic_prove(property)
     result.status != :unknown && return result
 
@@ -228,7 +255,8 @@ function prove_property(property::ParsedProperty)::ProofResult
         end
     end
 
-    # Strategy 3: Heuristic-based pattern matching for common properties
+    # Strategy 3: Experimental heuristic -- pattern matching for common
+    # properties. NOT a theorem prover (see heuristic_prove docstring).
     result = heuristic_prove(property)
     result.status != :unknown && return result
 
@@ -243,40 +271,62 @@ end
 """
     symbolic_prove(property::ParsedProperty)
 
-Attempts to prove a property using symbolic execution and simplification.
+**Experimental heuristic. Not symbolic execution, not a theorem prover.**
+
+Converts `property.body` to its printed string form via `string(...)` and
+does a literal substring check for the tokens `"true"` / `"false"`. It
+performs no AST interpretation, term rewriting, or simplification -- the
+name "symbolic" refers only to inspecting the unevaluated expression's
+printed text, not to symbolic execution in the program-analysis sense.
+
+Returns `:unknown` (via `ProofResult`) whenever the substring check is
+inconclusive, which is the common case; real proving for anything beyond
+this trivial pattern belongs to the SMT extension (`AxiomSMTExt`, strategy 2
+in `prove_property`) or the Lean/Coq/Isabelle export path in
+`proof_export.jl`.
 """
 function symbolic_prove(property::ParsedProperty)::ProofResult
-    # Lightweight symbolic pass:
-    # 1. Represent the property body symbolically.
-    # 2. Apply simplification rules.
-    # 3. Attempt to reduce the expression to `true` or `false`.
-    # 4. If false, try to extract a counterexample.
-
-    # For now, a very basic symbolic check:
+    # Experimental heuristic pass, NOT symbolic execution:
+    # literal substring match on `string(property.body)` for the tokens
+    # "true"/"false". No AST interpretation, term rewriting, or
+    # simplification is performed.
     body_str = string(property.body)
     if property.quantifier == :forall
         if contains(body_str, "true") && !contains(body_str, "false")
-            return ProofResult(:proven, nothing, 0.5, "Property trivially true (symbolic).", String[])
+            return ProofResult(:proven, nothing, 0.5, "Property trivially true (heuristic substring match; not symbolic execution).", String[])
         elseif contains(body_str, "false") && !contains(body_str, "true")
-            return ProofResult(:disproven, Dict(), 0.5, "Property trivially false (symbolic).", String[])
+            return ProofResult(:disproven, Dict(), 0.5, "Property trivially false (heuristic substring match; not symbolic execution).", String[])
         end
     elseif property.quantifier == :exists
         if contains(body_str, "true") && !contains(body_str, "false")
-            return ProofResult(:proven, Dict(), 0.5, "Property trivially true (symbolic).", String[])
+            return ProofResult(:proven, Dict(), 0.5, "Property trivially true (heuristic substring match; not symbolic execution).", String[])
         elseif contains(body_str, "false") && !contains(body_str, "true")
-            return ProofResult(:disproven, nothing, 0.5, "Property trivially false (symbolic).", String[])
+            return ProofResult(:disproven, nothing, 0.5, "Property trivially false (heuristic substring match; not symbolic execution).", String[])
         end
     end
 
     return ProofResult(:unknown, nothing, 0.0,
-                       "Symbolic execution could not determine truth value.",
+                       "Heuristic substring match could not determine a truth value (this is not symbolic execution).",
                        String[])
 end
 
 """
     heuristic_prove(property::ParsedProperty)
 
-Applies heuristic pattern matching to common properties.
+**Experimental heuristic. Not a theorem prover, not formal verification.**
+
+Applies textual pattern matching (e.g. `contains(string(expr), "relu")`)
+against the stringified AST of `property.body` to recognize a fixed list of
+common neural-network properties (softmax sums to 1, ReLU is non-negative,
+sigmoid/tanh bounds, etc.). A `:proven` result here means the printed
+expression matched one of these known text patterns -- it is not the output
+of a proof search, term rewriter, or solver, and it carries no soundness
+guarantee beyond "this looks like a property we've seen before".
+
+Returns `:unknown` for anything that doesn't match a recognized pattern.
+Real automated proving is handled by the SMT extension (`AxiomSMTExt`) when
+`SMTLib.jl` is loaded; interactive formal proofs go through the
+Lean/Coq/Isabelle export path in `proof_export.jl`.
 """
 function heuristic_prove(property::ParsedProperty)::ProofResult
     # Heuristic 1: Check for basic tautologies/contradictions

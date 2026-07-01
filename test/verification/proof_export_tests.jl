@@ -66,8 +66,9 @@ using Axiom: ProofResult
         """
         -- AXIOM_CERTIFICATE_HASH: deadbeef
         -- AXIOM_OBLIGATION_ID: feedface
-        theorem completed : True := by
-          trivial
+        theorem completed : forall x, relu x >= 0 := by
+          intro x
+          exact relu_nonneg x
         """
     )
     completed_cert = import_lean_certificate(completed_lean)
@@ -103,11 +104,113 @@ using Axiom: ProofResult
         -- AXIOM_PROOF_METHOD: pattern
         -- AXIOM_OBLIGATION_ID: $(expected_id)
 
-        theorem completed_bundle : True := by
-          trivial
+        theorem completed_bundle : forall x, sum(softmax(x)) == 1.0 := by
+          intro x
+          exact softmax_sum_one x
         """
     )
     reconciled = reconcile_proof_bundle(bundle["manifest"])
     @test reconciled["obligations"][1]["assistant_reports"]["lean"]["status"] == "complete"
     @test reconciled["obligations"][1]["status"] == "interactive_required"
+end
+
+@testset "Proof Assistant Import Rejects Vacuous/Empty Proofs (G03)" begin
+    # An empty file (or a file with only certificate-hash/obligation-id
+    # metadata comments and no theorem at all) must NOT be reported as
+    # verified merely because it contains no sorry/Admitted/oops tokens.
+    empty_dir = mktempdir()
+
+    empty_lean = joinpath(empty_dir, "empty.lean")
+    write(empty_lean, "")
+    empty_cert = import_lean_certificate(empty_lean)
+    @test empty_cert.status != :proven
+    empty_report = proof_assistant_obligation_report(empty_lean, :lean)
+    @test empty_report["status"] == "incomplete" || empty_report["status"] == "missing_metadata"
+    @test empty_report["has_statement"] == false
+
+    metadata_only_lean = joinpath(empty_dir, "metadata_only.lean")
+    write(
+        metadata_only_lean,
+        """
+        -- AXIOM_CERTIFICATE_HASH: deadbeef
+        -- AXIOM_OBLIGATION_ID: feedface
+        """
+    )
+    metadata_only_cert = import_lean_certificate(metadata_only_lean)
+    @test metadata_only_cert.status != :proven
+    metadata_only_report = proof_assistant_obligation_report(metadata_only_lean, :lean)
+    @test metadata_only_report["status"] == "incomplete"
+    @test metadata_only_report["has_statement"] == false
+
+    # A trivial/vacuous theorem (`theorem foo : True := trivial`) contains no
+    # sorry/Admitted/oops escape token, but it also proves nothing about the
+    # claimed property -- it must be rejected exactly like the empty case.
+    trivial_lean = joinpath(empty_dir, "trivial.lean")
+    write(
+        trivial_lean,
+        """
+        -- AXIOM_CERTIFICATE_HASH: deadbeef
+        -- AXIOM_OBLIGATION_ID: feedface
+        theorem foo : True := trivial
+        """
+    )
+    trivial_cert = import_lean_certificate(trivial_lean)
+    @test trivial_cert.status != :proven
+    trivial_report = proof_assistant_obligation_report(trivial_lean, :lean)
+    @test trivial_report["status"] == "incomplete"
+    @test trivial_report["has_statement"] == false
+    @test trivial_report["unresolved"] == 0  # confirms rejection is NOT just token-scan
+
+    trivial_coq = joinpath(empty_dir, "trivial.v")
+    write(
+        trivial_coq,
+        """
+        (* AXIOM_CERTIFICATE_HASH: deadbeef *)
+        (* AXIOM_OBLIGATION_ID: feedface *)
+        Theorem foo : True.
+        Proof.
+          exact I.
+        Qed.
+        """
+    )
+    trivial_coq_cert = import_coq_certificate(trivial_coq)
+    @test trivial_coq_cert.status != :proven
+    trivial_coq_report = proof_assistant_obligation_report(trivial_coq, :coq)
+    @test trivial_coq_report["status"] == "incomplete"
+    @test trivial_coq_report["has_statement"] == false
+
+    trivial_thy = joinpath(empty_dir, "trivial.thy")
+    write(
+        trivial_thy,
+        """
+        (* AXIOM_CERTIFICATE_HASH: deadbeef *)
+        (* AXIOM_OBLIGATION_ID: feedface *)
+        lemma foo: "True"
+          by simp
+        """
+    )
+    trivial_isabelle_cert = import_isabelle_certificate(trivial_thy)
+    @test trivial_isabelle_cert.status != :proven
+    trivial_isabelle_report = proof_assistant_obligation_report(trivial_thy, :isabelle)
+    @test trivial_isabelle_report["status"] == "incomplete"
+    @test trivial_isabelle_report["has_statement"] == false
+
+    # Sanity check: a real (non-vacuous) property theorem with no escape
+    # tokens IS accepted -- the fix must not reject genuine proofs.
+    real_lean = joinpath(empty_dir, "real.lean")
+    write(
+        real_lean,
+        """
+        -- AXIOM_CERTIFICATE_HASH: deadbeef
+        -- AXIOM_OBLIGATION_ID: feedface
+        theorem axiom_property_relu_nonneg : forall x, relu(x) >= 0 := by
+          intro x
+          exact relu_nonneg x
+        """
+    )
+    real_cert = import_lean_certificate(real_lean)
+    @test real_cert.status == :proven
+    real_report = proof_assistant_obligation_report(real_lean, :lean)
+    @test real_report["status"] == "complete"
+    @test real_report["has_statement"] == true
 end

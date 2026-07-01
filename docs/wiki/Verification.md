@@ -7,15 +7,22 @@
 
 ## Overview
 
-Axiom.jl's verification system lets you **prove properties** about your models. This isn't just testing - it's mathematical certainty.
+Axiom.jl's verification system lets you check properties about your models
+at several levels of rigor. `@ensure` is a runtime assertion. `@prove`
+*attempts* to establish a property via, in order: an experimental heuristic
+substring match, an optional real SMT solver (only when `SMTLib.jl` is
+loaded), and a second experimental heuristic pattern match -- falling back
+to `:unknown` when none of these can decide the property. Only the SMT path
+(and the Lean/Coq/Isabelle export/import workflow) produces an actual
+formal-methods result; the two heuristic paths are convenience shortcuts for
+a fixed list of well-known properties, not proofs.
 
 ```julia
 @axiom Classifier begin
     # ...
 
-    # These aren't just assertions - they're GUARANTEES
     @ensure sum(output) ≈ 1.0      # Runtime check
-    @prove ∀x. output(x) ∈ [0, 1]  # Mathematical proof
+    @prove ∀x. output(x) ∈ [0, 1]  # Experimental proof attempt (see caveats below)
 end
 ```
 
@@ -27,7 +34,7 @@ end
                     ╱╲
                    ╱  ╲
                   ╱    ╲
-                 ╱ @prove╲        <- Mathematical proofs
+                 ╱ @prove╲        <- Experimental proof attempt (heuristic + optional SMT)
                 ╱________╲
                ╱          ╲
               ╱  @ensure   ╲     <- Runtime assertions
@@ -114,17 +121,21 @@ end
 
 ---
 
-## @prove: Formal Proofs
+## @prove: Experimental Proof Attempts
 
 ### What Can Be Proven?
 
-The `@prove` macro attempts to **mathematically prove** properties about your model.
+The `@prove` macro *attempts* to establish properties about your model. It
+is **experimental** and is honest about being inconclusive: unless the SMT
+path fires, `@prove` is doing textual pattern matching, not proving anything
+in the formal-methods sense. Treat a `:proven` result from the heuristic
+paths as "recognized, not derived" -- always pair `@prove` with `@ensure`
+for anything safety-relevant.
 
 ```julia
 @axiom Model begin
     # ...
 
-    # These are PROVEN, not just tested
     @prove ∀x. sum(softmax(x)) == 1.0
     @prove ∀x. all(sigmoid(x) .∈ [0, 1])
     @prove ∀x. relu(x) >= 0
@@ -133,10 +144,27 @@ end
 
 ### How It Works
 
-1. **Pattern Matching**: Known properties of functions (e.g., softmax always sums to 1)
-2. **Symbolic Execution**: Trace computation symbolically
-3. **SMT Solvers**: Use Z3/CVC5 for complex properties
-4. **Fallback**: If unprovable, becomes runtime assertion
+`prove_property` tries three strategies in order and stops at the first
+that returns a decided (non-`:unknown`) result:
+
+1. **`symbolic_prove` (experimental heuristic, NOT symbolic execution)**:
+   stringifies the property body and does a literal substring check for the
+   tokens `"true"`/`"false"`. It does not trace, interpret, or simplify the
+   computation.
+2. **SMT solving (real, sound within solver limits)**: only runs if
+   `SMTLib.jl` is loaded (`using SMTLib`) and the property passes a
+   syntactic compatibility check. This is the only strategy that performs
+   genuine automated theorem proving (Z3/CVC5/etc. via `packages/SMTLib.jl`).
+3. **`heuristic_prove` (experimental heuristic, NOT a theorem prover)**:
+   matches known textual patterns in the stringified AST against a fixed
+   list of common neural-network properties (softmax sums to 1, ReLU
+   non-negative, sigmoid/tanh bounds, and similar). A match reports
+   `:proven` by convention, not by derivation.
+4. **Fallback**: if none of the above decide the property, `@prove` returns
+   `:unknown` -- this is the expected, honest outcome for anything outside
+   the recognized patterns and outside SMT's reach. Wrap such properties in
+   `@ensure` for a runtime check, or use the Lean/Coq/Isabelle export path
+   (`proof_export.jl`) for an actual interactive formal proof.
 
 ### SMT Solver Configuration
 

@@ -1,6 +1,21 @@
 -- SPDX-License-Identifier: MPL-2.0
 ||| Axiom.jl Foreign Function Interface Declarations
 |||
+||| ILLUSTRATIVE SCAFFOLD -- NOT A PROOF OF AXIOM'S PRODUCTION FFI BOUNDARY.
+||| The symbols declared here (axiom_init, axiom_process, axiom_free,
+||| axiom_register_callback, axiom_invoke_callback, etc.) are a generic
+||| lifecycle/callback surface for the hyperpolymath ABI-FFI pattern. They
+||| use concrete Axiom naming but do NOT correspond to Axiom's real Zig
+||| kernel exports (axiom_matmul, axiom_relu, axiom_conv2d, and the rest of
+||| the ~36 real exports in `ffi/zig/src/main.zig` / `zig/src/axiom.zig`
+||| consumed by `src/backends/zig_ffi.jl`). No `libaxiom` implementing
+||| exactly this surface is built by this repository.
+|||
+||| The production FFI boundary is Julia <-> Zig via `src/backends/zig_ffi.jl`
+||| and `ffi/zig/`; see `ABI-FFI-README.md` for the authoritative split.
+||| Connecting this scaffold's declarations to the real Zig exports is
+||| tracked future work (see ROADMAP note in `src/Abi/Types.idr`).
+|||
 ||| This module declares C ABI symbols used by the Idris2 ABI scaffold.
 ||| Symbol names are concrete for Axiom (`axiom_*`, `libaxiom`).
 
