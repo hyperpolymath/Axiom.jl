@@ -112,6 +112,13 @@ prod_model = compile(model, backend=ZigBackend("/path/to/libaxiom_zig.so"), opti
 
 ## Coprocessor Targets
 
+> **Status — skeleton, not accelerated execution.** Coprocessor support today is
+> a *detection + dispatch* surface: `detect_coprocessor()` probes for devices and
+> `compile(…, backend=cop)` routes through the backend interface, but the
+> per-device compute kernels are not yet implemented, so execution gracefully
+> falls back to the Julia backend. Treat this as a forward-looking API, not
+> hardware-accelerated inference.
+
 ```julia
 # Non-GPU accelerator targets with self-healing fallback
 cop = detect_coprocessor()  # TPU/NPU/VPU/QPU/PPU/MATH/CRYPTO/FPGA/DSP or nothing

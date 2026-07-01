@@ -325,3 +325,50 @@ caps the whole score).
 *Method held:* ran tools not docs (and ran them on my OWN deliverable);
 fixed the A2ML collision at source; no self-grade; faithful reporting of the
 BLOCKED push and the 3 template bugs I had to fix.
+
+== Entry 0008 — 2026-07-01 — Shipped a planned feature honestly, then swept the overclaims
+
+*Main-route directive:* "concentrate on concerns on our main route" — i.e. the
+flagship's holes, holes-first. Two slices, both ground-truthed by running tools.
+
+*G06 — HuggingFace, wired not deleted (#55, merged).* `huggingface.jl` was 825
+lines of dead code: not `include`d from `src/Axiom.jl`, `using JSON3` (a dep
+that had been removed from Project.toml), and a `✓ Current Status` header
+claiming features that could not run. Rather than delete cold code (doctrine #7)
+I WIRED it: ported JSON3→JSON (already a dep, no new dependency), fixed the two
+bugs wiring exposed (unexported internals `Pipeline`/`AbstractLayer`/`parameters`
+needed explicit import; `verify_model` was an *undefined export* Aqua flags),
+and added `test/integrations/huggingface_tests.jl` exercising the network-free
+core (architecture detection, model building into an Axiom Pipeline, SafeTensors
+dtype). The `✓` header became honest capability tiers (wired+tested / needs-
+network / not-implemented) and the wiki's contradictory "⚠ Beta / not shipped"
+was reconciled. Verified: Pkg.test 732/732 green (Aqua+JET+new HF tests). The
+network hub-fetch is present and honestly gated as network-required, not CI-run.
+Measurement drove the wire-vs-park call: I didn't guess JET would tolerate 825
+new lines — I ran it.
+
+*G09–G12 — the overclaim sweep (this entry's commit).* Four doc-vs-reality
+holes, each corrected to the ground-truth:
+- G11: EXPLAINME listed `AcceleratorGate` and `JSON3` as hard dependencies —
+  AcceleratorGate is VENDORED (`src/vendored/`), JSON3 was removed. Corrected to
+  the real 10 hard deps / 6 weakdeps / 5 extensions (counts verified against
+  Project.toml, so the fix doesn't introduce a new wrong number).
+- G12: README's "Coprocessor Targets" presented `compile(…, backend=cop)` as
+  working; the test log shows TPU falling back to the Julia backend. Added a
+  "skeleton, not accelerated execution" qualifier.
+- G10: REGISTRY-READINESS claimed LLM-tell files "✅ Removed" — false;
+  `0-AI-MANIFEST.a2ml` (a REQUIRED RSR manifest, must stay) and `llm-warmup-*.md`
+  are both still present. Corrected the row to the truth.
+- G09: documented that `packages/SMTLib.jl` is monorepo-only/unregistered, so
+  the `AxiomSMTExt` weakdep extension doesn't load outside the monorepo and
+  `@prove` degrades gracefully to `:unknown` — a deliberate, LOGGED fallback,
+  not a silent skip.
+
+*Flagged for owner (not touched):* README is `README.md` where the estate rule
+wants `README.adoc` (several tooling refs point at `README.adoc` and dangle);
+and whether `llm-warmup-*.md` belong in a registered package's root. Both are
+rename/delete/policy calls — surfaced, not decided unilaterally.
+
+*Method held:* wired-not-deleted; ran the tools (Pkg.test, grep-vs-Project.toml)
+not the status docs; verified my OWN corrected numbers so an honesty fix didn't
+smuggle in a fresh overclaim; no self-grade.
