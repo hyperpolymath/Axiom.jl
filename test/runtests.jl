@@ -761,6 +761,9 @@ with open(args.output, "w", encoding="utf-8") as f:
     include("e2e_test.jl")
     include("property_test.jl")
 
+    # HuggingFace integration — offline core (G06)
+    include("integrations/huggingface_tests.jl")
+
     # Quality gates (G07): static/dynamic analysis of Axiom's own code.
     include("aqua.jl")
     include("jet.jl")
