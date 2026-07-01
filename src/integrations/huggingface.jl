@@ -1,40 +1,54 @@
 # SPDX-License-Identifier: MPL-2.0
 # Axiom.jl HuggingFace Integration
 #
-# Import pretrained models from HuggingFace Hub with security verification.
+# Import pretrained models from HuggingFace into Axiom.
 #
-# Current Status (v0.2.0):
-# ✓ HuggingFace Hub API integration
-# ✓ Model metadata fetching
-# ✓ File downloading with caching
-# ✓ Architecture detection (BERT, RoBERTa, GPT-2, ViT, ResNet)
-# ✓ Security verification (@prove integration)
-# ✓ SHA256 checksum verification
-# ✓ Architecture conversion (BERT, RoBERTa, GPT-2, ViT, ResNet)
-# ✓ SafeTensors weight loading (pickle-free)
-# ⚠ PyTorch .bin weight loading (requires Python conversion to SafeTensors)
-# ✗ Tokenizer support (use Transformers.jl instead)
+# Status is stated honestly by capability, not as a flat "✓ done" list — the
+# offline core is wired into Axiom and exercised by the test suite
+# (test/integrations/huggingface_tests.jl); the hub-fetch layer requires the
+# network and is therefore NOT exercised in CI.
 #
-# Recommended Workflow:
-# 1. Export HF model to ONNX: model.save_pretrained("model", export=True)
-# 2. Import via Axiom: model = load_onnx("model/model.onnx")
-# 3. Verify: verify(model, properties=[FiniteOutput(), ValidProbabilities()])
+# WIRED + TESTED (offline, network-free):
+#   - Architecture detection from a config Dict (detect_architecture).
+#   - Model building into an Axiom Pipeline for BERT / GPT-2 / RoBERTa / ViT /
+#     ResNet / Llama / Whisper, plus a generic-transformer fallback
+#     (build_model_from_config and the build_* builders).
+#   - SafeTensors dtype mapping and header parsing (_safetensors_dtype,
+#     _load_safetensors!); pickle-free.
+#   - A structural verification report (verify_imported_model).
 #
-# Future Work:
-# - Full PyTorch .bin weight loading
-# - Complete architecture builders (GPT-2, ViT, ResNet)
-# - Integrated tokenizer support
-# - Quantization-aware conversion
-# - Model card parsing for metadata
+# PRESENT, requires network (NOT exercised in CI):
+#   - Hub metadata fetch (get_model_info) and file download (download_file),
+#     and the from_pretrained orchestrator that drives them. These need network
+#     access and, for private models, the AXIOM_HF_TOKEN environment variable.
+#   - SHA256 checksum verification of a downloaded file (verify_model_hash).
+#
+# NOT implemented (honest gaps, not silent failures):
+#   - Tokenizers — use Transformers.jl (load_tokenizer is a documented stub).
+#   - PyTorch .bin (Python pickle) weight loading — convert to SafeTensors first.
+#   - The `@prove` lines inside verify_imported_model are PLACEHOLDER comments,
+#     not active proofs; do not treat that report as formal verification.
+#
+# Roadmap: full .bin support, richer architecture builders, integrated
+# tokenizers, quantization-aware conversion, model-card metadata parsing.
 
 module HuggingFaceCompat
 
 using HTTP
-using JSON3
+using JSON
 using SHA
 using ..Axiom
+# Explicitly bring in the Axiom internals this module uses that are not part of
+# Axiom's exported surface (so `using ..Axiom` alone would not see them):
+#   Pipeline      — the layer-container type (`const Sequential = Pipeline`)
+#   AbstractLayer — element type of the layer vectors the builders assemble
+#   parameters    — per-layer parameter accessor used by the weight loaders
+using ..Axiom: Pipeline, AbstractLayer, parameters
 
-export from_pretrained, load_tokenizer, verify_model
+# Public surface. (`verify_model` was previously exported but never defined —
+# an undefined export; removed. Hash verification is `verify_model_hash`, kept
+# internal to the submodule.)
+export from_pretrained, load_tokenizer
 
 # HuggingFace Hub API endpoint
 const HF_HUB_URL = "https://huggingface.co"
@@ -110,7 +124,7 @@ function from_pretrained(
     end
 
     # Load configuration
-    config = JSON3.read(read(config_path, String))
+    config = JSON.parse(read(config_path, String))
 
     # Convert architecture
     architecture = detect_architecture(config)
@@ -175,14 +189,14 @@ function get_model_info(model_id::String, revision::String)
 
     try
         response = HTTP.get(url, headers=headers)
-        data = JSON3.read(String(response.body))
+        data = JSON.parse(String(response.body))
 
         ModelInfo(
             model_id,
             revision,
-            get(data, :architecture, "unknown"),
-            get(data, :num_parameters, 0),
-            get(data, :sha256, ""),
+            get(data, "architecture", "unknown"),
+            get(data, "num_parameters", 0),
+            get(data, "sha256", ""),
             ""
         )
     catch e
@@ -239,16 +253,16 @@ Detect model architecture from config.
 """
 function detect_architecture(config)
     # Check for architecture hints in config
-    if haskey(config, :model_type)
-        return String(config.model_type)
+    if haskey(config, "model_type")
+        return String(config["model_type"])
     end
 
-    if haskey(config, :architectures) && !isempty(config.architectures)
-        return String(config.architectures[1])
+    if haskey(config, "architectures") && !isempty(config["architectures"])
+        return String(config["architectures"][1])
     end
 
     # Heuristics based on config structure
-    if haskey(config, :num_hidden_layers) && haskey(config, :num_attention_heads)
+    if haskey(config, "num_hidden_layers") && haskey(config, "num_attention_heads")
         return "transformer"
     end
 
@@ -288,11 +302,11 @@ end
 Build BERT architecture.
 """
 function build_bert(config)
-    hidden_size = get(config, :hidden_size, 768)
-    num_layers = get(config, :num_hidden_layers, 12)
-    num_heads = get(config, :num_attention_heads, 12)
-    intermediate_size = get(config, :intermediate_size, 3072)
-    vocab_size = get(config, :vocab_size, 30522)
+    hidden_size = get(config, "hidden_size", 768)
+    num_layers = get(config, "num_hidden_layers", 12)
+    num_heads = get(config, "num_attention_heads", 12)
+    intermediate_size = get(config, "intermediate_size", 3072)
+    vocab_size = get(config, "vocab_size", 30522)
     head_dim = hidden_size ÷ num_heads
 
     @info "Building BERT model" hidden_size num_layers num_heads vocab_size
@@ -330,10 +344,10 @@ end
 Build GPT-2 architecture.
 """
 function build_gpt2(config)
-    hidden_size = get(config, :n_embd, 768)
-    num_layers = get(config, :n_layer, 12)
-    vocab_size = get(config, :vocab_size, 50257)
-    max_seq_len = get(config, :n_positions, 1024)
+    hidden_size = get(config, "n_embd", 768)
+    num_layers = get(config, "n_layer", 12)
+    vocab_size = get(config, "vocab_size", 50257)
+    max_seq_len = get(config, "n_positions", 1024)
     intermediate_size = hidden_size * 4
 
     @info "Building GPT-2 model" hidden_size num_layers vocab_size
@@ -379,14 +393,14 @@ end
 Build Vision Transformer architecture.
 """
 function build_vit(config)
-    hidden_size = get(config, :hidden_size, 768)
-    num_layers = get(config, :num_hidden_layers, 12)
-    num_heads = get(config, :num_attention_heads, 12)
-    intermediate_size = get(config, :intermediate_size, 3072)
-    image_size = get(config, :image_size, 224)
-    patch_size = get(config, :patch_size, 16)
-    num_channels = get(config, :num_channels, 3)
-    num_labels = get(config, :num_labels, 1000)
+    hidden_size = get(config, "hidden_size", 768)
+    num_layers = get(config, "num_hidden_layers", 12)
+    num_heads = get(config, "num_attention_heads", 12)
+    intermediate_size = get(config, "intermediate_size", 3072)
+    image_size = get(config, "image_size", 224)
+    patch_size = get(config, "patch_size", 16)
+    num_channels = get(config, "num_channels", 3)
+    num_labels = get(config, "num_labels", 1000)
 
     num_patches = (image_size ÷ patch_size)^2
 
@@ -421,12 +435,12 @@ Build ResNet architecture.
 """
 function build_resnet(config)
     # ResNet config may use different key names depending on HF model card
-    num_channels = get(config, :num_channels, 3)
-    num_labels = get(config, :num_labels, 1000)
+    num_channels = get(config, "num_channels", 3)
+    num_labels = get(config, "num_labels", 1000)
 
     # Detect ResNet variant from config
-    depths = get(config, :depths, [3, 4, 6, 3])  # ResNet-50 default
-    hidden_sizes = get(config, :hidden_sizes, [256, 512, 1024, 2048])
+    depths = get(config, "depths", [3, 4, 6, 3])  # ResNet-50 default
+    hidden_sizes = get(config, "hidden_sizes", [256, 512, 1024, 2048])
 
     @info "Building ResNet model" depths hidden_sizes
 
@@ -467,13 +481,13 @@ end
 Build LLaMA architecture (decoder-only transformer with RMSNorm and SwiGLU MLP).
 """
 function build_llama(config)
-    hidden_size = get(config, :hidden_size, 4096)
-    num_layers = get(config, :num_hidden_layers, 32)
-    num_heads = get(config, :num_attention_heads, 32)
-    intermediate_size = get(config, :intermediate_size, 11008)
-    vocab_size = get(config, :vocab_size, 32000)
+    hidden_size = get(config, "hidden_size", 4096)
+    num_layers = get(config, "num_hidden_layers", 32)
+    num_heads = get(config, "num_attention_heads", 32)
+    intermediate_size = get(config, "intermediate_size", 11008)
+    vocab_size = get(config, "vocab_size", 32000)
     # num_key_value_heads for GQA (defaults to num_heads for MHA)
-    num_kv_heads = get(config, :num_key_value_heads, num_heads)
+    num_kv_heads = get(config, "num_key_value_heads", num_heads)
 
     @info "Building LLaMA model" hidden_size num_layers num_heads num_kv_heads vocab_size
 
@@ -513,15 +527,15 @@ end
 Build Whisper architecture (encoder-decoder transformer for speech recognition).
 """
 function build_whisper(config)
-    d_model = get(config, :d_model, 512)
-    encoder_layers = get(config, :encoder_layers, 6)
-    decoder_layers = get(config, :decoder_layers, 6)
-    encoder_attention_heads = get(config, :encoder_attention_heads, 8)
-    decoder_attention_heads = get(config, :decoder_attention_heads, 8)
-    encoder_ffn_dim = get(config, :encoder_ffn_dim, 2048)
-    decoder_ffn_dim = get(config, :decoder_ffn_dim, 2048)
-    vocab_size = get(config, :vocab_size, 51865)
-    num_mel_bins = get(config, :num_mel_bins, 80)
+    d_model = get(config, "d_model", 512)
+    encoder_layers = get(config, "encoder_layers", 6)
+    decoder_layers = get(config, "decoder_layers", 6)
+    encoder_attention_heads = get(config, "encoder_attention_heads", 8)
+    decoder_attention_heads = get(config, "decoder_attention_heads", 8)
+    encoder_ffn_dim = get(config, "encoder_ffn_dim", 2048)
+    decoder_ffn_dim = get(config, "decoder_ffn_dim", 2048)
+    vocab_size = get(config, "vocab_size", 51865)
+    num_mel_bins = get(config, "num_mel_bins", 80)
 
     @info "Building Whisper model" d_model encoder_layers decoder_layers vocab_size
 
@@ -632,7 +646,7 @@ function _load_safetensors!(model, path::String)
     data = read(path)
     header_size = reinterpret(UInt64, data[1:8])[1]
     header_json = String(data[9:8+header_size])
-    header = JSON3.read(header_json)
+    header = JSON.parse(header_json)
     tensor_data_start = 8 + header_size
 
     # Build name → array mapping
@@ -641,9 +655,9 @@ function _load_safetensors!(model, path::String)
         name_str = String(name)
         name_str == "__metadata__" && continue
 
-        dtype_str = String(meta.dtype)
-        shape = Tuple(meta.shape)
-        offsets = meta.data_offsets  # [start, end] relative to tensor data
+        dtype_str = String(meta["dtype"])
+        shape = Tuple(meta["shape"])
+        offsets = meta["data_offsets"]  # [start, end] relative to tensor data
 
         # Parse dtype
         T = _safetensors_dtype(dtype_str)
@@ -731,7 +745,7 @@ function _set_layer_param!(layer, param_name::Symbol, data::Array)
 end
 
 function _load_json_weights!(model, path::String)
-    data = JSON3.read(read(path, String))
+    data = JSON.parse(read(path, String))
     tensors = Dict{String, Array}()
     for (name, tensor_data) in pairs(data)
         if tensor_data isa AbstractVector

@@ -253,8 +253,13 @@ model = from_pytorch("model.pytorch.json")
 
 ### HuggingFace
 
-HuggingFace direct import remains a roadmap item and is not a shipped API in
-the current baseline.
+HuggingFace support is wired into Axiom (`Axiom.HuggingFaceCompat`). The
+offline core — architecture detection, model building into an Axiom `Pipeline`
+(BERT/GPT-2/RoBERTa/ViT/ResNet/Llama/Whisper), and SafeTensors weight loading —
+is shipped and exercised by the test suite. The network hub-fetch path
+(`from_pretrained` downloading by model id) is present but requires network
+access (and `AXIOM_HF_TOKEN` for private models), so it is not exercised in CI.
+Tokenizers are not implemented (use Transformers.jl).
 
 Current recommended path:
 
@@ -491,7 +496,7 @@ upload_blob("models", "axiom/model.axiom", "model.axiom")
 | ONNX | ⚠ Beta | Export API shipped for Dense/Conv/Norm/Pool + activation Sequential/Pipeline subset |
 | PyTorch | ⚠ Beta | Import API shipped for canonical JSON descriptor + direct `.pt/.pth/.ckpt` bridge |
 | TensorFlow | ⚠ Beta | Via ONNX |
-| HuggingFace | ⚠ Beta | Selected models |
+| HuggingFace | ⚠ Beta | Offline import wired + tested (config→architecture→build + SafeTensors); hub-fetch present but requires network |
 | **Tracking** | | |
 | MLflow | ✓ Stable | Full support |
 | W&B | ✓ Stable | Full support |

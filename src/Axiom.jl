@@ -132,6 +132,7 @@ include("serving/api.jl")
 
 # Integrations
 include("integrations/interop.jl")
+include("integrations/huggingface.jl")  # HuggingFace model import (G06: wired; hub-fetch needs network, offline import/build/verify is exercised)
 
 # Re-exports for user convenience
 export @axiom, @ensure, @prove, @no_grad
