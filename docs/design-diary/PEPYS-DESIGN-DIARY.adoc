@@ -1,0 +1,273 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= The Samuel Pepys of Design — Axiom.jl Flagship Initiative
+Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+:toc: left
+:sectnums:
+:icons: font
+
+A running, candid design diary for the initiative to make *Axiom.jl* the
+hyperpolymath estate's Julia flagship and measuring-stick, with the
+*julia-professional-registry* infrastructure and the *julianiser* tooling
+ultra-completed around it. In the spirit of Pepys: dated entries, honest about
+what was tried, what worked, what didn't, and why each decision was taken.
+
+Doctrine in force (from `standards`, `rsr-template-repo`, `cicd-squabbler`):
+holes-before-features; fixes-first-on-firm-foundations; fail-loudly-seal-soundly;
+distrust-the-neural-for-exactness; squabble-don't-bypass; *no automated licence
+edits — ever*; wire-first; report-faithfully-no-overclaim; stop-first on
+costly/outward-facing actions; boundaries are real (IS / IS-NOT).
+
+Orchestration model for this initiative (the agentic-design demonstration):
+*Opus (me) orchestrates and synthesises*; *Sonnet* runs the deep repo audits and
+web research; *Haiku* runs mechanical inventory/extraction. Every non-trivial
+decision is logged here and, where exactness matters (licences, invariants,
+equivalence), deferred to formal tooling rather than model judgement.
+
+== Entry 0001 — 2026-07-01 — Kickoff & ground-truth
+
+*Present:* Opus (orchestrator), user (Jonathan).
+
+*Mission (verbatim intent):* ultra-complete the Julia professional registry
+infrastructure and the Julianiser on this run; bring Axiom.jl to utter
+completeness across systems, compliance, effects, and corrective/adaptive/
+perfective maintenance — all claimed and planned features present and correct;
+documentation complete; licensing unambiguous; fully panic-attacked, proven,
+defensible, and coherent within the wider Julia ecosystem, backed by every
+estate capability that can strengthen it. End state: Axiom.jl is the estate's
+Julia flagship and the measuring-stick for all other estate Julia libraries.
+Do this as a demonstration of best-practice agentic design.
+
+*Ground-truth established this session (ran the tools, did not trust docs):*
+
+* All 15 in-scope repos are present on disk under `/home/user`. Nothing missing.
+* *Axiom.jl* — real library, not a scaffold. `Project.toml` name=Axiom,
+  uuid=bbd403f8-…, version=1.0.0, license=MPL-2.0. Subsystems on disk:
+  `types/` `layers/` `autograd/` `training/` `verification/` `dsl/` `backends/`
+  `serving/` `integrations/` `Abi/*.idr` (Idris2 ABI) + `ffi/` + `zig/`.
+  Weakdeps declare CUDA/AMDGPU/Metal/PyCall/SMTLib extensions. Rich `test/ci/`
+  suite (gpu/tpu/npu required-mode, backend parity, certificate integrity,
+  proof-bundle reconciliation, verification telemetry).
+* *julia-professional-registry* — live registry. `Registry.toml`
+  name=JuliaProfessionalRegistry, uuid=2ba92a00-…,
+  repo=github.com/hyperpolymath/HyperpolymathRegistry.git. ~31 packages across
+  A–Z buckets; Axiom is registered (A/Axiom). Has contractiles + CI.
+  NOTE: `Registry.toml` repo URL points at `HyperpolymathRegistry.git`, but the
+  in-scope forge is `hyperpolymath/julia-professional-registry` — possible
+  naming/repo-URL drift to resolve (FLAG, do not assume).
+* *julianiser* — Rust CLI scaffold (auto-wrap Python/R pipelines into Julia).
+  Has `src/{abi,codegen,manifest,...}`, a populated `verification/` tree
+  (proofs/tests/coverage/fuzzing/simulations/safety_case/benchmarks/
+  traceability), and a full `.github/workflows/` set.
+* *Toolchain bare*: julia, z3, cvc5, idris2, agda, lean, coqc, zig, deno, guile,
+  just, gh all ABSENT at session start. Only cargo + git present. Toolchain
+  install kicked off (juliaup LTS 1.10, z3, cvc5, zig).
+
+*Licensing stance fixed up front (from `standards` canon):* Axiom.jl, the
+registry, and julianiser are sole-owner repos ⇒ *MPL-2.0* (code) +
+*CC-BY-SA-4.0* (docs). None are the 007 (ARR), son-shared (AGPL), or
+Palimpsest (PMPL) carve-outs. Therefore licensing work = *verify + complete +
+FLAG drift only*. Absolutely no bulk SPDX sweeps, no relicensing PRs without
+owner approval. New files I author carry correct SPDX from birth (that is
+authoring, not relicensing).
+
+*Development branch (all repos):* `claude/axiom-jl-registry-infra-kr7t4a`.
+
+*Actions taken:*
+. Ground-truth recon of the three core repos + toolchain (done).
+. Background toolchain install started (Julia/z3/cvc5/zig).
+. Launched understand+research workflow: 4 sonnet repo/estate audits +
+  1 haiku mechanical inventory + 2 sonnet web-research agents (agentic-design
+  best practice; Julia-registry & flagship-library best practice), then an
+  opus synthesis into a gap register + phased ultraplan + decision forks.
+
+*Open questions to put to the user (next entry will record answers):* canonical
+home for this diary; how aggressive to be on Axiom "planned" features vs
+"shipped"; registry repo-URL/name drift; whether to gate on real prover runs.
+
+*Next:* synthesise the workflow output into the ULTRAPLAN, present decision
+forks, get sign-off, then execute phase-by-phase on the branch above.
+
+== Entry 0002 — 2026-07-01 — Foundation ground-truth (ran the tool, did not trust the docs)
+
+*Toolchain install: full success.* Julia 1.10.11 (LTS), Z3 4.8.12, cvc5 1.3.4,
+Zig 0.13.0 all on PATH.
+
+*Axiom.jl builds and passes clean under fresh Julia:*
+`Pkg.instantiate()` OK → `Pkg.precompile()` OK (94 deps, ~70s) →
+`using Axiom` OK → *`Pkg.test()` = 642/642 PASS in 1m35s.* The flagship
+foundation is solid, not broken. This is a strong starting point.
+
+*BUT running it surfaced four holes invisible to code-reading — captured now
+so we fix holes-before-features (doctrine #1):*
+
+. *SMT runner test SILENTLY SKIPPED* — log line `Skipping SMT runner test; no
+  solver available` even though z3+cvc5 are installed. Root cause: the
+  `AxiomSMTExt` extension triggers on the `SMTLib` weakdep, which lives in the
+  professional registry; that registry FAILED to add (see #4), so the extension
+  never loaded and the test self-skipped. This is a "no silent green"
+  violation: a claimed capability (SMT-backed verification) is unexercised.
+. *Proofs are EXPORTED but not CHECKED* — the suite emits
+  `softmax_norm.lean`, `.v` (Coq), `.thy` (Isabelle), and a `.proof`
+  certificate, but nothing runs a proof assistant over them. Export ≠ verified.
+  Per "distrust-the-neural-for-exactness", a proof that is only emitted is not
+  a proof. → installing Coq/Agda/Lean/Idris2 now to actually check them.
+. *Backend fallback fires quietly* — `TPU device 4 out of range (available:
+  0:1), falling back to Julia backend`. Need to confirm the GPU/TPU/NPU
+  backends are real vs simulated, and that fallback is loud + certificate-aware.
+. *Professional registry cannot be added as a Julia registry* — cloning it as
+  a registry fails with a git ODB error: `object not found - no match for id
+  (a7be00f811ff2a963b68140d0c30af1dddbe21e7)`. The registry's git state is
+  broken for clone-as-registry (the primary way downstream users would consume
+  it via `Pkg.Registry.add`). CRITICAL registry foundation hole — a registry
+  that can't be added isn't a registry.
+
+*Decision inputs this produces:* (a) SMT + proof-checking must be wired to run
+for real (kills silent-skip); (b) registry git integrity must be repaired and
+verified by an actual `Pkg.Registry.add` round-trip; (c) proof-assistant infra
+is in-scope (installing now). Whether CI hard-gates on real prover execution
+remains a user fork.
+
+*Action:* background-installing Coq, Agda, Lean (elan), Idris2 so the
+proof-verification hole can be closed with real checkers.
+
+*Provers landed:* Coq 8.18.0, Agda 2.6.3, Lean (elan stable) — with Z3/cvc5.
+Idris2 ABSENT (no apt package on Ubuntu noble; source/Chez bootstrap deferred —
+flagged, so Axiom/julianiser Idris2 ABI typecheck becomes CI-only or a scoped
+build task, never a string-match proxy). Isabelle deferred (~1GB+).
+
+== Entry 0003 — 2026-07-01 — Understand workflow landed; ULTRAPLAN drafted
+
+The 8-agent workflow (4 Sonnet audits + 1 Haiku inventory + 2 Sonnet research +
+1 Opus synthesis; ~1.0M tokens, 340 tool calls) returned a ground-truthed
+gap register (41 items), a 9-phase plan (P0–P8), 6 decision forks, estate-wiring
+steps, and risks. Persisted to `ULTRAPLAN.adoc` + `GAP-REGISTER.md` (living
+tracker) in the coordination workspace.
+
+*Headline: Axiom is real and 642/642-green but ships 3 confirmed soundness holes*
+(forgeable cert falsely labelled SHA256-HMAC; `has_safe_operations()==true`
+vacuous NoNaN "proof"; proof-import verifying by regex-absence of `sorry`) plus
+a dead-code/doc knot (`huggingface.jl`). Registry has 2 critical Pkg-resolution
+breakers (repo-URL drift; JuliaKids/JuliaForChildren name↔UUID mismatch) and a
+flag-only PMPL-drift in NOTICE. julianiser has 2 critical codegen bugs +
+unwired ABI/FFI scaffolding.
+
+*Decision to present to owner (4 forks asked, 2 defaulted):* canonical registry
+identity; how far to push planned features; cert relabel-vs-sign; CI real-prover
+gating. Defaults taken (owner may override): diary/ADR home = both per-repo
+`docs/decisions/` + a `standards` index; Julia matrix = 1.10 LTS floor + `1` +
+nightly(non-blocking).
+
+*Method locked in (from the agentic-design research):* holes-first ordering;
+Opus adjudicates every "proven"/"done" via an independent fresh-context
+adversarial pass (assume-false-until-proven, re-run the command, diff exit
+criteria) — no self-grading; pilot the loop on a small slice (Axiom cert-hole +
+registry repo-URL) before fanning out; condensed hand-off reports; disjoint
+worker file-sets; licence files strictly no-touch except birth-authoring.
+
+*Next:* get the 4 fork answers, then execute — P0 finish (build panic-attack) →
+pilot P1/P2 slice → adversarial verify → scale across phases, committing to
+`claude/axiom-jl-registry-infra-kr7t4a` per repo.
+
+== Entry 0004 — 2026-07-01 — Owner forks + the estate trust/crypto ground-truth
+
+*Owner decisions:* registry canonical identity = *JuliaProfessionalRegistry*
+(keep as registry `name`; point `repo` at the real julia-professional-registry
+remote — name≠slug in Julia, so NO GitHub rename needed; sweep ~20 stale
+"HyperpolymathRegistry" mentions, old name → CLADE aliases). Feature scope =
+*push planned features* (coprocessor kernels / ONNX / HuggingFace; hardware
+kernels implementable but only hardware-CI-verifiable — never claimed green from
+this GPU-less box). CI = *hard-gate everything* (real Idris2/SMT/doctest/
+RegistryCI execution; Idris2 local build blocked by proxy 403 → CI-only, retry
+release-tarball). Certificate = discussion (below).
+
+*Builds:* panic-attack built (full CLI). Idris2 local build FAILED (proxy 403 on
+idris-lang git clone; my net scope is hyperpolymath/*) → Idris2 gate is CI-only.
+
+*The crypto/Trustfile discovery (major).* The owner surfaced `proven`'s
+Trustfile as "the estate trust scheme Mistral set out." Ground-truthed:
+* There are TWO senses of "Trustfile" in the estate: (a) the RSR *agent-trust +
+  integrity-invariant* contractile (Axiom already has one: trust-level=standard,
+  no-secrets/no-private-keys invariants, protected semantic-authority surfaces);
+  (b) the *cryptographic* trust spec (proven's rich one).
+* proven's Trustfile is an excellent *spec* but 100% PLACEHOLDERS — declared,
+  not instantiated; every key/hash/sig is `BASE64_...`. "status: proven" is
+  aspirational (ProvenCrypto.jl spec = 0% proof coverage).
+* REAL implementation EXISTS IN SCOPE: `odds-and-sods-package-manager`
+  `opsm_pq_nif` (Rust, `#![forbid(unsafe_code)]`) binds vetted `pqcrypto` crates:
+  Dilithium5 (ML-DSA-87/FIPS204), SPHINCS+-256f-SHAKE (SLH-DSA/FIPS205),
+  Kyber1024 (ML-KEM/FIPS203). Elixir `HybridSignatures` = Ed25519+Dilithium5,
+  both-must-verify, honest fallback modes, e2e-tested.
+* DIVERGENCE: spec says *Ed448*; the only built+tested impl uses *Ed25519*.
+  Per "solutions-at-source" this is the owner's estate-wide reconciliation call.
+* Axiom already declares `integrations/proven.a2ml` (uses proven SafeCrypto,
+  thin-ffi-wrapper). ProvenCrypto.jl is the intended Julia home but 0%-proven +
+  source out-of-scope.
+
+*Design decision (provisional, pending owner):* Axiom's certificate reuses the
+vetted `pqcrypto` crates behind its existing Rust/Zig FFI (no hand-roll, no dep
+on unfinished ProvenCrypto.jl), producing a real Trustfile-conforming hybrid
+signature; cert hashing moves SHA-256 → SHA3-512/SHAKE256/BLAKE3; Kyber1024 KEM
+envelope added (owner approved confidentiality). This makes Axiom the FIRST repo
+to instantiate the estate trust standard for real — the flagship exemplar.
+Open owner forks: classical curve (Ed448 vs Ed25519); crypto provider approach.
+The false `SHA256-HMAC` label is closed immediately regardless.
+
+== Entry 0005 — 2026-07-01 — Pilot slice landed + verified + PR #46
+
+Proceeded on doctrine-consistent crypto defaults (AskUserQuestion tool stream
+dropped; owner said "continue"): classical curve = Ed448 (honor spec; flag
+opsm's Ed25519 as drift); provider = reuse vetted `pqcrypto` crates behind
+Axiom's FFI. Both overridable.
+
+*Pilot executed inline (opus) to prove the loop before fanning out (per risk
+register), on the scheme-INDEPENDENT holes:*
+* G02 (checker.jl) — `has_safe_operations()` bare `true` removed; NoNaN no longer
+  vacuously `:proven`, routes to empirical. FIXED + verified.
+* G01 relabel (certificates.jl) — false `"SHA256-HMAC"` label over an unkeyed
+  digest removed; now honest `algorithm=SHA-256, kind=content-digest,
+  authenticated=false` + note. Docstrings corrected. Hybrid Ed448+Dilithium5
+  authenticating signature = tracked follow-up. RELABEL done + verified.
+* Added `test/verification/soundness_tests.jl` to the main suite (guards both).
+
+*Ground-truthed verification (ran the tools, no self-grade):* `Pkg.test()` =
+*651/651 pass* (642 + 9 new); `test/ci/certificate_integrity.jl` = *6/6 pass*.
+
+*Committed* bdb9244 to `claude/axiom-jl-registry-infra-kr7t4a`; pushed; opened
+*draft PR hyperpolymath/Axiom.jl#46*. Subscribed to PR activity (watch CI +
+reviews to merge/close).
+
+*Loop proven.* Next: scale to the remaining Axiom P1 holes (G03 proof-import
+theorem-presence; G04 @prove relabel; G05 Idris2 ABI↔zig) and the registry P2
+criticals (G20 repo-URL, G21 JuliaKids↔JuliaForChildren) — now safe to fan out
+sonnet workers on disjoint files with opus adversarial verify. The big hybrid-
+signing (G01 auth) is its own Rust/FFI chunk.
+
+== Entry 0006 — 2026-07-01 — Parallel fan-out wave merged; follow-up on fresh main
+
+*Orchestration demonstration ran:* three parallel Sonnet workers (one per repo,
+disjoint working trees), each closing that repo's critical holes with real-tool
+verification, then *Opus adversarially re-verified every result independently*
+(re-ran Pkg.test / cargo test / zig build from clean, reviewed git diffs, checked
+no licence files touched) BEFORE any commit. All three passed and were pushed as
+draft PRs.
+
+*Owner merged all three* (squash): Axiom #46 (pilot G01-relabel + G02), registry
+#40 (G20 repo-URL, G21 JuliaKids→JuliaForChildren), julianiser #48
+(G30 bracket-depth, G31 scope-model, G32 FFI honest-relabel, G33 Zig-0.13 build).
+Branches auto-deleted on squash.
+
+*Axiom worker also delivered G03/G04/G05* (proof-import theorem-presence check;
+@prove honest relabel; Idris2-ABI illustrative-scaffold labelling + flagged the
+orphan ffi/zig tree with zero axiom_* exports as a KNOWN ISSUE). Verified
+670/670. Because #46 was squash-merged, the branch was RESTARTED from fresh main
+and only the G03/G04/G05 commit replayed (no stacking on merged history), plus
+this diary + ULTRAPLAN promoted into docs/design-diary/ for the online record.
+A NEW PR carries this follow-up.
+
+*Gap status (verified/fixed):* G01(relabel), G02, G03, G04, G20, G21, G30, G31,
+G32, G33. G05 = honest relabel done; full ABI↔zig connection deferred (Idris2
+CI-only). Registry Pkg-add round-trip = CI-only (sandbox libgit2 quirk).
+
+*Method held:* holes-first; ran the tools not the docs; no self-grade (opus
+independent verify); no licence edits; birth-SPDX on new files; pushed + PR'd
+each repo so nothing lives only on local disk.
