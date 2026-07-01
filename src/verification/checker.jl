@@ -276,12 +276,12 @@ function try_static_verify(prop::Property, model)
         end
     end
 
-    if prop isa NoNaN
-        # Check for NaN-producing operations
-        if has_safe_operations(model)
-            return :proven
-        end
-    end
+    # NoNaN is intentionally NOT statically proven here. A sound static NoNaN
+    # proof needs BOTH structural operation-safety (see `has_safe_operations`)
+    # AND a finite-input guarantee, and inputs cannot be constrained statically.
+    # Returning :proven from structure alone was a soundness hole (every model
+    # was vacuously "proven" NaN-safe), so NoNaN routes to empirical checking.
+    # Planned input-range analysis (see ROADMAP.adoc) would enable a sound proof.
 
     :unknown
 end
@@ -316,11 +316,18 @@ function has_bounded_output(model, low, high)
 end
 
 """
-Check if model uses only NaN-safe operations.
+Whether `model` uses only NaN/Inf-safe operations. This is a NECESSARY but not
+SUFFICIENT condition for NaN-freedom (finite inputs are also required and cannot
+be established statically), so it must never be used on its own to claim a
+NoNaN proof — see `try_static_verify`.
+
+A real structural graph analysis is planned (see ROADMAP.adoc). Until it lands
+this makes NO safety claim and returns `false`, so NoNaN is checked empirically
+rather than via a vacuous static "proof". (Previously this returned `true`
+unconditionally — a soundness hole that reported every model as NaN-safe.)
 """
 function has_safe_operations(model)
-    # Simplified check - real implementation would analyze graph
-    true
+    false
 end
 
 """
