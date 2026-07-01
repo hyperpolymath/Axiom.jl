@@ -761,6 +761,10 @@ with open(args.output, "w", encoding="utf-8") as f:
     include("e2e_test.jl")
     include("property_test.jl")
 
+    # Quality gates (G07): static/dynamic analysis of Axiom's own code.
+    include("aqua.jl")
+    include("jet.jl")
+
 end
 
 println("\nAll tests passed!")

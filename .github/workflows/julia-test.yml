@@ -1,0 +1,106 @@
+# SPDX-License-Identifier: MPL-2.0
+# SPDX-FileCopyrightText: 2025-2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+
+# Julia test gate (required check).
+#
+# `ci.yml`'s `julia-compat` job runs `Pkg.test()` but never builds the
+# hybrid Ed448+Dilithium5 crypto cdylib (crypto/), so
+# `test/verification/hybrid_signing_tests.jl` always takes the
+# `@test_skip` branch there and the real signing path is never exercised
+# in CI. This workflow builds the crypto shim first so those tests
+# actually run, and also runs the new Aqua/JET quality-gate testsets
+# (test/aqua.jl, test/jet.jl).
+#
+# Per the estate required-check rule: no `on.*.paths` filter on a required
+# gate -- a path-filtered required workflow that never triggers is
+# reported as permanently "Expected" and blocks merges. This workflow
+# always runs.
+
+name: Julia Test Gate
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 0 * * 0'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  JULIA_NUM_THREADS: 2
+
+jobs:
+  test:
+    name: Julia ${{ matrix.julia-version }} (crypto-enabled) - ubuntu-latest
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 1.10 is the LTS floor declared in Project.toml's `[compat] julia`;
+        # '1' resolves to the current stable release.
+        julia-version: ['1.10', '1']
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9 # stable
+
+      - name: Cache Cargo (crypto shim)
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            crypto/target
+          key: ${{ runner.os }}-cargo-crypto-${{ hashFiles('crypto/Cargo.lock') }}
+
+      - name: Build hybrid-signing crypto cdylib
+        run: cd crypto && cargo build --release
+
+      - uses: julia-actions/setup-julia@4c0cb0fce8556fdb04a90347310e5db8b1f98fb9 # v2
+        with:
+          version: ${{ matrix.julia-version }}
+
+      - uses: julia-actions/cache@e33b4bfa0ea7cd9caedd7cb82b0e36956ef40285 # v2
+
+      - name: Instantiate / Build / Precompile / Test
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile(); Pkg.test()'
+
+  test-nightly:
+    name: Julia nightly (crypto-enabled) - ubuntu-latest
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9 # stable
+
+      - name: Cache Cargo (crypto shim)
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            crypto/target
+          key: ${{ runner.os }}-cargo-crypto-${{ hashFiles('crypto/Cargo.lock') }}
+
+      - name: Build hybrid-signing crypto cdylib
+        run: cd crypto && cargo build --release
+
+      - uses: julia-actions/setup-julia@4c0cb0fce8556fdb04a90347310e5db8b1f98fb9 # v2
+        with:
+          version: nightly
+
+      - uses: julia-actions/cache@e33b4bfa0ea7cd9caedd7cb82b0e36956ef40285 # v2
+
+      - name: Instantiate / Build / Precompile / Test
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile(); Pkg.test()'

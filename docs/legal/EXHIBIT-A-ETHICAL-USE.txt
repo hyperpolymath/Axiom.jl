@@ -1,0 +1,34 @@
+SPDX-License-Identifier: MPL-2.0
+
+================================================================================
+EXHIBIT A — SOURCE CODE FORM LICENSE NOTICE
+Mozilla Public License Version 2.0
+Axiom.jl
+================================================================================
+
+  This Source Code Form is subject to the terms of the Mozilla Public
+  License, v. 2.0. If a copy of the MPL was not distributed with this
+  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+If it is not possible or desirable to put the notice in a particular file,
+then You may include the notice in a location (such as a LICENSE file) where
+a recipient would be likely to look for such a notice.
+
+You may add additional accurate notices of copyright ownership.
+
+Axiom.jl is dual-licensed at the artefact level, per REUSE conventions:
+
+  - Source code (Julia, Rust, Zig, Idris2) is MPL-2.0. This covers `src/`,
+    `ext/`, `crypto/`, `zig/`, `ffi/`, `packages/SMTLib.jl/`, `scripts/`,
+    `test/`, `benchmark/`, and the axiom-abi.ipkg / Justfile / Mustfile
+    build definitions.
+  - Prose documentation (this exhibit's sibling `.adoc` files under `docs/`,
+    and Markdown files that are the GitHub-wiki mirror under `docs/wiki/`)
+    is CC-BY-SA-4.0 unless a file's own SPDX header states otherwise.
+
+Full license texts are at `LICENSE` (root) and `LICENSES/MPL-2.0.txt`,
+`LICENSES/CC-BY-SA-4.0.txt`.
+
+================================================================================
+END OF EXHIBIT A
+================================================================================

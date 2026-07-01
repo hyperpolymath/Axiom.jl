@@ -1,0 +1,88 @@
+# SPDX-License-Identifier: MPL-2.0
+# k9iser manifest — wrap configs into self-validating K9 contracts
+#
+# Axiom.jl: Julia ML/numerics framework with a Zig compute layer
+# (zig/, ffi/zig/), a formally-specified Idris2 ABI (src/Abi/,
+# axiom-abi.ipkg), and a Rust cdylib crypto shim (crypto/) implementing the
+# estate hybrid Trustfile scheme (Ed448 classical + Dilithium5/ML-DSA-87
+# post-quantum certificate signing, FIPS 204). Safety-tier "fv" (formal
+# verification) — this repo carries a real formal-ABI surface plus a genuine
+# cryptographic attack surface (FFI boundary + PQ signing), not just
+# numerics; both must be held to formal-verification-adjacent scrutiny.
+
+[project]
+name = "Axiom.jl"
+safety-tier = "fv"  # formal-verification tier — Idris2 ABI + PQ crypto surface
+
+# ── Project.toml — Julia package manifest ────────────────────────────────────
+
+[[configs]]
+name = "julia-package-manifest"
+source = "Project.toml"
+format = "toml"
+must = [
+  "name == 'Axiom'",
+  "uuid is set",
+  "license == 'MPL-2.0'",
+  "authors is non-empty",
+  "version is set",
+  "compat.julia is set",                      # minimum Julia version pinned
+  "no dependency on PyCall unless behind [weakdeps]",  # Python interop is opt-in only, never a hard dep
+  "extensions.AxiomCUDAExt implies weakdeps.CUDA is set",
+  "extensions.AxiomAMDGPUExt implies weakdeps.AMDGPU is set",
+  "extensions.AxiomMetalExt implies weakdeps.Metal is set",
+  "extensions.AxiomSMTExt implies weakdeps.SMTLib is set",
+]
+trust = ["signed-by: ci-pipeline"]
+dust = ["remove: unused weakdeps/extensions pairs"]
+intend = ["production-ready", "registry-ready"]
+
+# ── axiom-abi.ipkg — Idris2 formal ABI package ────────────────────────────────
+
+[[configs]]
+name = "idris2-abi"
+source = "axiom-abi.ipkg"
+format = "ipkg"
+must = [
+  "package == 'axiom-abi'",
+  "sourcedir == 'src'",
+  "modules contains 'Abi.Types'",
+  "modules contains 'Abi.Layout'",
+  "modules contains 'Abi.Foreign'",
+  "depends contains 'base'",
+  "no module uses 'believe_me'",              # unsoundness marker — banned in the ABI surface
+  "no module uses 'assert_total' without a documented termination proof",
+  "typechecks-in-ci == true",                 # axiom-abi.ipkg must be gated by idris2 --typecheck, not just authored
+]
+trust = ["signed-by: ci-pipeline", "typechecked-by: idris2-abi-check"]
+dust = ["remove: unreferenced Abi modules"]
+intend = ["formally-verified-abi", "zero-unsoundness-markers"]
+
+# ── crypto/Cargo.toml — Rust PQ-crypto cdylib shim ───────────────────────────
+
+[[configs]]
+name = "crypto-shim-manifest"
+source = "crypto/Cargo.toml"
+format = "toml"
+must = [
+  "package.name == 'axiom_crypto'",
+  "package.edition == '2021'",
+  "package.license == 'MPL-2.0'",
+  "package.publish == false",                 # cdylib is a build artifact consumed via ccall, never published to crates.io
+  "lib.crate-type contains 'cdylib'",
+  "dependencies.openssl is set",              # Ed448 classical signature via vetted system libcrypto
+  "dependencies.pqcrypto-dilithium is set",   # Dilithium5 / ML-DSA-87 post-quantum signature via PQClean reference impl
+  "no dependency on md5",                     # MD5 banned for security-relevant crate
+  "no dependency on sha1",                    # SHA-1 banned for security-relevant crate
+  "no hand-rolled cryptographic primitives",  # both algorithms MUST come from vetted crates, never reimplemented
+  "profile.release.panic == 'abort'",         # unwinding across the C-ABI/ccall boundary is UB — abort is the defence-in-depth backstop
+  "private keys never read/written to disk by this crate",  # key custody stays out-of-band (HSM / offline signing per ROADMAP.adoc)
+]
+trust = ["signed-by: ci-pipeline"]
+dust = ["remove: unused pqcrypto feature flags"]
+intend = ["production-ready", "quantum-safe", "ffi-boundary-sealed"]
+
+[validation]
+strict = true
+auto-fix = false
+report-format = "text"

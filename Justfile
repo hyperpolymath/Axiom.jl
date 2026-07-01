@@ -86,9 +86,9 @@ status:
     @echo "Zig backend:"
     @test -f zig/zig-out/lib/libaxiom_zig.so && echo "  Built" || echo "  Not built (run: just build-zig)"
 
-# Run panic-attacker pre-commit scan
+# Run panic-attack pre-commit scan (renamed 2026-02-08: panic-attacker -> panic-attack)
 assail:
-    @command -v panic-attack >/dev/null 2>&1 && panic-attack assail . || echo "panic-attack not found — install from https://github.com/hyperpolymath/panic-attacker"
+    @command -v panic-attack >/dev/null 2>&1 && panic-attack assail . || echo "panic-attack not found — install from https://github.com/hyperpolymath/panic-attack"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ONBOARDING & DIAGNOSTICS

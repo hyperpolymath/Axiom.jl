@@ -42,10 +42,46 @@ package submissions. The only thing that rebuilds that trust is honesty.
 - [x] OSI license (MPL-2.0), consistent, REUSE.toml
 - [x] Honest README with usage example + prior-art comparison
 - [x] `Pkg.test()` green (verified repeatedly, incl. post-relicense)
-- [x] Aqua.jl quality gate: unbound-params / undefined-exports /
-      project-extras pass; stale-deps **now clean** (orphaned
-      `src/integrations/huggingface.jl` + its sole-consumer dep `JSON3`
-      removed — they were unreachable dead code)
+- [x] Aqua.jl quality gate: **now a real, wired-in CI gate**
+      (`test/aqua.jl`, included from `test/runtests.jl`), not just a
+      self-assessment claim. `Aqua.test_all(Axiom)` passes with **zero
+      overrides** -- ambiguities, unbound type parameters, undefined
+      exports, project-extras, stale deps, `[compat]` bounds (incl.
+      `julia`), piracy, and persistent tasks all pass clean. Getting there
+      required two real fixes, not exemptions:
+      - Three genuine unbound-type-parameter bugs in
+        `src/layers/normalization.jl` (`LayerNorm`, `InstanceNorm`,
+        `GroupNorm`): their auto-generated default constructors left `T`
+        (and `S`) unbound because the only `T`-typed fields were
+        `Union{_, Nothing}` (nullable when `affine=false`). Fixed with
+        explicit inner constructors that bind `T`/`S` from the type
+        application itself.
+      - The stale `JSON3` dependency (its sole consumer,
+        `src/integrations/huggingface.jl`, is dead code never
+        `include()`d from `src/Axiom.jl`) is now actually removed from
+        `Project.toml`'s `[deps]` -- this bullet had previously been
+        marked done without a real Aqua run to verify it; it was not.
+- [x] JET.jl static analysis gate: **new** (`test/jet.jl`), scoped to
+      Axiom's own code via JET's native `target_modules` config.
+      `report_package(Axiom)` finds 66 possible errors when run
+      unscoped (essentially all rooted in transitive deps: JSON/
+      StructUtils conversions, LinearAlgebra QR internals, Zygote adjoint
+      plumbing); scoped to `target_modules = (Axiom,)` it finds **zero**,
+      verified by direct report enumeration, not just by trusting the
+      scoping logic.
+- [x] Documenter.jl docs build (`docs/make.jl`, `docs/src/`), with
+      `doctest = true`, builds clean locally (`julia --project=docs
+      docs/make.jl`, exit 0, no warnings). API reference split across 4
+      pages by source-file area because a single-page `@autodocs` dump
+      of Axiom's full public surface exceeds Documenter's HTML
+      `size_threshold` sanity check.
+- [x] Julia test-gate wired into CI (`.github/workflows/julia-test.yml`):
+      builds the hybrid Ed448+Dilithium5 crypto cdylib (`crypto/`) before
+      running `Pkg.test()`, so `test/verification/hybrid_signing_tests.jl`
+      actually exercises the real signing path in CI instead of always
+      taking the `@test_skip` branch (the pre-existing `ci.yml`
+      `julia-compat` job never built the crypto shim, so those 27 tests
+      were silently skipped in every CI run to date).
 - [ ] **Human maintainer track** — NOT a code task: genuine Julia
       community participation, engaging the registry maintainers as a
       person, and reducing org-wide package sprawl. This, not tooling, is

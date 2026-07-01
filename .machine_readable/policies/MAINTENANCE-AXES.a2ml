@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: MPL-2.0
+# SPDX-FileCopyrightText: 2026 Axiom.jl Contributors
+#
+# Canonical maintenance governance model — Axiom.jl
+
+[metadata]
+version = "1.0.0"
+last-updated = "2026-07-01"
+scope = "repo"
+repo = "Axiom.jl"
+
+[discovery]
+human-entrypoints = [
+  "README.md",
+  "ROADMAP.adoc",
+  "docs/governance/MAINTENANCE-CHECKLIST.adoc",
+  "docs/governance/SOFTWARE-DEVELOPMENT-APPROACH.adoc",
+]
+machine-entrypoints = [
+  ".machine_readable/policies/MAINTENANCE-AXES.a2ml",
+  ".machine_readable/policies/MAINTENANCE-CHECKLIST.a2ml",
+  ".machine_readable/policies/SOFTWARE-DEVELOPMENT-APPROACH.a2ml",
+  ".machine_readable/6a2/META.a2ml",
+  ".machine_readable/bot_directives/README.adoc",
+]
+bots = ["hypatia", "gitbot-fleet", "repo visitors"]
+
+[axes]
+axis-1 = "must > intend > like"
+axis-2 = "corrective > adaptive > perfective"
+axis-3 = "systems > compliance > effects"
+execution-order = "axis-1 > axis-2 > axis-3"
+
+[axis-1-scoping]
+required = true
+sources = "README, ROADMAP.adoc, REGISTRY-READINESS.md, TEST-NEEDS.md, CI/security workflows"
+markers = "TODO/FIXME/XXX/HACK/STUB/PARTIAL"
+idris-unsound-markers = "believe_me/assert_total (src/Abi/*.idr, packages/SMTLib.jl/src/abi/*.idr)"
+output = "scoped work assembly in must/intend/like buckets"
+
+[axis-2-maintenance]
+corrective-first = true
+adaptive-second = true
+adaptive-focus = "scope changes, stale references, obsolete work culling"
+perfective-third = true
+perfective-source = "honest state from axis-1 after corrective/adaptive updates"
+
+[axis-3-audit]
+systems-check = true
+compliance-check = true
+effects-check = true
+compliance-focus = "seams/compromises/exception register and anti-drift — notably the crypto/ FFI cdylib boundary and the Idris2 ABI seam (src/Abi/, axiom-abi.ipkg)"
+compliance-tooling = "panic-attack"
+effects-tooling = "benchmark/ directory (framework_comparison.jl, threaded_benchmark.jl, gpu_performance_baseline.json)"
+effects-evidence = "benchmark/results_*.md snapshots and maintainer status review"
+
+[axiom-specific-surfaces]
+formal-abi = ".machine_readable-adjacent: axiom-abi.ipkg (Idris2), typechecked via idris2-abi-check in CI"
+compute-layer = "zig/ (matmul, attention, norm, activations, pool, threading, conv, bench) + ffi/zig/ FFI bridge"
+crypto-shim = "crypto/ (Rust cdylib axiom_crypto) — hybrid Ed448 + Dilithium5/ML-DSA-87 certificate signing"
+gpu-extensions = "ext/AxiomCUDAExt.jl, AxiomAMDGPUExt.jl, AxiomMetalExt.jl (weakdeps-gated)"

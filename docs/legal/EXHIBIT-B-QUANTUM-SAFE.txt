@@ -1,0 +1,163 @@
+SPDX-License-Identifier: MPL-2.0
+
+================================================================================
+QUANTUM-SAFE PROVENANCE SPECIFICATION
+Axiom.jl — Exhibit B
+================================================================================
+
+0. STATUS — THIS IS NOT ASPIRATIONAL
+
+   Unlike the generic RSR template version of this exhibit, this repository
+   SHIPS a real, working implementation of the scheme described below: the
+   `crypto/` crate (`axiom_crypto`, a Rust `cdylib` loaded from Julia via
+   `ccall`/`Libdl`, see `src/verification/signing.jl` and
+   `crypto/README.md`). The hybrid Ed448 + Dilithium5 (ML-DSA-87) signing
+   path is real code with real tests, not a policy placeholder.
+
+1. PURPOSE
+
+   This exhibit specifies the cryptographic algorithms and procedures Axiom.jl
+   uses for quantum-safe provenance of verification certificates. It is a
+   standalone, licence-agnostic specification: it imposes no licence terms
+   of its own and may be referenced by software under any licence (this
+   repository is MPL-2.0 for code, CC-BY-SA-4.0 for prose).
+
+2. ALGORITHMS ACTUALLY IN USE (this repository)
+
+   2.1. Digital Signatures — Hybrid scheme, both required to pass
+        - Ed448 (RFC 8032, EdDSA over Curve448) — the classical half.
+          Implemented via the system libcrypto (OpenSSL 3.x) through the
+          vetted Rust `openssl` crate. No hand-rolled elliptic-curve code.
+        - Dilithium5 / ML-DSA-87 (FIPS 204) — the post-quantum half.
+          Implemented via the vetted Rust `pqcrypto-dilithium` crate
+          (PQClean reference implementation). No hand-rolled lattice code.
+        - Both signatures are required to verify (`hybrid_verify`); this
+          mirrors the "hybrid signatures encouraged during transition"
+          guidance in §6 below, but Axiom.jl treats the PQ half as
+          mandatory rather than optional, given the FFI-boundary and
+          certificate-authenticity stakes involved.
+
+   2.2. Key sizes (from `crypto/README.md`, C ABI length getters)
+        - Ed448 public key: 57 bytes; secret key: 57 bytes; signature:
+          114 bytes.
+        - Dilithium5 (ML-DSA-87) public key: 2592 bytes; secret key: 4896
+          bytes; signature: up to 4627 bytes (variable-length, bounded).
+
+   2.3. Hash Functions
+        - SHA-256, via Julia's `SHA` stdlib, for the default (non-PQ)
+          certificate content digest (`src/verification/certificates.jl`,
+          `authenticated=false` mode — the always-on baseline).
+        - The hybrid PQ signature path (§2.1) signs over this same
+          certificate content; it does not replace the digest, it adds an
+          opt-in authenticating signature layer on top of it.
+
+   2.4. Algorithms considered but NOT currently implemented here
+        - ML-KEM (FIPS 203) key encapsulation: not needed — Axiom.jl signs
+          certificates, it does not encrypt provenance metadata for
+          transport.
+        - SLH-DSA (FIPS 205) / FALCON: not implemented. Dilithium5 was
+          selected to match the estate Trustfile hybrid scheme used
+          elsewhere (see `opsm_ex/native/opsm_pq_nif`, the Elixir/BEAM
+          reference implementation this crate's algorithm choice mirrors,
+          per `crypto/README.md`). A future revision MAY add SLH-DSA as a
+          third factor; this is not committed.
+
+3. PROVENANCE METADATA FORMAT (certificate fields, this implementation)
+
+   3.1. Required Fields (see `src/verification/certificates.jl` /
+        `src/verification/signing.jl`)
+        - content-hash: SHA-256 digest of the certificate content
+          (always present, even when `authenticated=false`).
+        - hybrid-signature: present only when the opt-in authenticating
+          path is used — pairs `(ed448_signature, dilithium5_signature)`,
+          both over the same message.
+        - public keys: Ed448 and Dilithium5 PUBLIC keys only, hex-encoded
+          (`hybrid_signature_to_dict`). Private keys are never serialized
+          by this crate — see §5.
+
+   3.2. Optional Fields
+        - parent-hash / witnesses / context-notes are not currently
+          modelled in the certificate schema; this is a documented gap,
+          not a silent omission — see `ROADMAP.adoc` for the key-custody
+          and certificate-schema roadmap.
+
+4. SIGNATURE PROCEDURE (as implemented)
+
+   4.1. Signing (`axiom_crypto_ed448_sign` / `axiom_crypto_dilithium5_sign`,
+        both `extern "C"` / `#[no_mangle]`, called from Julia via `ccall`)
+        a. Compute the certificate content (SHA-256 digest already present
+           from the default, non-PQ path).
+        b. Sign the same message independently with Ed448 and Dilithium5.
+        c. Attach both signatures to the certificate
+           (`hybrid_signature_to_dict`).
+        d. `panic = "abort"` is set in `crypto/Cargo.toml` as a defence-in-
+           depth backstop: every exported function is written to catch
+           errors internally and return a status code (`i32`; 0 = OK,
+           negative = error) rather than unwind, because unwinding across
+           the C ABI / `ccall` boundary is undefined behaviour.
+
+   4.2. Verification (`axiom_crypto_ed448_verify` /
+        `axiom_crypto_dilithium5_verify`)
+        a. Extract both signatures and both public keys from the
+           certificate.
+        b. Verify Ed448 first, then Dilithium5 (or vice versa) — BOTH must
+           return valid (`1`) for the hybrid signature to be accepted.
+        c. Verify the content hash matches the actual certificate content.
+        d. A negative return value from either verify call means the call
+           itself could not be carried out (bad pointer, bad length) —
+           distinct from "ran and returned invalid" (a forged/tampered
+           certificate). Callers must not conflate the two.
+
+5. KEY MANAGEMENT (as implemented — read before assuming HSM integration)
+
+   5.1. This crate NEVER reads or writes private key material to disk on
+        its own. Keys are either:
+        - generated in-memory for tests/examples only
+          (`*_keypair` functions in `crypto/src/lib.rs`), or
+        - generated and held out-of-band by an HSM or an offline signing
+          process, with only the PUBLIC keys ever embedded in a
+          certificate (see `crypto/README.md`, "Private key custody").
+        No `.pem`/`.key` file produced by a real signing key may ever enter
+        this repository. This is an enforced convention, not aspirational
+        guidance — `crypto/.gitignore` and the review process are the
+        current controls; formal HSM integration is tracked in
+        `ROADMAP.adoc`, not yet implemented.
+
+   5.2. Key rotation policy: not yet automated in this repository. Treat
+        rotation as a manual, out-of-band operational procedure until
+        `ROADMAP.adoc`'s custody story is implemented.
+
+6. TRANSITION PERIOD
+
+   6.1. Axiom.jl's DEFAULT certificate path (`generate_certificate`,
+        `authenticated=false`) remains a SHA-256 content digest with no
+        signature at all — this is the baseline, unconditionally available
+        without the `crypto/` cdylib being built.
+   6.2. The hybrid Ed448 + Dilithium5 path (§2.1) is opt-in, on top of the
+        default digest, and — unlike the generic RSR guidance that treats
+        hybrid signing as merely "encouraged" — Axiom.jl requires BOTH
+        halves to verify once the opt-in path is engaged; there is no
+        "classical-signature-only" mode in this implementation.
+   6.3. Pure-PQ-only (dropping the Ed448 half) is not implemented and not
+        currently planned — the hybrid pairing is the estate Trustfile
+        convention this crate follows.
+
+7. COMPLIANCE
+
+   Quantum-safe signing is OPTIONAL at the certificate-generation call site
+   (`authenticated=false` remains the default), but once a certificate
+   carries a hybrid signature, both the Ed448 and Dilithium5 signatures
+   MUST verify for the certificate to be accepted as authenticated; a
+   hybrid signature must never be partially stripped (e.g. keeping only
+   the classical half) from a distribution that carries it.
+
+   FFI/UnsafeCode residual: `crypto/src/lib.rs`'s `unsafe` blocks (the C-ABI
+   `extern "C"` surface itself) and the `ccall` sites in
+   `src/verification/signing.jl` / `src/backends/zig_ffi.jl` are expected,
+   legitimate residuals of this design — see the `panic-attack assail`
+   findings referenced in `docs/governance/MAINTENANCE-CHECKLIST.adoc` and,
+   once written, `audits/assail-classifications.a2ml`.
+
+================================================================================
+END OF EXHIBIT B
+================================================================================
