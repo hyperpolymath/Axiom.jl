@@ -1,6 +1,26 @@
 -- SPDX-License-Identifier: MPL-2.0
 ||| Axiom.jl ABI Type Definitions
 |||
+||| ILLUSTRATIVE SCAFFOLD -- NOT A PROOF OF AXIOM'S PRODUCTION FFI BOUNDARY.
+||| This module defines a generic `axiom_*`/`libaxiom` ABI surface
+||| (axiom_init/axiom_process/axiom_register_callback, etc.) that does NOT
+||| match the ~36 real Zig exports (axiom_matmul, axiom_relu, axiom_conv2d,
+||| and friends) actually used by `src/backends/zig_ffi.jl`. It is a
+||| worked example of the hyperpolymath ABI-FFI pattern (Idris2 ABI + Zig
+||| FFI), not a formal specification of Axiom's shipped kernels.
+|||
+||| The production FFI boundary lives in `zig/` (kernel implementations)
+||| and `src/backends/zig_ffi.jl` (Julia-side ccall wiring); see
+||| `ABI-FFI-README.md` for the authoritative split. Connecting this .idr
+||| surface to the real Zig exports is tracked future work (ROADMAP note
+||| below); until then, treat `Verify.verifySizes` / `Verify.verifyAlignments`
+||| in this file as `putStrLn` placeholders, not executed proofs.
+|||
+||| ROADMAP: extend this scaffold (and Layout.idr/Foreign.idr) with typed
+||| declarations for each real `axiom_*` Zig export and replace the
+||| `Verify` namespace stubs with actual size/alignment/signature proofs
+||| checked against `zig/src/axiom.zig` and `ffi/zig/include/axiom.h`.
+|||
 ||| This module defines the core ABI-facing types used by the Idris2
 ||| specification layer for Axiom.jl.
 

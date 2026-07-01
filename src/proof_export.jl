@@ -193,11 +193,62 @@ function _assistant_placeholder_regex(assistant::Symbol)
     throw(ArgumentError("Unsupported proof assistant: $assistant"))
 end
 
+# Matches a theorem/lemma *declaration* header for the given assistant
+# syntax, capturing the declared name and the claimed statement text (up to
+# the point where the proof body begins) so:
+#  (a) boilerplate (the AXIOM_CERTIFICATE_HASH witness emitted into every
+#      exported file) can be told apart from an actual claimed-property
+#      statement, and
+#  (b) a vacuous claim (bare `True` / `"True"`, proving nothing about the
+#      model) can be told apart from a real property statement.
+function _assistant_statement_regex(assistant::Symbol)
+    if assistant == :lean
+        # `theorem NAME : STATEMENT := by|:= ...`
+        return r"\btheorem\s+(\w+)[^\n:]*:\s*(.*?)\s*:="
+    elseif assistant == :coq
+        # `Theorem NAME : STATEMENT.` (statement ends at the line's period)
+        return r"\bTheorem\s+(\w+)\s*:\s*(.*?)\.\s*(?:\r?\n|$)"
+    elseif assistant == :isabelle
+        # `theorem NAME: "STATEMENT"` or `lemma NAME: "STATEMENT"`
+        return r"\b(?:theorem|lemma)\s+(\w+)\s*:\s*\"+(.*?)\"+"
+    end
+    throw(ArgumentError("Unsupported proof assistant: $assistant"))
+end
+
+# A claim consisting only of the literal `True` (Lean/Coq) proves nothing
+# about the model -- it is the same vacuous placeholder emitted by the
+# fallback branches in `export_lean/coq/isabelle(model, properties)`.
+function _vacuous_statement(statement::AbstractString)
+    s = strip(statement)
+    isempty(s) && return true
+    lowercase(s) == "true"
+end
+
+# A proof is only credible evidence of a claimed property if it contains at
+# least one theorem/lemma that is (a) not the fixed `axiom_certificate_witness`
+# metadata boilerplate emitted into every exported file regardless of whether
+# the real property was ever addressed, and (b) not a vacuous `True`-only
+# tautology. An empty file, a file that only restates the certificate-hash
+# witness, or a file with a `theorem foo : True := trivial`-style placeholder
+# must not be treated as containing a real proof obligation.
+function _assistant_has_substantive_statement(content::String, assistant::Symbol)
+    for m in eachmatch(_assistant_statement_regex(assistant), content)
+        name = m.captures[1]
+        statement = m.captures[2]
+        name == "axiom_certificate_witness" && continue
+        _vacuous_statement(statement) && continue
+        return true
+    end
+    return false
+end
+
 function _assistant_obligation_summary(content::String, assistant::Symbol)
     unresolved = count(_ -> true, eachmatch(_assistant_placeholder_regex(assistant), content))
+    has_statement = _assistant_has_substantive_statement(content, assistant)
     (
         unresolved = unresolved,
-        complete = unresolved == 0
+        has_statement = has_statement,
+        complete = unresolved == 0 && has_statement
     )
 end
 
@@ -228,6 +279,10 @@ function _assistant_status_label(
     if !hash_matches || !obligation_matches
         return "metadata_mismatch"
     end
+    # `summary.complete` already folds in `has_statement`: a file with zero
+    # escape tokens (no sorry/Admitted/oops) but also zero substantive
+    # theorem/lemma statements is NOT "complete" -- it is a vacuous or empty
+    # proof and must be reported "incomplete" rather than falsely verified.
     summary.complete ? "complete" : "incomplete"
 end
 
@@ -271,6 +326,7 @@ function proof_assistant_obligation_report(
         "path" => path,
         "status" => status,
         "unresolved" => summary.unresolved,
+        "has_statement" => summary.has_statement,
         "complete" => status == "complete",
         "certificate_hash" => markers.certificate_hash,
         "obligation_id" => markers.obligation_id,
@@ -890,7 +946,9 @@ end
 """
     import_lean_certificate(lean_file::String; expected_certificate_hash=nothing, expected_obligation_id=nothing) -> ProofCertificate
 
-Import a completed Lean proof file and check for sorry-free status.
+Import a completed Lean proof file and check that it is sorry-free AND
+contains an actual property theorem (not just the certificate-hash witness
+boilerplate or an empty file).
 """
 function import_lean_certificate(
     lean_file::String;
@@ -945,7 +1003,9 @@ end
 """
     import_coq_certificate(coq_file::String; expected_certificate_hash=nothing, expected_obligation_id=nothing) -> ProofCertificate
 
-Import a completed Coq proof file and check for Admitted-free status.
+Import a completed Coq proof file and check that it is Admitted-free AND
+contains an actual property theorem (not just the certificate-hash witness
+boilerplate or an empty file).
 """
 function import_coq_certificate(
     coq_file::String;
@@ -1000,7 +1060,9 @@ end
 """
     import_isabelle_certificate(thy_file::String; expected_certificate_hash=nothing, expected_obligation_id=nothing) -> ProofCertificate
 
-Import a completed Isabelle/HOL proof file and check for oops-free status.
+Import a completed Isabelle/HOL proof file and check that it is oops-free AND
+contains an actual property theorem/lemma (not just the certificate-hash
+witness boilerplate or an empty file).
 """
 function import_isabelle_certificate(
     thy_file::String;

@@ -1,6 +1,19 @@
 -- SPDX-License-Identifier: MPL-2.0
 ||| Axiom.jl ABI Layout Utilities
 |||
+||| ILLUSTRATIVE SCAFFOLD -- NOT A PROOF OF AXIOM'S PRODUCTION FFI BOUNDARY.
+||| This is a generic struct-layout model (example fields, example struct)
+||| for the hyperpolymath ABI-FFI pattern; it does not describe the layout
+||| of any real Axiom/Zig data structure. `checkCABI` always returns
+||| `Right CABIProof` regardless of input -- it is not a real compliance
+||| check. See `src/Abi/Types.idr` for the full scaffold-vs-production
+||| explanation and `ABI-FFI-README.md` for the authoritative FFI split
+||| (production boundary: `zig/` + `src/backends/zig_ffi.jl`).
+|||
+||| ROADMAP: replace `checkCABI`'s trivial `Right` with a real layout
+||| compatibility check against the actual struct layouts crossing the
+||| Zig FFI boundary (tracked future work; see Types.idr ROADMAP note).
+|||
 ||| This module provides a lightweight, concrete memory-layout model used by
 ||| the Idris2 ABI scaffold.
 
