@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: MPL-2.0
+# Audited legitimate residuals for `panic-attack assail`.
+# Companion audit (rationale + review): audits/audit-ffi-unsafe.adoc
+# Per the user-classification protocol this registry lives separately from the
+# code under scan, so a newly-added unsafe block cannot self-suppress — the
+# suppression only holds while the cited audit is kept current.
+(assail-classifications
+  (classification
+    (file "crypto/src/lib.rs")
+    (category "UnsafeCode")
+    (audit "audits/audit-ffi-unsafe.adoc §1")
+    (rationale "C-ABI cdylib: extern-C raw-pointer surface requires unsafe; each block has a // SAFETY comment; thin shim over vetted openssl + pqcrypto-dilithium, no hand-rolled crypto"))
+  (classification
+    (file "src/verification/signing.jl")
+    (category "UnsafeFFI")
+    (audit "audits/audit-ffi-unsafe.adoc §2")
+    (rationale "Julia ccall/Libdl into the audited axiom_crypto cdylib; optional shim with a runtime ABI self-check; buffer lengths validated against ABI constants before every ccall"))
+  (classification
+    (file "src/backends/zig_ffi.jl")
+    (category "UnsafeFFI")
+    (audit "audits/audit-ffi-unsafe.adoc §3")
+    (rationale "Julia ccall/Libdl into the Zig compute backend; availability checked before dispatch; memory-safety-critical logic lives Zig-side")))

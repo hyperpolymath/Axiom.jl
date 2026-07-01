@@ -1,0 +1,69 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= Audit — Axiom.jl FFI / unsafe boundary
+Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+:revdate: 2026-07-01
+
+Records why the three FFI / `unsafe` residuals that `panic-attack assail`
+reports for Axiom.jl are *legitimate, reviewed* boundaries rather than defects.
+This is the companion document cited by `audits/assail-classifications.a2ml`.
+Per the panic-attack user-classification protocol the classification registry
+lives in a *separate* file from the code under scan, so adding a new `unsafe`
+block cannot silently self-suppress — a suppression is only honoured while this
+audit is kept current in the same review.
+
+None of these boundaries hand-rolls cryptography or safety logic; each is the
+minimal, necessary seam between Julia and a vetted native library.
+
+== §1 — `crypto/src/lib.rs` (category: UnsafeCode)
+
+`axiom_crypto` is a thin C-ABI shim (`cdylib`) exposing hybrid Ed448 +
+Dilithium5 certificate signing to Julia. A stable C ABI necessarily uses
+`extern "C"` + `#[no_mangle]` functions taking raw pointers, which Rust
+requires to be dereferenced inside `unsafe` — the UnsafeCode finding is this
+expected surface, not a soundness hole. Sound because:
+
+* *No hand-rolled crypto.* Ed448 → system libcrypto (OpenSSL 3.x) via the vetted
+  `openssl` crate; Dilithium5 → the vetted `pqcrypto-dilithium` crate (PQClean
+  reference implementation). The crate implements no primitive of its own.
+* *Every `unsafe` block carries a `// SAFETY:` comment* stating the precondition
+  it relies on (non-null pointer; caller-allocated buffer of the ABI-declared
+  length).
+* *Caller-allocates-buffer + written-length ABI* — no allocate-and-return /
+  free-fn pairs, so there is no cross-language ownership to leak or double-free.
+* *Length-checked entry points* — each function validates slice lengths against
+  the exported `axiom_crypto_*_len()` constants and returns a negative status
+  code (never UB) on a bad length or null pointer.
+
+== §2 — `src/verification/signing.jl` (category: UnsafeFFI)
+
+Loads the `axiom_crypto` cdylib via `Libdl.dlopen` and calls it via `ccall` —
+Julia's only foreign-call mechanism, inherently flagged UnsafeFFI. Sound
+because:
+
+* The shim is *optional*: if the cdylib is unbuilt, `crypto_shim_available()`
+  returns `false` and every signing entry point throws a clear, documented error
+  rather than calling through a null handle.
+* A runtime ABI self-check (`_validate_crypto_abi!`) confirms the library's
+  reported key/signature lengths match the Julia-side constants before any
+  cryptographic `ccall` (this check caught a real length mismatch in
+  development).
+* Every sign/verify call validates buffer lengths against the ABI constants
+  before the `ccall`, so no out-of-bounds pointer crosses the boundary.
+
+== §3 — `src/backends/zig_ffi.jl` (category: UnsafeFFI)
+
+Loads the Zig compute backend (`libaxiom_zig`) via `Libdl.dlopen` and dispatches
+kernels via `ccall`. Sound because:
+
+* `init_zig_backend` checks the library file exists and wraps `dlopen` in
+  `try`/`catch`, setting an availability flag; the `@zig_call` macro refuses to
+  dispatch (`error(...)`) unless `zig_available()` is true, so no call is made
+  through a null handle.
+* The memory-safety-critical compute logic lives on the *Zig* side (a
+  memory-safe systems language); Julia holds only the thin dispatch seam.
+
+== Scope
+
+Covers ONLY the three boundaries above. All other `assail` findings (ProofDrift,
+InputBoundary, MutationGap) are deliberately left *visible and un-suppressed* —
+tracked as ordinary findings, not audited-legitimate residuals.
