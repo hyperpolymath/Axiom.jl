@@ -1,0 +1,175 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= Flagship Rubric — the measuring-stick for hyperpolymath Julia libraries
+Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+:revdate: 2026-07-01
+:toc: left
+:toclevels: 3
+
+The gradable standard every estate Julia library is measured against.
+`Axiom.jl` is the reference instance (the flagship), defined as 100% on this
+rubric; every other estate Julia library is scored relative to it. The
+machine-checkable subset of this rubric is what `just quality` runs.
+
+[.lead]
+Design principle: *a claim counts only if a tool can be run to confirm it.*
+Doctrine — ground-truth by running the tool, not trusting a status doc; report
+faithfully, no overclaim; holes before features.
+
+== Grades
+
+Adapted from the Component Readiness Grade (CRG) ladder, specialised for a
+registered Julia library.
+
+[cols="1,2,4"]
+|===
+| Grade | Name | Bar
+
+| D | Alpha | Loads and runs: `using Pkg; Pkg.test()` completes without erroring
+on the LTS floor. At least one *meaningful* assertion (not `@test true`).
+
+| C | Beta | Correct on representative input; `Aqua.test_all` passes; closed
+`[compat]`; README.adoc + a building Documenter site.
+
+| B | RC | Edge cases + multiple input types covered; scoped `JET.test_package`
+returns zero package-origin reports; doctests pass; `panic-attack assail` = 0
+unsuppressed critical; registry name↔UUID/repo-slug agree.
+
+| A | Production | All of B green in CI across `[LTS, stable]`; property/fuzz
+tests where the domain admits them; maintenance axes documented; SPDX + licence
+correct; A2ML dogfood gate + estate-rules green.
+
+| ★ | Flagship | All of A, *plus*: verification claims formally honest (no
+overclaimed proofs; certificates truthfully labelled; FFI residuals audited via
+`assail-classifications.a2ml`); zero-warning build; and it is itself a
+*reference* others are measured against. `Axiom.jl` holds ★.
+|===
+
+An instance's grade is the highest ladder rung for which *every* row below at or
+below that rung passes. One failing B-row caps you at C regardless of A-rows.
+
+== The scored dimensions
+
+Each dimension lists its machine check (what `just quality` runs) and the flagship
+bar. `[auto]` = enforced by `just quality`; `[review]` = human/agent-judged
+(e.g. licence classification — never automated, per doctrine #6).
+
+=== 1. Correctness & tests `[auto]`
+* `julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile(); Pkg.test()'` green.
+* Assertions are behavioural, not tautological. Grep guard: fail if the only
+  assertions are `@test true` / type-only `@test x isa T` (mirrors panic-attack
+  MutationGap PA025 "all-type-only assertions").
+* Flagship bar: green on LTS *and* stable in CI; nightly allow-fail present.
+
+=== 2. Static quality — Aqua `[auto]`
+* `Aqua.test_all(<Pkg>)` passes with NO overrides.
+* An override is a finding unless it carries an inline written rationale for a
+  genuine false positive. Flagship bar: zero overrides (fix source, as Axiom did
+  for the normalization unbound-typeparam bug + the stale-JSON3 dep).
+
+=== 3. Static quality — JET `[auto]`
+* `JET.test_package(<Pkg>; target_modules = (<Pkg>,))` returns zero
+  package-origin reports.
+* Scoping uses JET's native `target_modules` (not a file-path hack), and a
+  written note explains any borderline candidate as non-package-origin.
+* Flagship bar: zero, with the honesty note ("count is 0 today, not an
+  allowlist").
+
+=== 4. Compat closure & registry `[auto]`
+* Every `[deps]`/`[weakdeps]` entry + stdlibs + `julia` bounded in `[compat]`.
+* `name`/`uuid`/`repo` agree across `Project.toml`, the registry `Package.toml`,
+  the `Registry.toml` line, and the GitHub slug (registry `ci/validate.jl`).
+* Flagship bar: AutoMerge-eligible; upper-bounded compat everywhere (registry
+  warns on lower-bound-only).
+
+=== 5. Documentation `[auto]` + `[review]`
+* `julia --project=docs docs/make.jl` builds; `doctest = true` passes `[auto]`.
+* `README.adoc` (AsciiDoc, estate default) + `EXPLAINME.adoc` present `[auto]`.
+* API-doc coverage of exported symbols; no dangling doc references `[review]`.
+* Flagship bar: doctests green in CI; docs deploy on main.
+
+=== 6. Security & soundness `[auto]`
+* `panic-attack assail .` = 0 *unsuppressed* critical.
+* FFI/`unsafe` residuals are audited via `audits/assail-classifications.a2ml`
+  (TOML-A2ML conformant) + a companion `audits/audit-*.adoc` — suppressions are
+  non-gameable (registry lives separately from the code under scan).
+* No MD5/SHA-1 for security (SHA-256+); HTTPS-only; no hardcoded secrets;
+  SHA-pinned CI actions.
+* Flagship bar: every suppression cites a current audit; secret-scanner +
+  static-analysis-gate green.
+
+=== 7. Verification honesty `[review]` + partial `[auto]`
+* No overclaimed proofs: a `@prove`/proof-import path labelled as formal must be
+  formal; heuristics labelled as heuristics (Axiom G03/G04).
+* Certificates truthfully labelled (no fake "authenticated" without a real MAC/
+  signature; Axiom G01).
+* Proof-drift honest: proof escape hatches visible, not hidden (panic-attack
+  ProofDrift PA021 left un-suppressed unless audited).
+* Flagship bar: verification claims survive an adversarial re-read; no
+  soundness hole outranked by a feature.
+
+=== 8. Estate compliance `[auto]` + `[review]`
+* A2ML substrate present and *valid TOML-A2ML* — dogfood gate `Validate A2ML
+  manifests` green (every `.a2ml` self-identifies; even a panic-attack
+  S-expression registry is TOML-A2ML-wrapped, per Axiom PR #52).
+* `estate-rules` green: no Python; AsciiDoc-by-default under `docs/` (except
+  `docs/wiki/` + `docs/src/`); no V-lang (Zig is allowed and encouraged).
+* Licence correct for the repo's classification `[review]` — MPL-2.0 sole-owner
+  default; NEVER an automated licence edit.
+* SPDX headers on all source files (authored from birth, never bulk-swept).
+
+=== 9. Maintenance & lifecycle `[review]`
+* Corrective / adaptive / perfective / preventive maintenance axes documented
+  (`.machine_readable/policies/MAINTENANCE-AXES.a2ml`) with a checklist.
+* `CHANGELOG.md` current; ADRs under `docs/decisions/` for load-bearing choices.
+* Flagship bar: a living gap register; every "fixed" reaches "verified" via an
+  independent adversarial pass before it counts.
+
+=== 10. Wire-first / no-dead-scaffolding `[review]`
+* Every claimed feature is reachable and tested; no orphaned modules that the
+  README advertises (Axiom G06 huggingface lesson). Unwired is not done.
+* Placeholders (`{{...}}`) rendered or removed before release.
+* Flagship bar: green from birth on instantiation; docs and code agree.
+
+== `just quality` — the machine-checkable bar
+
+The recipe runs every `[auto]` row and fails on the first breach. Sketch (the
+template ships the real recipe wired to the instance):
+
+[source,makefile]
+----
+# Justfile (excerpt) — the flagship rubric's automated subset.
+quality:
+    # 1,2,3  correctness + Aqua + JET (Aqua/JET run inside Pkg.test)
+    julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile(); Pkg.test()'
+    # 5      docs build + doctests
+    julia --project=docs -e 'using Pkg; Pkg.instantiate()'
+    julia --project=docs docs/make.jl
+    # 6      static analysis: 0 unsuppressed critical
+    panic-attack assail . --output /tmp/assail.json
+    # 4,8    compat/registry + A2ML validity are enforced by CI gates
+    #        (registry ci/validate.jl; dogfood-gate Validate A2ML manifests)
+    @echo "quality gates passed"
+
+test:
+    julia --project=. -e 'using Pkg; Pkg.test()'
+----
+
+`just test && just quality` is the golden path; both green is the minimum for a
+release claim (release-claim-requires-hard-pass).
+
+== Scoring (relative to the flagship)
+
+For cross-library comparison, score each of the 10 dimensions 0–3 (0 = absent,
+1 = partial, 2 = meets grade-A bar, 3 = meets flagship bar). Max 30.
+
+* `Axiom.jl` = 30/30 by definition (the reference).
+* A library is *flagship-track* at ≥ 27 with no dimension below 2.
+* Publish the vector, not just the total — a 24 with a 0 in "Security &
+  soundness" is not a 24-quality library; the hole caps it (holes-first).
+
+== Provenance
+
+Every bar here was met, and the tool run, on `Axiom.jl` during the flagship
+initiative (gaps G01–G18 verified). This rubric is the generalisation of that
+work into a reusable standard; the template's `just quality` is its executable
+form.
