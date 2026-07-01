@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: MPL-2.0
 ||| Foreign Function Interface Declarations
 |||
 ||| This module declares all C-compatible functions that will be

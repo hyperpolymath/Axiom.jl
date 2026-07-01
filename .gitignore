@@ -104,3 +104,4 @@ deps/
 build/
 dist/
 docs/Manifest.toml
+ffi/zig/.zig-cache/
