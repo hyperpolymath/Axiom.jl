@@ -271,3 +271,57 @@ CI-only). Registry Pkg-add round-trip = CI-only (sandbox libgit2 quirk).
 *Method held:* holes-first; ran the tools not the docs; no self-grade (opus
 independent verify); no licence edits; birth-SPDX on new files; pushed + PR'd
 each repo so nothing lives only on local disk.
+
+== Entry 0007 — 2026-07-01 — P5 audit, an A2ML dialect collision, and a *verified* Julia template
+
+*Directive:* "p5, then 2 then 3." Done in order.
+
+*P5 (G18) — audited residuals.* Authored `audits/assail-classifications.a2ml`
++ `audit-ffi-unsafe.adoc` classifying only the 3 genuine FFI/unsafe seams
+(crypto/src/lib.rs UnsafeCode; signing.jl + zig_ffi.jl UnsafeFFI). Ground-truthed
+by re-running `panic-attack assail`: exactly 3 flip to suppressed, 0 critical.
+PR #51 — owner merged.
+
+*The collision (and the lesson, again).* #51 merged with the dogfood-gate
+"Validate A2ML manifests" check RED. Cause: the estate `a2ml-validate-action`
+scans *every* `.a2ml` and requires TOML-A2ML identity (`name`/`project`);
+panic-attack's classification registry is authored in an *S-expression* dialect
+with no such header — two A2ML dialects colliding on one file extension. The
+honest fix was NOT to game the lenient check but to make the file *genuinely*
+TOML-A2ML: a real `[metadata]` header + the S-expression payload carried in a
+TOML literal string (`'''…'''`) under `[payload]`. Verified BOTH sides locally —
+Julia's `TOML` stdlib parses it (identity present); `panic-attack assail` still
+suppresses exactly 3 (its loader reads raw text for `(classification …)` forms,
+ignores the header). PR #52 — green in CI, merged. *Lesson reinforced from
+#49→#50: run the newly-added CI gate's logic locally, and when a merged PR left a
+red check I caused, fix it at source in a fresh-from-main follow-up.*
+
+*Item 2 — the Julia-library template (staged; VERIFIED by running it).* Drafted
+`rsr-julia-library-template-DRAFT/` in scratchpad: PORT-MANIFEST (file-by-file
+CLONE/PARAM/NEW/DROP provenance + instantiation runbook), GENERIC-VS-JULIA-SPLIT
+(the owner-requested README/EXPLAINME split; generic `rsr-template-repo` stays
+un-renamed), README/EXPLAINME, and a full parameterised `template/` payload
+lifted from Axiom's *verified* scaffolding (Project.toml `[compat]` closure +
+weakdeps/extensions; Aqua+JET+runtests; Documenter make.jl; julia-test.yml with
+optional native-shim block; registry REGISTER hook). Then — doctrine, ground
+truth by running — I materialised a throwaway `Widget.jl` and *executed* it:
+`Pkg.test()` 13/13 green (Aqua+JET+smoke, offline from the depot) and
+`docs/make.jl` green (doctests). Execution caught THREE latent bugs pure
+reasoning missed: (1) docs env listing the unregistered package → premature
+registry resolve (fix: Documenter-only docs env, package dev-pathed in make.jl);
+(2) git-remote auto-detection dependency (fix: explicit
+`repo = Remotes.GitHub(...)`); (3) module docstring missing from the manual under
+strict `checkdocs=:all` (fix: include it in the `@docs` block). Green-from-birth
+is now *proven*, not asserted. BLOCKED on push: `rsr-julia-library-template-repo`
+is not in session scope — owner must create it + add to env config + start a
+fresh session.
+
+*Item 3 — the flagship rubric (P8).* `FLAGSHIP-RUBRIC.adoc`: 5 grades
+(D/C/B/A/★-Flagship), 10 machine-or-review-scored dimensions, a `just quality`
+`[auto]` subset, and a 0–30 scoring vector with Axiom.jl = 30/30 as the reference
+every estate Julia library is measured against (holes-first: a 0 in Security
+caps the whole score).
+
+*Method held:* ran tools not docs (and ran them on my OWN deliverable);
+fixed the A2ML collision at source; no self-grade; faithful reporting of the
+BLOCKED push and the 3 template bugs I had to fix.
