@@ -105,6 +105,7 @@ include("training/train.jl")
 # Verification system
 include("verification/properties.jl")
 include("verification/checker.jl")
+include("verification/signing.jl")  # Hybrid Ed448+Dilithium5 signing (optional; degrades gracefully)
 include("verification/certificates.jl")
 include("verification/serialization.jl")
 include("proof_export.jl")  # Issue #19 - Proof assistant integration
@@ -208,6 +209,14 @@ export ProofCertificate, serialize_proof, deserialize_proof
 export export_proof_certificate, import_proof_certificate, verify_proof_certificate
 export VerificationResult, generate_certificate, save_certificate, load_certificate, verify_certificate
 export verification_result_telemetry, verification_telemetry_report, reset_verification_telemetry!
+
+# Hybrid post-quantum certificate signing (Ed448 + Dilithium5/ML-DSA-87)
+export HybridKeyPair, HybridPublicKeys, HybridSignature
+export generate_hybrid_keypair, hybrid_sign, hybrid_verify, public_keys
+export crypto_shim_available, certificate_content_digest
+export hybrid_signature_to_dict, hybrid_signature_from_dict
+export sign_certificate_hybrid, verify_certificate_hybrid, save_certificate_hybrid
+export canonical_certificate_content
 
 # Autograd
 export gradient, jacobian, pullback, zero_grad!, clip_grad_norm!

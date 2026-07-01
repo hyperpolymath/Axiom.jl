@@ -47,6 +47,15 @@ build-backends: build-zig
 run-zig: build-zig
     AXIOM_ZIG_LIB=zig/zig-out/lib/libaxiom_zig.so julia --project=. -e 'using Axiom; println("Backend: ", typeof(current_backend()))'
 
+# Build the hybrid Ed448+Dilithium5 certificate-signing crypto shim (cdylib)
+build-crypto:
+    cd crypto && cargo build --release
+    @echo "Crypto shim built at crypto/target/release/libaxiom_crypto.so (or .dylib/.dll)"
+
+# Run the crypto shim's own Rust test suite (round-trip + tamper/wrong-key rejection)
+test-crypto:
+    cd crypto && cargo test --release
+
 # Check code quality
 lint:
     @echo "Checking editorconfig..."

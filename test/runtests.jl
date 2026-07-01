@@ -754,6 +754,9 @@ with open(args.output, "w", encoding="utf-8") as f:
     # Soundness regression tests (P1 holes must never silently reopen)
     include("verification/soundness_tests.jl")
 
+    # Hybrid Ed448+Dilithium5 authenticating-signature tests (G01, opt-in path)
+    include("verification/hybrid_signing_tests.jl")
+
     # CRG Grade C tests
     include("e2e_test.jl")
     include("property_test.jl")

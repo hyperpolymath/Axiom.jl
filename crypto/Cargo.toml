@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: MPL-2.0
+[package]
+name = "axiom_crypto"
+version = "0.1.0"
+authors = ["Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"]
+edition = "2021"
+description = "Hybrid Ed448 + Dilithium5 (ML-DSA-87) certificate signing for Axiom.jl (estate Trustfile scheme)"
+license = "MPL-2.0"
+publish = false
+
+[lib]
+name = "axiom_crypto"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+openssl = "0.10"
+pqcrypto-dilithium = "0.5"
+pqcrypto-traits = "0.3"
+
+[profile.release]
+# Keep panics as aborts out of the FFI boundary story simple: every exported
+# fn is written to catch errors internally and return a status code instead
+# of unwinding across the C ABI, but `panic = "abort"` is a defence in depth
+# backstop in case a bug slips through (unwinding across FFI is UB).
+panic = "abort"
