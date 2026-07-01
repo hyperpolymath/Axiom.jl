@@ -103,3 +103,4 @@ deps/
 .cache/
 build/
 dist/
+docs/Manifest.toml
