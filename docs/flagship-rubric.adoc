@@ -112,7 +112,8 @@ bar. `[auto]` = enforced by `just quality`; `[review]` = human/agent-judged
   manifests` green (every `.a2ml` self-identifies; even a panic-attack
   S-expression registry is TOML-A2ML-wrapped, per Axiom PR #52).
 * `estate-rules` green: no Python; AsciiDoc-by-default under `docs/` (except
-  `docs/wiki/` + `docs/src/`); no V-lang (Zig is allowed and encouraged).
+  `docs/wiki/` + `docs/src/`); the banned legacy V language absent (Zig, its
+  estate replacement, is allowed and encouraged).
 * Licence correct for the repo's classification `[review]` — MPL-2.0 sole-owner
   default; NEVER an automated licence edit.
 * SPDX headers on all source files (authored from birth, never bulk-swept).
