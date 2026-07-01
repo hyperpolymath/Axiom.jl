@@ -4,8 +4,9 @@
 # Estate Rules — enforces hyperpolymath estate-wide conventions relevant to a
 # Julia numerics package: no-Python (banned estate-wide, replacement is
 # Julia/Rust/AffineScript), AsciiDoc-by-default under docs/ (excluding the
-# docs/wiki/ GitHub-wiki mirror, which is legitimately Markdown because
-# GitHub's wiki renderer consumes .md, not .adoc), and no V-lang (vlang.io)
+# docs/wiki/ GitHub-wiki mirror and docs/src/ Documenter source, both of which
+# are legitimately Markdown — GitHub's wiki renderer and Documenter both consume
+# .md, not .adoc), and no V-lang (vlang.io)
 # references — NOT a ban on Zig. Zig is the current estate default for
 # APIs/FFI/gateways (hyperpolymath/standards CLAUDE.md, "Estate default
 # 2026-05-28"), and Axiom.jl legitimately ships a Zig compute layer
@@ -47,15 +48,15 @@ jobs:
           fi
           echo "PASS: no Python files found"
 
-      - name: AsciiDoc by default under docs/ (excluding docs/wiki/ GitHub-wiki mirror)
+      - name: AsciiDoc by default under docs/ (excluding docs/wiki/ mirror + docs/src/ Documenter source)
         run: |
-          HITS=$(find docs -name '*.md' -type f -not -path 'docs/wiki/*' 2>/dev/null || true)
+          HITS=$(find docs -name '*.md' -type f -not -path 'docs/wiki/*' -not -path 'docs/src/*' 2>/dev/null || true)
           if [ -n "$HITS" ]; then
             echo "::error::.md files found under docs/ outside the docs/wiki/ mirror (estate rule: AsciiDoc by default):"
             echo "$HITS"
             exit 1
           fi
-          echo "PASS: no disallowed .md files under docs/ (docs/wiki/ is the GitHub-wiki Markdown mirror, exempt by design)"
+          echo "PASS: no disallowed .md files under docs/ (docs/wiki/ = GitHub-wiki mirror, docs/src/ = Documenter source; both legitimately Markdown)"
 
       - name: No V-lang references (Zig is the estate default — do not confuse the two)
         run: |

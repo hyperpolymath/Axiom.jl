@@ -4,6 +4,8 @@
 # Canonical maintenance governance model — Axiom.jl
 
 [metadata]
+name = "axiom-maintenance-governance"
+project = "Axiom.jl"
 version = "1.0.0"
 last-updated = "2026-07-01"
 scope = "repo"

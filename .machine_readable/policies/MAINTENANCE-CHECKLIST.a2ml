@@ -4,6 +4,8 @@
 # Maintenance baseline (machine-readable canonical) — Axiom.jl
 
 [metadata]
+name = "axiom-maintenance-checklist"
+project = "Axiom.jl"
 version = "1.0.0"
 last-updated = "2026-07-01"
 scope = "repo"
