@@ -44,7 +44,7 @@ Must progress snapshot (2026-02-16):
 * [x] Added non-GPU accelerator strategy checks and CI coverage: `test/ci/coprocessor_strategy.jl`.
 * [x] Added certificate integrity CI checks and digest-report artifacts: `test/ci/certificate_integrity.jl`, `.github/workflows/verify-certificates.yml`.
 * [x] Added in-tree gRPC unary protobuf binary-wire support (`application/grpc`) with JSON bridge fallback (`application/grpc+json`).
-* [x] Added direct `.pt/.pth/.ckpt` import bridge and expanded ONNX export coverage (Dense/Conv/Norm/Pool + activations).
+* [x] Added pure-Julia PyTorch **descriptor** import (`axiom.pytorch.sequential.v1`) and expanded ONNX export coverage (Dense/Conv/Norm/Pool + activations). (Direct `.pt/.pth/.ckpt` binary import is *not* shipped — it would need a PyTorch/Python runtime; export to the descriptor first.)
 * [x] Added consolidated readiness gate script for local/CI release checks: `scripts/readiness-check.sh`.
 * [x] Added REAL authenticating hybrid Ed448+Dilithium5 (ML-DSA-87) certificate
   signing (G01, opt-in): Rust `cdylib` shim in `crypto/` (`pqcrypto-dilithium`
@@ -88,7 +88,7 @@ Could completion gates:
 
 These roadmap promises are still tracked explicitly (with current delivery state):
 
-* [x] `from_pytorch(...)` import API (baseline shipped: descriptor import + direct `.pt/.pth/.ckpt` bridge + CI interop smoke via `scripts/pytorch_to_axiom_descriptor.py`).
+* [x] `from_pytorch(...)` import API (shipped: pure-Julia `axiom.pytorch.sequential.v1` descriptor import + CI interop smoke). Direct binary `.pt/.pth/.ckpt` import is out of scope (needs a PyTorch/Python runtime); a native Julia checkpoint reader (zip + pickle) is future work.
 * [x] `to_onnx(...)` export API (baseline shipped: Dense/Conv/Norm/Pool + common activations for supported `Sequential`/`Pipeline` models).
 * [x] Production-hardened GPU paths across CUDA/ROCm/Metal (baseline shipped: deterministic fallback CI + optional hardware smoke + extension-hook dispatch + device-range guards + runtime self-healing diagnostics + backend-specific performance evidence via `test/ci/gpu_resilience.jl` and `scripts/gpu-performance-evidence.jl`).
 * [ ] Non-GPU accelerators (TPU/NPU/PPU/MATH/FPGA/DSP) backend strategy (in progress: targets, detection, compiled dispatch, fallback/strategy CI, capability/evidence reporting, runtime self-healing diagnostics, resilience CI/evidence, and TPU/NPU/DSP/MATH strict-mode gating shipped via `coprocessor_capability_report`, `coprocessor_runtime_diagnostics`, `scripts/coprocessor-evidence.jl`, `test/ci/coprocessor_resilience.jl`, `scripts/coprocessor-resilience-evidence.jl`, `test/ci/tpu_required_mode.jl`, `scripts/tpu-strict-evidence.jl`, `test/ci/npu_required_mode.jl`, `scripts/npu-strict-evidence.jl`, `test/ci/dsp_required_mode.jl`, `scripts/dsp-strict-evidence.jl`, `test/ci/math_required_mode.jl`, and `scripts/math-strict-evidence.jl`; production kernels remain).
