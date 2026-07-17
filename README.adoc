@@ -44,18 +44,38 @@ result = verify(model, properties=[ValidProbabilities(), FiniteOutput()], data=[
 
 === Compile-Time Shape Verification
 
+The `@axiom` macro tracks tensor shapes through the layer chain **at
+macro-expansion time**, so a provable mismatch is a compile-time error — raised
+before the model is ever constructed or run, not after hours of training.
+
 [source,julia]
 ----
-# PyTorch: Runtime error after hours of training
-# Axiom.jl: Compile error in milliseconds
-
-@axiom BrokenModel begin
-    input :: Tensor{Float32, (224, 224, 3)}
-    features = input |> Conv(64, (3,3))
-    output = features |> Dense(10)  # COMPILE ERROR!
-    # "Shape mismatch: Conv output is (222,222,64), Dense expects vector"
+# Correct: the feature dimensions chain cleanly (784 -> 256 -> 10).
+@axiom Classifier begin
+    input  :: Tensor{Float32, (:batch, 784)}
+    output :: Tensor{Float32, (:batch, 10)}
+    hidden = input  |> Dense(784, 256, relu)
+    output = hidden |> Dense(256, 10) |> Softmax
 end
+
+# Broken: a Dense expecting 128 features fed a 256-feature tensor.
+@axiom BrokenModel begin
+    input  :: Tensor{Float32, (:batch, 784)}
+    output :: Tensor{Float32, (:batch, 10)}
+    hidden = input  |> Dense(784, 256, relu)
+    output = hidden |> Dense(128, 10)   # COMPILE ERROR
+end
+# ERROR: @axiom BrokenModel: compile-time shape mismatch in `output`.
+#   Dense layer expects 128 input feature(s), but the incoming tensor has 256.
+#   Running shape entering this layer: (:batch, 256).
 ----
+
+Verification is **sound but incomplete**: it rejects any mismatch it can prove
+from the declared `input ::`/`output ::` shapes and literal layer sizes (the
+`Dense` feature dimensions along the chain, and the final output declaration),
+and passes through anything it cannot statically resolve — `Conv`/pooling output
+geometry, non-literal layer arguments — so a *valid* model never receives a
+false compile error.
 
 === Formal Verification
 
