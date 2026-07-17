@@ -132,6 +132,167 @@ function _parse_macro_call(expr::Expr)
     end
 end
 
+# ===========================================================================
+# Compile-time shape verification
+#
+# Walks the declared layer chain at MACRO-EXPANSION time, tracking the tensor
+# shape from the `input ::` declaration through each layer assignment. A
+# *provable* shape mismatch — e.g. a `Dense` whose declared `in_features`
+# disagrees with the running feature dimension, or a computed `output` that
+# contradicts the `output ::` declaration — raises an error during expansion,
+# i.e. a genuine compile-time error before the model is constructed or run.
+#
+# Sound-but-incomplete BY DESIGN. A running shape is either a concrete
+# `Vector` of dims (each an `Int`, or `:dynamic` for a `:batch`/`:dynamic`
+# wildcard) or `nothing` (statically unknown). Anything that cannot be
+# resolved from literals — Conv/Pool output geometry, non-literal layer args,
+# unrecognised layers — collapses the running shape to `nothing` and is passed
+# through unchecked, so a *valid* model can never receive a false compile
+# error. Only definite, literal-provable contradictions are rejected.
+# ===========================================================================
+
+# Layer names known to preserve tensor shape (activations / normalisation).
+const _SHAPE_PRESERVING_LAYERS = Set(Symbol.([
+    "Softmax", "LogSoftmax", "relu", "ReLU", "sigmoid", "Sigmoid", "tanh",
+    "Tanh", "gelu", "GELU", "elu", "ELU", "swish", "SiLU", "leakyrelu",
+    "LeakyReLU", "Dropout", "BatchNorm", "LayerNorm", "GroupNorm", "Identity",
+    "softplus", "mish", "Mish",
+]))
+
+# Extract the shape dims from an `input ::` / `output ::` type AST of the form
+# `Tensor{ElemType, (d1, d2, ...)}`. Returns a Vector of dims (Int or :dynamic)
+# or `nothing` if it is not in the recognised 2-parameter shorthand form.
+function _extract_shape_dims(typ)
+    typ isa Expr || return nothing
+    typ.head === :curly || return nothing
+    length(typ.args) >= 3 || return nothing          # Tensor, ElemType, shape
+    shape_ast = typ.args[3]
+    (shape_ast isa Expr && shape_ast.head === :tuple) || return nothing
+    return Any[_norm_dim(d) for d in shape_ast.args]
+end
+
+# Normalise one dim AST node to an Int, or :dynamic for any symbolic/wildcard
+# dim (:batch, :dynamic, :, or any other symbol). Unknown → :dynamic keeps the
+# analysis sound (a wildcard never triggers a mismatch).
+function _norm_dim(d)
+    d isa Integer && return Int(d)
+    if d isa QuoteNode
+        return :dynamic
+    end
+    return :dynamic
+end
+
+# (head, args) for a layer application: `Dense(784,256,relu)` -> (:Dense, [784,256,relu]);
+# a bare `Softmax` symbol -> (:Softmax, []); anything else -> (nothing, []).
+function _layer_head_args(layer)
+    if layer isa Symbol
+        return (layer, Any[])
+    elseif layer isa Expr && layer.head === :call
+        return (layer.args[1], layer.args[2:end])
+    else
+        return (nothing, Any[])
+    end
+end
+
+_lit_int(x) = x isa Integer ? Int(x) : nothing
+
+# Apply one layer to the running shape. Returns (new_shape, mismatch_msg_or_nothing).
+# `shape === nothing` means statically unknown: never checked, stays unknown.
+function _shape_after_layer(layer, shape)
+    head, args = _layer_head_args(layer)
+
+    if head === :Dense
+        in_f = length(args) >= 1 ? _lit_int(args[1]) : nothing
+        out_f = length(args) >= 2 ? _lit_int(args[2]) : nothing
+        shape === nothing && return (nothing, nothing)
+        if in_f !== nothing && !isempty(shape)
+            last_dim = shape[end]
+            if last_dim isa Int && last_dim != in_f
+                return (shape, "Dense layer expects $in_f input feature(s), but the incoming tensor has $last_dim")
+            end
+        end
+        # Output feature dim = out_f if known, else unknown (:dynamic).
+        isempty(shape) && return (nothing, nothing)
+        new_last = out_f === nothing ? :dynamic : out_f
+        return (Any[shape[1:end-1]..., new_last], nothing)
+
+    elseif head === :Flatten || layer === :Flatten
+        shape === nothing && return (nothing, nothing)
+        # Only resolvable under the (batch, dims...) convention: a wildcard
+        # leading dim with all-Int trailing dims. Otherwise -> unknown.
+        if length(shape) >= 2 && shape[1] === :dynamic && all(x -> x isa Int, shape[2:end])
+            return (Any[:dynamic, prod(shape[2:end])], nothing)
+        end
+        return (nothing, nothing)
+
+    elseif head in _SHAPE_PRESERVING_LAYERS
+        return (shape, nothing)                        # shape unchanged (may be nothing)
+
+    else
+        # Conv/Pool geometry and any unrecognised layer: cannot resolve
+        # soundly -> collapse to unknown so nothing downstream false-errors.
+        return (nothing, nothing)
+    end
+end
+
+# Flatten a pipeline AST `a |> L1 |> L2 |> ...` into (base, [L1, L2, ...]).
+function _flatten_pipeline(expr)
+    layers = Any[]
+    cur = expr
+    while is_pipeline_expr(cur)
+        pushfirst!(layers, cur.args[3])
+        cur = cur.args[2]
+    end
+    return (cur, layers)
+end
+
+_fmt_shape(dims) = "(" * join(map(d -> d === :dynamic ? ":batch" : string(d), dims), ", ") * ")"
+
+"""
+    _verify_axiom_shapes(name::Symbol, def::AxiomDefinition)
+
+Compile-time shape check for an `@axiom` body. Raises an error during macro
+expansion on a provable shape mismatch; returns silently otherwise (including
+when the shapes are not statically resolvable).
+"""
+function _verify_axiom_shapes(name::Symbol, def::AxiomDefinition)
+    in_dims = def.input_type === nothing ? nothing : _extract_shape_dims(def.input_type)
+    in_dims === nothing && return nothing            # no parseable input shape
+
+    shapes = Dict{Symbol, Any}(:input => in_dims)
+
+    for (lname, lexpr) in def.layers
+        base, chain = _flatten_pipeline(lexpr)
+        (base isa Symbol && haskey(shapes, base)) || continue
+        cur = shapes[base]
+        for layer in chain
+            new_shape, msg = _shape_after_layer(layer, cur)
+            if msg !== nothing
+                error("@axiom $(name): compile-time shape mismatch in `$(lname)`.\n" *
+                      "  $msg.\n" *
+                      "  Running shape entering this layer: $(_fmt_shape(cur)).")
+            end
+            cur = new_shape
+        end
+        shapes[lname] = cur
+    end
+
+    # Computed `output` vs declared `output ::` — reject a definite contradiction.
+    if haskey(shapes, :output) && shapes[:output] isa Vector && def.output_type !== nothing
+        out_dims = _extract_shape_dims(def.output_type)
+        computed = shapes[:output]
+        if out_dims !== nothing && length(out_dims) == length(computed)
+            for (d_decl, d_comp) in zip(out_dims, computed)
+                if d_decl isa Int && d_comp isa Int && d_decl != d_comp
+                    error("@axiom $(name): declared output shape $(_fmt_shape(out_dims)) " *
+                          "contradicts the computed output shape $(_fmt_shape(computed)).")
+                end
+            end
+        end
+    end
+    return nothing
+end
+
 """
     generate_axiom_code(name::Symbol, def::AxiomDefinition) -> Expr
 
@@ -140,6 +301,11 @@ parsed `AxiomDefinition`. This includes the struct definition, layer
 initialization, the forward pass function, and any `@ensure` checks.
 """
 function generate_axiom_code(name::Symbol, def::AxiomDefinition)
+    # Compile-time shape verification: runs NOW, during macro expansion, so a
+    # provable shape mismatch is a genuine compile-time error (before the model
+    # is ever constructed or run). Sound-but-incomplete — see _verify_axiom_shapes.
+    _verify_axiom_shapes(name, def)
+
     layer_fields, layer_inits = _generate_layer_fields_and_inits(def)
     persistent_layer_names = [field.args[1] for field in layer_fields]
     forward_body = _generate_forward_body(def)

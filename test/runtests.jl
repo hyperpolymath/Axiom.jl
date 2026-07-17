@@ -715,6 +715,64 @@ with open(args.output, "w", encoding="utf-8") as f:
         @test_throws EnsureViolation @ensure sum(x) ≈ 2.0 "Wrong sum"
     end
 
+    @testset "Compile-Time Shape Verification" begin
+        # The @axiom macro runs _verify_axiom_shapes during expansion; test it
+        # directly on parsed bodies (a struct can't be defined in local scope).
+        mkdef(body) = Axiom.parse_axiom_body(body)
+
+        # Valid Dense chain: returns nothing (no error).
+        valid = quote
+            input :: Tensor{Float32, (:batch, 784)}
+            output :: Tensor{Float32, (:batch, 10)}
+            h1 = input |> Dense(784, 256, relu)
+            logits = h1 |> Dense(256, 10)
+            output = logits |> Softmax
+        end
+        @test Axiom._verify_axiom_shapes(:ValidNet, mkdef(valid)) === nothing
+
+        # Dense in-features mismatch (256 -> Dense(128,…)): compile-time error.
+        mismatch = quote
+            input :: Tensor{Float32, (:batch, 784)}
+            output :: Tensor{Float32, (:batch, 10)}
+            h1 = input |> Dense(784, 256, relu)
+            output = h1 |> Dense(128, 10)
+        end
+        @test_throws ErrorException Axiom._verify_axiom_shapes(:BrokenNet, mkdef(mismatch))
+
+        # First-layer input mismatch (input 784 vs Dense wants 20): error.
+        badin = quote
+            input :: Tensor{Float32, (:batch, 784)}
+            output :: Tensor{Float32, (:batch, 2)}
+            output = input |> Dense(20, 2)
+        end
+        @test_throws ErrorException Axiom._verify_axiom_shapes(:BadIn, mkdef(badin))
+
+        # Declared output contradicts computed output: error.
+        badout = quote
+            input :: Tensor{Float32, (:batch, 20)}
+            output :: Tensor{Float32, (:batch, 5)}
+            output = input |> Dense(20, 3)
+        end
+        @test_throws ErrorException Axiom._verify_axiom_shapes(:BadOut, mkdef(badout))
+
+        # Conv/Flatten geometry is not statically resolvable -> must NOT error
+        # (soundness: a valid model never gets a false compile error).
+        convnet = quote
+            input :: Tensor{Float32, (:batch, 28, 28, 1)}
+            output :: Tensor{Float32, (:batch, 10)}
+            c = input |> Conv(1, 32, (3, 3))
+            f = c |> Flatten
+            output = f |> Dense(100, 10)
+        end
+        @test Axiom._verify_axiom_shapes(:ConvNet, mkdef(convnet)) === nothing
+
+        # No input type declared -> nothing to verify, returns nothing.
+        noinput = quote
+            output = something |> Dense(10, 2)
+        end
+        @test Axiom._verify_axiom_shapes(:NoInput, mkdef(noinput)) === nothing
+    end
+
     @testset "SMT Runner" begin
         solver = Axiom.get_smt_solver()
         if solver === nothing
