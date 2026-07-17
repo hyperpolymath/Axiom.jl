@@ -93,54 +93,13 @@ function _nested_array_f32(value, field_name::AbstractString)
     _array_from_row_major(flat, shape)
 end
 
-function _default_pytorch_bridge_script()
-    normpath(joinpath(@__DIR__, "..", "..", "scripts", "pytorch_to_axiom_descriptor.py"))
-end
-
-function _run_pytorch_bridge(
-    input_path::AbstractString;
-    python_cmd::AbstractString = get(ENV, "AXIOM_PYTHON", "python3"),
-    bridge_script::AbstractString = _default_pytorch_bridge_script(),
-    strict::Bool = true,
-)
-    isfile(input_path) || throw(ArgumentError("Checkpoint path does not exist: $(input_path)"))
-    isfile(bridge_script) || throw(ArgumentError("PyTorch bridge script not found: $(bridge_script)"))
-
-    parts = Base.shell_split(String(python_cmd))
-    isempty(parts) && throw(ArgumentError("`python_cmd` must not be empty"))
-
-    tmp_path, tmp_io = mktemp()
-    close(tmp_io)
-    tmp_json_path = tmp_path * ".pytorch.json"
-    mv(tmp_path, tmp_json_path; force=true)
-
-    cmd_parts = copy(parts)
-    append!(cmd_parts, [
-        String(bridge_script),
-        "--input", String(input_path),
-        "--output", String(tmp_json_path),
-        strict ? "--strict" : "--no-strict",
-    ])
-    cmd = Cmd(cmd_parts)
-
-    stdout_buf = IOBuffer()
-    stderr_buf = IOBuffer()
-    ok = success(pipeline(cmd; stdout=stdout_buf, stderr=stderr_buf))
-    if !ok
-        stderr_out = String(take!(stderr_buf))
-        stdout_out = String(take!(stdout_buf))
-        rm(tmp_json_path; force=true)
-        throw(ErrorException(
-            "PyTorch bridge failed for `$(input_path)`.\n" *
-            "Command: $(cmd)\n" *
-            (isempty(stdout_out) ? "" : "stdout:\n$(stdout_out)\n") *
-            (isempty(stderr_out) ? "" : "stderr:\n$(stderr_out)\n")
-        ))
-    end
-
-    isfile(tmp_json_path) || throw(ErrorException("PyTorch bridge did not produce descriptor output: $(tmp_json_path)"))
-    tmp_json_path
-end
+# PyTorch import is pure Julia: `from_pytorch` reads the
+# `axiom.pytorch.sequential.v1` JSON descriptor directly (see below). The
+# previous bridge shelled out to a `python3` script to convert raw
+# `.pt/.pth/.ckpt` checkpoints — removed, because Python is banned estate-wide
+# and that bridge script never shipped (so the "direct checkpoint" path always
+# failed anyway). Reading a raw checkpoint (zip + pickle) natively in Julia is
+# tracked as future work; today, export the model to the descriptor first.
 
 function _pytorch_layers(spec::Dict{String, Any})
     raw_layers = get(spec, "layers", get(spec, "modules", nothing))
@@ -373,54 +332,33 @@ function _pytorch_module_to_layer(spec::Dict{String, Any}; strict::Bool = true)
 end
 
 """
-    from_pytorch(path::AbstractString; strict=true, bridge=true, python_cmd="python3", bridge_script=scripts/pytorch_to_axiom_descriptor.py)
+    from_pytorch(path::AbstractString; strict=true)
 
-Import a model from:
-- a PyTorch JSON descriptor (`axiom.pytorch.sequential.v1`)
-- or a `.pt`/`.pth`/`.ckpt` checkpoint via the built-in Python bridge script.
-
-Bridge requirements for direct checkpoints:
-- Python runtime (`python3` by default, configurable via `python_cmd`)
-- `torch` installed in that Python environment
+Import a model from a PyTorch **JSON descriptor** (`axiom.pytorch.sequential.v1`).
+Pure Julia — no Python runtime, no external bridge.
 
 Supported descriptor format:
 - `format = "axiom.pytorch.sequential.v1"`
 - `layers = [...]` where each layer is a module object (`Linear`, `ReLU`, etc.)
+
+Raw `.pt`/`.pth`/`.ckpt` checkpoints are **not** loaded directly (that would
+require a PyTorch/Python runtime, which is out of scope). Export the model to
+the descriptor format first, then pass the resulting `.json` here.
 """
-function from_pytorch(
-    path::AbstractString;
-    strict::Bool = true,
-    bridge::Bool = true,
-    python_cmd::AbstractString = get(ENV, "AXIOM_PYTHON", "python3"),
-    bridge_script::AbstractString = _default_pytorch_bridge_script(),
-)
+function from_pytorch(path::AbstractString; strict::Bool = true)
     isfile(path) || throw(ArgumentError("PyTorch import path does not exist: $(path)"))
     ext = lowercase(splitext(String(path))[2])
 
     if ext in (".pt", ".pth", ".ckpt")
-        bridge || throw(ArgumentError(
-            "Direct `.pt/.pth/.ckpt` loading requires bridge support. " *
-            "Pass `bridge=true` (default) or export JSON descriptor first."
+        throw(ArgumentError(
+            "Direct `.pt/.pth/.ckpt` import is not supported (it needs a " *
+            "PyTorch/Python runtime). Export the model to the " *
+            "`axiom.pytorch.sequential.v1` JSON descriptor and pass that `.json` " *
+            "to `from_pytorch` instead."
         ))
-        descriptor_path = _run_pytorch_bridge(
-            path;
-            python_cmd=python_cmd,
-            bridge_script=bridge_script,
-            strict=strict
-        )
-        try
-            return from_pytorch(descriptor_path; strict=strict, bridge=false)
-        finally
-            rm(descriptor_path; force=true)
-        end
     end
 
-    spec = try
-        JSON.parse(read(path, String))
-    catch e
-        rethrow(e)
-    end
-
+    spec = JSON.parse(read(path, String))
     from_pytorch(spec; strict=strict)
 end
 

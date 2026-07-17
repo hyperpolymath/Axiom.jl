@@ -61,45 +61,22 @@ Random.seed!(0xA710)
 
     pt_path = tempname() * ".pth"
     write(pt_path, "placeholder")
-    @test_throws ArgumentError from_pytorch(pt_path; bridge=false)
+    # Raw .pt/.pth/.ckpt import is unsupported (needs a PyTorch/Python runtime).
+    @test_throws ArgumentError from_pytorch(pt_path)
 
-    bridge_script = tempname() * ".py"
-    open(bridge_script, "w") do io
-        write(io, """
-import argparse
-import json
-
-p = argparse.ArgumentParser()
-p.add_argument("--input", required=True)
-p.add_argument("--output", required=True)
-p.add_argument("--strict", action="store_true")
-p.add_argument("--no-strict", action="store_false", dest="strict")
-args = p.parse_args()
-
-spec = {
-  "format": "axiom.pytorch.sequential.v1",
-  "layers": [
+    # Pure-Julia descriptor import — no Python, no external bridge.
+    descriptor_path = tempname() * ".pytorch.json"
+    write(descriptor_path, """
     {
-      "type": "Linear",
-      "in_features": 3,
-      "out_features": 2,
-      "weight": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
-      "bias": [0.0, 0.0]
-    },
-    {"type": "ReLU"}
-  ]
-}
-
-with open(args.output, "w", encoding="utf-8") as f:
-    json.dump(spec, f)
-""")
-    end
-    bridged = from_pytorch(
-        pt_path;
-        python_cmd="python3",
-        bridge_script=bridge_script,
-        strict=true
-    )
+      "format": "axiom.pytorch.sequential.v1",
+      "layers": [
+        {"type": "Linear", "in_features": 3, "out_features": 2,
+         "weight": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]], "bias": [0.0, 0.0]},
+        {"type": "ReLU"}
+      ]
+    }
+    """)
+    bridged = from_pytorch(descriptor_path; strict=true)
     @test bridged isa Axiom.Pipeline
 
     cv_model = Sequential(
@@ -129,7 +106,7 @@ with open(args.output, "w", encoding="utf-8") as f:
     rm(spec_path)
     rm(onnx_path)
     rm(pt_path)
-    rm(bridge_script)
+    rm(descriptor_path)
     rm(cv_onnx_path_a)
     rm(cv_onnx_path_b)
 end

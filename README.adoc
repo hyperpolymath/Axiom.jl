@@ -96,12 +96,12 @@ save_certificate(cert, "fda_submission.cert")
 
 [source,julia]
 ----
-# Import from a PyTorch checkpoint (.pt/.pth/.ckpt) via built-in Python bridge
-# (requires python3 + torch in the selected runtime)
-model = from_pytorch("model.pt")
+# Import from a canonical PyTorch descriptor JSON — pure Julia, no runtime deps.
+model = from_pytorch("model.pytorch.json")
 
-# Or import canonical descriptor JSON
-model2 = from_pytorch("model.pytorch.json")
+# Raw .pt/.pth/.ckpt files are Python-pickle and need a PyTorch/Python runtime
+# to read, so they are not imported directly — export your model to the
+# `axiom.pytorch.sequential.v1` descriptor first, then import the .json above.
 
 # Export supported models to ONNX
 to_onnx(model, "model.onnx", input_shape=(1, 3, 224, 224))
@@ -109,7 +109,7 @@ to_onnx(model, "model.onnx", input_shape=(1, 3, 224, 224))
 
 Current scope:
 
-* `from_pytorch(…)`: canonical descriptor import + direct `.pt/.pth/.ckpt` bridge.
+* `from_pytorch(…)`: pure-Julia `axiom.pytorch.sequential.v1` descriptor import.
 * `to_onnx(…)`: export for `Sequential`/`Pipeline` models built from
   Dense/Conv/Norm/Pool + common activations.
 
@@ -193,8 +193,7 @@ generate_grpc_proto("axiom_inference.proto")
 
 [source,julia]
 ----
-# PyTorch import (checkpoint bridge or canonical descriptor JSON)
-model = from_pytorch("model.pt")
+# PyTorch import — pure-Julia descriptor JSON (export from PyTorch first)
 model = from_pytorch("model.pytorch.json")
 
 # ONNX export (Dense/Conv/Norm/Pool + common activations)
