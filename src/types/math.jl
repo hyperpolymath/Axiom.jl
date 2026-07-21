@@ -37,6 +37,3 @@ end
 function Base.adjoint(t::Tensor{T, 2, S}) where {T, S}
     return Tensor(collect(t.data'))
 end
-
-# 7. Broadcasters/Forwarding for activations
-(t::Tensor)(x) = t.data(x) # Handle case where layer itself is called (though usually layers wrap tensors)

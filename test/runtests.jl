@@ -694,6 +694,23 @@ using JSON
         @test_throws EnsureViolation @ensure sum(x) ≈ 2.0 "Wrong sum"
     end
 
+    @testset "Tensor Arithmetic" begin
+        a = Axiom.Tensor(Float32[1 2; 3 4])
+        b = Axiom.Tensor(Float32[5 6; 7 8])
+
+        @test (a + b).data == Float32[6 8; 10 12]
+        @test (b - a).data == Float32[4 4; 4 4]
+        @test (a * 2.0f0).data == Float32[2 4; 6 8]
+        @test (2.0f0 * a).data == Float32[2 4; 6 8]
+        @test (a * b).data == Float32[1 2; 3 4] * Float32[5 6; 7 8]
+        @test sum(a) == 10.0f0
+        @test adjoint(a).data == permutedims(Float32[1 2; 3 4])
+
+        # Results are Tensors, not raw arrays
+        @test (a + b) isa Axiom.Tensor
+        @test (a * b) isa Axiom.Tensor
+    end
+
     @testset "Compile-Time Shape Verification" begin
         # The @axiom macro runs _verify_axiom_shapes during expansion; test it
         # directly on parsed bodies (a struct can't be defined in local scope).
