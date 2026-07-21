@@ -43,6 +43,19 @@ using JSON
         y = layer_relu(x)
         @test all(y.data .>= 0)  # ReLU output
 
+        # Flux-style pair form: Dense(in => out) — the idiom used throughout the docs.
+        layer_pair = Dense(784 => 128)
+        @test layer_pair.in_features == 784
+        @test layer_pair.out_features == 128
+        @test layer_pair.activation === identity
+        @test size(layer_pair(x)) == (32, 128)
+
+        # activation supplied positionally, by keyword, and via the pair form — all agree.
+        @test Dense(784, 128, activation=relu).activation === relu
+        @test Dense(784 => 128, relu).activation === relu
+        @test Dense(784 => 128, activation=relu).activation === relu
+        @test Dense(784 => 128, bias=false).bias === nothing
+
         # Test shape mismatch
         x_wrong_shape = Tensor(randn(Float32, 32, 783)) # Wrong number of features
         # Note: The actual error will be a MethodError because the matrix multiplication

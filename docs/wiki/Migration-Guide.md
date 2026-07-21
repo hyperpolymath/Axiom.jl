@@ -11,9 +11,14 @@
 |--------------|---------|----------|
 | Compile-time shape checking | | |
 | Formal verification | | |
-| 2-3x faster inference | | |
+| Competitive kernel performance† | | |
 | REPL exploration | | |
 | Keep existing models | | |
+
+> † *Performance is workload-dependent — Axiom is competitive with PyTorch on
+> small/medium ops and behind on large element-wise ops; see
+> `benchmark/results_2026-02-20_framework-comparison.md`. The real differentiator is
+> compile-time verification, not raw speed.*
 
 **The best part**: You don't have to rewrite anything. Import and go.
 
@@ -460,12 +465,13 @@ After migration, you can compile for production:
 # Development (Julia backend)
 dev_model = from_pytorch("model.pytorch.json")
 
-# Production (Zig backend) - 2-3x faster
-prod_model = compile(dev_model, backend=:zig, optimize=:aggressive)
+# Production (Zig backend)
+prod_model = compile(dev_model, backend=ZigBackend("/path/to/libaxiom_zig.so"), optimize=:aggressive)
 
-# Benchmark
-@time dev_model(test_input)   # 0.012s
-@time prod_model(test_input)  # 0.004s
+# Benchmark on your own workload — op-level medians are in
+# benchmark/results_2026-02-20_framework-comparison.md
+@time dev_model(test_input)
+@time prod_model(test_input)
 ```
 
 ---
