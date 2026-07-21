@@ -54,8 +54,7 @@ function main()
         -- AXIOM_PROOF_METHOD: pattern
         -- AXIOM_OBLIGATION_ID: $(expected_id)
 
-        theorem proof_bundle_complete : True := by
-          trivial
+        theorem proof_bundle_complete : 1 + 1 = 2 := by decide
         """,
     )
 
@@ -67,9 +66,9 @@ function main()
         (* AXIOM_PROOF_METHOD: pattern *)
         (* AXIOM_OBLIGATION_ID: $(expected_id) *)
 
-        Theorem proof_bundle_complete : True.
+        Theorem proof_bundle_complete : 1 + 1 = 2.
         Proof.
-          exact I.
+          reflexivity.
         Qed.
         """,
     )
@@ -86,7 +85,7 @@ function main()
         (* AXIOM_PROOF_METHOD: pattern *)
         (* AXIOM_OBLIGATION_ID: $(expected_id) *)
 
-        theorem proof_bundle_complete: "True"
+        theorem proof_bundle_complete: "(1::nat) + 1 = 2"
           by simp
 
         end
