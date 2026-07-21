@@ -52,6 +52,11 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9 # stable
+        with:
+          # Required when the action is SHA-pinned: it can only infer the
+          # toolchain from a tag ref (e.g. @stable), so a SHA pin needs it
+          # explicitly or the run fails with "'toolchain' is a required input".
+          toolchain: stable
 
       - name: Cache Cargo (crypto shim)
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
@@ -83,6 +88,11 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9 # stable
+        with:
+          # Required when the action is SHA-pinned: it can only infer the
+          # toolchain from a tag ref (e.g. @stable), so a SHA pin needs it
+          # explicitly or the run fails with "'toolchain' is a required input".
+          toolchain: stable
 
       - name: Cache Cargo (crypto shim)
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4

@@ -73,6 +73,7 @@ using Serialization
 # Core type system
 include("types/tensor.jl")
 include("types/shapes.jl")
+include("types/math.jl")   # Tensor arithmetic (+, -, scalar/mat *, sum, adjoint)
 
 # Layer abstractions
 include("layers/abstract.jl")
