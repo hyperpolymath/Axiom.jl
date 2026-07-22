@@ -226,14 +226,19 @@ end
 
 ### Is Axiom.jl faster than PyTorch?
 
-**Inference**: Yes, 2-3x faster with Zig backend
-**Training**: Comparable (Julia) to 1.5x faster (Zig)
+**It depends on the operation.** Axiom's own measured benchmark
+(`benchmark/results_2026-02-20_framework-comparison.md`) records a geometric mean of
+~0.73× PyTorch for the SmartBackend — i.e. slower on average, winning 11 of 25 ops.
+It is faster on small inputs and on RMSNorm/LayerNorm/BatchNorm at small sizes, but
+PyTorch's MKL wins large element-wise ops (sigmoid/gelu/softmax at ≥100K) by 5–25×.
+Axiom's differentiator is provable correctness, not raw speed. Training throughput is
+not separately benchmarked.
 
 ### How do I enable the Zig backend?
 
 ```julia
 # Compile for Zig
-model = compile(my_model, backend=:zig)
+model = compile(my_model, backend=ZigBackend("/path/to/libaxiom_zig.so"))
 
 # Or set environment variable
 ENV["AXIOM_BACKEND"] = "zig"

@@ -56,6 +56,9 @@ dense1 = Dense(784, 128)
 # A layer with ReLU activation
 dense2 = Dense(128, 64, relu)
 
+# Flux-style pair form (equivalent), with a keyword activation
+dense2b = Dense(128 => 64, activation=relu)
+
 # A layer without a bias term
 dense3 = Dense(64, 10, bias=false)
 
@@ -72,25 +75,24 @@ mutable struct Dense{T, F} <: AbstractLayer
 end
 
 """
-    Dense(
-        in_features::Int,
-        out_features::Int,
-        activation::F = identity;
-        bias::Bool = true,
-        init::AbstractInitializer = DEFAULT_WEIGHT_INIT,
-        bias_init::AbstractInitializer = DEFAULT_BIAS_INIT,
-        dtype::Type{T} = Float32
-    ) where {T, F}
+    Dense(in_features, out_features, σ = identity; activation = nothing, bias = true,
+          init = GlorotUniform(), bias_init = Zeros(), dtype = Float32)
+    Dense(in_features => out_features, σ = identity; kwargs...)   # Flux-style pair form
 
-Constructs a `Dense` layer.
+Constructs a `Dense` layer. The activation may be supplied positionally (`σ`,
+Flux-style) or via the `activation` keyword (the keyword wins if both are given).
+The pair form `in => out` forwards to the positional constructor, so the
+`Dense(784 => 256)` idiom used throughout the docs resolves to a real method.
 
 Arguments:
 - `in_features::Int`: The number of input features this layer expects. Must be positive.
 - `out_features::Int`: The number of output features this layer produces. Must be positive.
-- `activation::F`: The activation function to apply after the linear transformation.
-                   Can be any Julia function or callable object. Defaults to `identity`.
+- `σ`: The activation function to apply after the linear transformation (positional).
+       Can be any Julia function or callable object. Defaults to `identity`.
 
 Keyword Arguments:
+- `activation`: Alternative to the positional `σ`; overrides it when given. Lets you
+                write `Dense(in, out; activation=relu)` and `Dense(in => out; activation=relu)`.
 - `bias::Bool`: If `true`, a bias term `b` is added to the output. Defaults to `true`.
 - `init::AbstractInitializer`: The initializer strategy for the `weight` matrix.
                                Defaults to `DEFAULT_WEIGHT_INIT` (GlorotUniform).
@@ -108,20 +110,32 @@ Throws:
 function Dense(
     in_features::Int,
     out_features::Int,
-    activation::F = identity;
+    σ = identity;
+    activation = nothing,
     bias::Bool = true,
     init::AbstractInitializer = DEFAULT_WEIGHT_INIT,
     bias_init::AbstractInitializer = DEFAULT_BIAS_INIT,
     dtype::Type{T} = Float32
-) where {T, F}
+) where {T}
     @assert in_features > 0 "in_features must be positive."
     @assert out_features > 0 "out_features must be positive."
+
+    # The activation may be supplied positionally (`σ`, Flux-style) or by the
+    # `activation` keyword (as the docstring and docs advertise); the keyword
+    # wins when both are given.
+    act = activation === nothing ? σ : activation
 
     weight = T.(init(in_features, out_features)) # Initializes as (in_features, out_features) matrix
     b = bias ? T.(bias_init(out_features)) : nothing # Initializes as (out_features,) vector
 
-    Dense{T, F}(weight, b, activation, in_features, out_features)
+    Dense{T, typeof(act)}(weight, b, act, in_features, out_features)
 end
+
+# Flux-style pair form: `Dense(in => out)`, `Dense(in => out, relu)`,
+# `Dense(in => out; activation=relu)`. Forwards to the primary constructor so the
+# `in => out` idiom used throughout the docs resolves to a real method.
+Dense(dims::Pair{<:Integer, <:Integer}, args...; kwargs...) =
+    Dense(Int(first(dims)), Int(last(dims)), args...; kwargs...)
 
 # forward(d::Dense, x::AbstractTensor) is defined in backends/abstract.jl
 # with backend-aware dispatch (routes through Zig/GPU when active).

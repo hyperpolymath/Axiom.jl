@@ -21,14 +21,14 @@
 
 ```julia
 # The type system ensures correctness
-model = @axiom begin
+model = @axiom MnistNet begin
     @ensure input_shape == (784,) "MNIST images must be 784-dim"
     Dense(784 => 256, activation=relu)
     Dense(256 => 10, activation=softmax)
     @ensure output_shape == (10,) "Must output 10 classes"
 end
 
-# Compile-time verification
+# Verification (static where a property is provable; runtime otherwise)
 @prove BoundedOutputs(0.0, 1.0) model
 ```
 

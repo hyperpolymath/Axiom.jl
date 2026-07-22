@@ -126,9 +126,9 @@ result = verify(model, properties=[ValidProbabilities(), FiniteOutput()], data=b
 
 ## Optional Backends
 
-Axiom is Julia-first. The Rust backend is optional and used only when you
-explicitly enable it (e.g., for high-performance kernels or SMT runner
-hardening). Most users can ignore it entirely.
+Axiom is Julia-first. The optional **Zig backend** provides native SIMD kernels for
+high-performance hot paths and is used only when you explicitly enable it
+(e.g. `compile(model, backend=ZigBackend(path))`). Most users can ignore it entirely.
 
 ---
 
@@ -139,9 +139,13 @@ hardening). Most users can ignore it entirely.
 | Shape checking | Runtime | Runtime | **Compile time** |
 | Formal proofs | No | No | **Yes** |
 | REPL exploration | No | No | **Yes** |
-| Performance | Good | Good | **Better** (Rust) |
+| Performance | Good | Good | Competitive (Zig)† |
 | Safety certification | No | No | **Yes** |
 | Learning curve | Low | Medium | Low |
+
+> † *Performance is workload-dependent: Axiom's Zig SmartBackend is competitive with
+> PyTorch on small/medium ops and behind on large element-wise ops (geomean ~0.73×).
+> See `benchmark/results_2026-02-20_framework-comparison.md`.*
 
 ---
 
@@ -160,7 +164,7 @@ hardening). Most users can ignore it entirely.
 - [@axiom DSL](Axiom-DSL.md) - The declarative model definition
 - [Verification System](Verification.md) - @ensure and @prove
 - [Architecture](Architecture.md) - Deep dive into design
-- [Rust Backend](Rust-Backend.md) - Performance architecture
+- [Performance Tuning](Performance-Tuning.md) - Backend selection and optimization
 
 ### API Reference
 - [Complete API Reference](API-Reference.md) - All functions, types, macros

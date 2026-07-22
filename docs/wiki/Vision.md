@@ -100,31 +100,35 @@ Flatten()(input) |> Dense(784, 10)  # ✓ Compiles
 
     # ... layers ...
 
-    # These are PROVEN, not just tested
+    # @ensure adds runtime contracts; @prove attempts to discharge them statically
     @ensure sum(output) ≈ 1.0
     @ensure all(output .>= 0)
     @prove ∀x. no_nan(output(x))
 end
 ```
 
-**What this means**: You get mathematical proof that your model has certain properties.
+**What this means**: `@ensure` attaches runtime contracts that are checked on every
+forward pass; `@prove` attempts to discharge a property *statically* — via
+known-pattern heuristics, or an SMT solver when `SMTLib.jl` is loaded — and honestly
+returns `:unknown` when it cannot. It is not a blanket claim that every property is
+formally proved.
 
 ### 3. Production Performance
 
 ```julia
 # Development: Julia backend (fast iteration)
-model = compile(MyModel, backend=:julia)
+model = compile(MyModel, backend=JuliaBackend())
 
-# Production: Rust backend (maximum speed)
-model = compile(MyModel, backend=:rust, optimize=:aggressive)
-# 2-3x faster than PyTorch, with formal guarantees
+# Production: Zig backend (native SIMD kernels)
+model = compile(MyModel, backend=ZigBackend("/path/to/libaxiom_zig.so"), optimize=:aggressive)
+# Competitive with PyTorch on small/medium workloads — see benchmark/ for measured medians
 ```
 
-**What this means**: No compromise between safety and speed.
+**What this means**: verification guarantees without giving up competitive performance.
 
 ---
 
-## Why Julia + Rust?
+## Why Julia + Zig?
 
 ### Why Not Pure Python?
 
@@ -138,9 +142,9 @@ def broken(x):
 # Only crashes at runtime, maybe
 ```
 
-### Why Not Pure Rust?
+### Why Not a Pure Systems Language?
 
-Rust is great for systems programming. But ML research needs:
+Systems languages like Zig are great for native kernels. But ML research needs:
 
 - **REPL exploration** - Try ideas instantly
 - **Interactive visualization** - Plot results immediately
@@ -156,7 +160,7 @@ Rust is great for systems programming. But ML research needs:
 // This is a flow killer for research
 ```
 
-### Why Julia + Rust?
+### Why Julia + Zig?
 
 **Julia for research**:
 ```julia
@@ -167,11 +171,11 @@ julia> model(randn(4, 10))  # Instant feedback
  ...
 ```
 
-**Rust for production**:
+**Zig for production**:
 ```julia
 # When you're done experimenting
-production_model = compile(model, backend=:rust)
-# Single binary, 2-3x faster, memory safe
+production_model = compile(model, backend=ZigBackend("/path/to/libaxiom_zig.so"))
+# Native SIMD kernels; competitive on small/medium ops (see benchmark/)
 ```
 
 **Best of both worlds.**
@@ -206,7 +210,7 @@ end
 ```julia
 @axiom Model begin
     # ...
-    @prove ∀x. sum(softmax(x)) == 1.0  # Proven mathematically
+    @prove ∀x. sum(softmax(x)) == 1.0  # discharged via @prove (known pattern; SMT when SMTLib.jl loaded)
     @prove ∀x ε. (ε < δ) ⟹ stable(f(x), f(x+ε))  # Robustness
 end
 ```
