@@ -31,6 +31,31 @@ pub const threading = @import("threading.zig");
 
 pub const VERSION = "0.1.0";
 
+pub const AXIOM_STATUS_OK: u32 = 0;
+pub const AXIOM_STATUS_NULL_POINTER: u32 = 1;
+pub const AXIOM_STATUS_NON_FINITE_INPUT: u32 = 2;
+pub const AXIOM_STATUS_ALIASING: u32 = 3;
+pub const AXIOM_STATUS_INVALID_DIMENSION: u32 = 4;
+pub const AXIOM_STATUS_NON_FINITE_RESULT: u32 = 5;
+
+const AddressRange = struct {
+    start: usize,
+    end: usize,
+
+    fn overlaps(self: AddressRange, other: AddressRange) bool {
+        return self.start < other.end and other.start < self.end;
+    }
+};
+
+fn f32Range(pointer: anytype, len: usize) ?AddressRange {
+    if (len == 0) return .{ .start = 0, .end = 0 };
+    const resolved = pointer orelse return null;
+    const start = @intFromPtr(resolved);
+    const bytes = std.math.mul(usize, len, @sizeOf(f32)) catch return null;
+    const end = std.math.add(usize, start, bytes) catch return null;
+    return .{ .start = start, .end = end };
+}
+
 export fn axiom_zig_version() [*:0]const u8 {
     return "Axiom.jl Zig Backend v" ++ VERSION;
 }
@@ -59,6 +84,46 @@ export fn axiom_matmul(
     const c = c_ptr[0 .. m * n];
 
     matmul.matmul_tiled(a, b, c, m, k, n);
+}
+
+fn matmulCellFinite(a: []const f32, b: []const f32, row: usize, column: usize, k: usize, n: usize) bool {
+    var sum: f32 = 0.0;
+    for (0..k) |inner| {
+        sum += a[row * k + inner] * b[inner * n + column];
+        if (!std.math.isFinite(sum)) return false;
+    }
+    return true;
+}
+
+/// Checked row-major matrix multiplication. Dimensions derive every buffer
+/// length; inputs and all prospective cells are validated before output is
+/// changed. The legacy void export remains available for proven callers.
+export fn axiom_matmul_checked(
+    a_ptr: ?[*]const f32,
+    b_ptr: ?[*]const f32,
+    c_ptr: ?[*]f32,
+    m: usize,
+    k: usize,
+    n: usize,
+) u32 {
+    const a_len = std.math.mul(usize, m, k) catch return AXIOM_STATUS_INVALID_DIMENSION;
+    const b_len = std.math.mul(usize, k, n) catch return AXIOM_STATUS_INVALID_DIMENSION;
+    const c_len = std.math.mul(usize, m, n) catch return AXIOM_STATUS_INVALID_DIMENSION;
+    if ((a_len != 0 and a_ptr == null) or (b_len != 0 and b_ptr == null) or (c_len != 0 and c_ptr == null))
+        return AXIOM_STATUS_NULL_POINTER;
+    const a_range = f32Range(a_ptr, a_len) orelse return AXIOM_STATUS_INVALID_DIMENSION;
+    const b_range = f32Range(b_ptr, b_len) orelse return AXIOM_STATUS_INVALID_DIMENSION;
+    const c_range = f32Range(c_ptr, c_len) orelse return AXIOM_STATUS_INVALID_DIMENSION;
+    if (c_range.overlaps(a_range) or c_range.overlaps(b_range)) return AXIOM_STATUS_ALIASING;
+    const a = if (a_len == 0) &[_]f32{} else a_ptr.?[0..a_len];
+    const b = if (b_len == 0) &[_]f32{} else b_ptr.?[0..b_len];
+    for (a) |value| if (!std.math.isFinite(value)) return AXIOM_STATUS_NON_FINITE_INPUT;
+    for (b) |value| if (!std.math.isFinite(value)) return AXIOM_STATUS_NON_FINITE_INPUT;
+    for (0..m) |row| for (0..n) |column| {
+        if (!matmulCellFinite(a, b, row, column, k, n)) return AXIOM_STATUS_NON_FINITE_RESULT;
+    };
+    if (c_len != 0) matmul.matmul_tiled(a, b, c_ptr.?[0..c_len], m, k, n);
+    return AXIOM_STATUS_OK;
 }
 
 /// Batched matrix multiplication
@@ -91,6 +156,35 @@ export fn axiom_bmm(
 
 export fn axiom_relu(x_ptr: [*]const f32, y_ptr: [*]f32, n: usize) void {
     threading.parallel_relu(x_ptr, y_ptr, n);
+}
+
+/// Checked, output-atomic ReLU for FFI consumers that cannot prove pointer and
+/// numeric preconditions in their type system. Legacy `axiom_relu` remains for
+/// compatibility with existing Julia callers.
+export fn axiom_relu_checked(x_ptr: ?[*]const f32, y_ptr: ?[*]f32, n: usize) u32 {
+    if (n == 0) return AXIOM_STATUS_OK;
+    const input_range = f32Range(x_ptr, n) orelse return AXIOM_STATUS_NULL_POINTER;
+    const output_range = f32Range(y_ptr, n) orelse return AXIOM_STATUS_NULL_POINTER;
+    if (input_range.overlaps(output_range)) return AXIOM_STATUS_ALIASING;
+    const input = x_ptr.?[0..n];
+    for (input) |value| if (!std.math.isFinite(value)) return AXIOM_STATUS_NON_FINITE_INPUT;
+    activations.relu(input, y_ptr.?[0..n]);
+    return AXIOM_STATUS_OK;
+}
+
+export fn axiom_relu6(x_ptr: [*]const f32, y_ptr: [*]f32, n: usize) void {
+    activations.relu6(x_ptr[0..n], y_ptr[0..n]);
+}
+
+export fn axiom_relu6_checked(x_ptr: ?[*]const f32, y_ptr: ?[*]f32, n: usize) u32 {
+    if (n == 0) return AXIOM_STATUS_OK;
+    const input_range = f32Range(x_ptr, n) orelse return AXIOM_STATUS_NULL_POINTER;
+    const output_range = f32Range(y_ptr, n) orelse return AXIOM_STATUS_NULL_POINTER;
+    if (input_range.overlaps(output_range)) return AXIOM_STATUS_ALIASING;
+    const input = x_ptr.?[0..n];
+    for (input) |value| if (!std.math.isFinite(value)) return AXIOM_STATUS_NON_FINITE_INPUT;
+    activations.relu6(input, y_ptr.?[0..n]);
+    return AXIOM_STATUS_OK;
 }
 
 export fn axiom_relu_inplace(x_ptr: [*]f32, n: usize) void {
@@ -349,6 +443,7 @@ export fn axiom_scaled_dot_product_attention(
     head_dim: usize,
     mask_ptr: ?[*]const f32,
 ) void {
+    if (seq_len == 0 or seq_len > 64 or head_dim == 0) return;
     attention.scaled_dot_product_attention(
         q_ptr,
         k_ptr,
@@ -361,6 +456,24 @@ export fn axiom_scaled_dot_product_attention(
     );
 }
 
+export fn axiom_scaled_dot_product_attention_checked(
+    q_ptr: ?[*]const f32,
+    k_ptr: ?[*]const f32,
+    v_ptr: ?[*]const f32,
+    output_ptr: ?[*]f32,
+    batch: usize,
+    seq_len: usize,
+    head_dim: usize,
+    mask_ptr: ?[*]const f32,
+) u32 {
+    if (seq_len == 0 or seq_len > 64 or head_dim == 0) return AXIOM_STATUS_INVALID_DIMENSION;
+    if (batch != 0 and (q_ptr == null or k_ptr == null or v_ptr == null or output_ptr == null))
+        return AXIOM_STATUS_NULL_POINTER;
+    if (batch == 0) return AXIOM_STATUS_OK;
+    attention.scaled_dot_product_attention(q_ptr.?, k_ptr.?, v_ptr.?, output_ptr.?, batch, seq_len, head_dim, mask_ptr);
+    return AXIOM_STATUS_OK;
+}
+
 export fn axiom_flash_attention(
     q_ptr: [*]const f32,
     k_ptr: [*]const f32,
@@ -371,6 +484,7 @@ export fn axiom_flash_attention(
     head_dim: usize,
     block_size: usize,
 ) void {
+    if (seq_len == 0 or seq_len > 4096 or head_dim == 0 or block_size == 0 or block_size > 64) return;
     attention.flash_attention(
         q_ptr,
         k_ptr,
@@ -381,6 +495,25 @@ export fn axiom_flash_attention(
         head_dim,
         block_size,
     );
+}
+
+export fn axiom_flash_attention_checked(
+    q_ptr: ?[*]const f32,
+    k_ptr: ?[*]const f32,
+    v_ptr: ?[*]const f32,
+    output_ptr: ?[*]f32,
+    batch: usize,
+    seq_len: usize,
+    head_dim: usize,
+    block_size: usize,
+) u32 {
+    if (seq_len == 0 or seq_len > 4096 or head_dim == 0 or block_size == 0 or block_size > 64)
+        return AXIOM_STATUS_INVALID_DIMENSION;
+    if (batch != 0 and (q_ptr == null or k_ptr == null or v_ptr == null or output_ptr == null))
+        return AXIOM_STATUS_NULL_POINTER;
+    if (batch == 0) return AXIOM_STATUS_OK;
+    attention.flash_attention(q_ptr.?, k_ptr.?, v_ptr.?, output_ptr.?, batch, seq_len, head_dim, block_size);
+    return AXIOM_STATUS_OK;
 }
 
 export fn axiom_rotary_embedding(
@@ -416,6 +549,28 @@ export fn axiom_add(a_ptr: [*]const f32, b_ptr: [*]const f32, c_ptr: [*]f32, n: 
     }
 }
 
+fn validateBinaryBuffers(a_ptr: ?[*]const f32, b_ptr: ?[*]const f32, c_ptr: ?[*]f32, n: usize) u32 {
+    if (n == 0) return AXIOM_STATUS_OK;
+    const a_range = f32Range(a_ptr, n) orelse return AXIOM_STATUS_NULL_POINTER;
+    const b_range = f32Range(b_ptr, n) orelse return AXIOM_STATUS_NULL_POINTER;
+    const c_range = f32Range(c_ptr, n) orelse return AXIOM_STATUS_NULL_POINTER;
+    if (c_range.overlaps(a_range) or c_range.overlaps(b_range)) return AXIOM_STATUS_ALIASING;
+    return AXIOM_STATUS_OK;
+}
+
+export fn axiom_add_checked(a_ptr: ?[*]const f32, b_ptr: ?[*]const f32, c_ptr: ?[*]f32, n: usize) u32 {
+    const status = validateBinaryBuffers(a_ptr, b_ptr, c_ptr, n);
+    if (status != AXIOM_STATUS_OK or n == 0) return status;
+    const a = a_ptr.?[0..n];
+    const b = b_ptr.?[0..n];
+    for (a, b) |left, right| {
+        if (!std.math.isFinite(left) or !std.math.isFinite(right)) return AXIOM_STATUS_NON_FINITE_INPUT;
+        if (!std.math.isFinite(left + right)) return AXIOM_STATUS_NON_FINITE_RESULT;
+    }
+    axiom_add(a_ptr.?, b_ptr.?, c_ptr.?, n);
+    return AXIOM_STATUS_OK;
+}
+
 /// Element-wise multiplication with SIMD
 export fn axiom_mul(a_ptr: [*]const f32, b_ptr: [*]const f32, c_ptr: [*]f32, n: usize) void {
     const Vec = @Vector(8, f32);
@@ -434,6 +589,19 @@ export fn axiom_mul(a_ptr: [*]const f32, b_ptr: [*]const f32, c_ptr: [*]f32, n: 
     while (j < n) : (j += 1) {
         c_ptr[j] = a_ptr[j] * b_ptr[j];
     }
+}
+
+export fn axiom_mul_checked(a_ptr: ?[*]const f32, b_ptr: ?[*]const f32, c_ptr: ?[*]f32, n: usize) u32 {
+    const status = validateBinaryBuffers(a_ptr, b_ptr, c_ptr, n);
+    if (status != AXIOM_STATUS_OK or n == 0) return status;
+    const a = a_ptr.?[0..n];
+    const b = b_ptr.?[0..n];
+    for (a, b) |left, right| {
+        if (!std.math.isFinite(left) or !std.math.isFinite(right)) return AXIOM_STATUS_NON_FINITE_INPUT;
+        if (!std.math.isFinite(left * right)) return AXIOM_STATUS_NON_FINITE_RESULT;
+    }
+    axiom_mul(a_ptr.?, b_ptr.?, c_ptr.?, n);
+    return AXIOM_STATUS_OK;
 }
 
 /// Fill array with scalar
@@ -470,6 +638,41 @@ test "relu" {
     try testing.expectEqual(@as(f32, 2.0), output[4]);
 }
 
+test "checked relu family is finite, non-aliasing, and output atomic" {
+    const input = [_]f32{ -2.0, -0.0, 2.5, 9.0 };
+    var relu_output = [_]f32{ 91.0, 91.0, 91.0, 91.0 };
+    try testing.expectEqual(AXIOM_STATUS_OK, axiom_relu_checked(&input, &relu_output, input.len));
+    try testing.expectEqualSlices(f32, &[_]f32{ 0.0, 0.0, 2.5, 9.0 }, &relu_output);
+
+    var relu6_output = [_]f32{ 92.0, 92.0, 92.0, 92.0 };
+    try testing.expectEqual(AXIOM_STATUS_OK, axiom_relu6_checked(&input, &relu6_output, input.len));
+    try testing.expectEqualSlices(f32, &[_]f32{ 0.0, 0.0, 2.5, 6.0 }, &relu6_output);
+
+    const invalid = [_]f32{ 1.0, std.math.nan(f32), 3.0 };
+    var untouched = [_]f32{ 7.0, 8.0, 9.0 };
+    try testing.expectEqual(AXIOM_STATUS_NON_FINITE_INPUT, axiom_relu_checked(&invalid, &untouched, invalid.len));
+    try testing.expectEqualSlices(f32, &[_]f32{ 7.0, 8.0, 9.0 }, &untouched);
+
+    var aliased = [_]f32{ -1.0, 2.0 };
+    try testing.expectEqual(AXIOM_STATUS_ALIASING, axiom_relu_checked(&aliased, &aliased, aliased.len));
+    try testing.expectEqualSlices(f32, &[_]f32{ -1.0, 2.0 }, &aliased);
+}
+
+test "checked attention rejects dimensions beyond fixed scratch capacity" {
+    const input = [_]f32{1.0};
+    var output = [_]f32{77.0};
+    try testing.expectEqual(
+        AXIOM_STATUS_INVALID_DIMENSION,
+        axiom_scaled_dot_product_attention_checked(&input, &input, &input, &output, 1, 65, 1, null),
+    );
+    try testing.expectEqual(@as(f32, 77.0), output[0]);
+    try testing.expectEqual(
+        AXIOM_STATUS_INVALID_DIMENSION,
+        axiom_flash_attention_checked(&input, &input, &input, &output, 1, 1, 1, 65),
+    );
+    try testing.expectEqual(@as(f32, 77.0), output[0]);
+}
+
 test "softmax sums to 1" {
     var input = [_]f32{ 1.0, 2.0, 3.0 };
     var output: [3]f32 = undefined;
@@ -496,4 +699,36 @@ test "matmul identity" {
     try testing.expectEqual(@as(f32, 6), c[1]);
     try testing.expectEqual(@as(f32, 7), c[2]);
     try testing.expectEqual(@as(f32, 8), c[3]);
+}
+
+test "checked matmul and binary operations are output atomic" {
+    const a = [_]f32{ 1, 2, 3, 4, 5, 6 };
+    const b = [_]f32{ 7, 8, 9, 10, 11, 12 };
+    var matrix = [_]f32{91.0} ** 4;
+    try testing.expectEqual(AXIOM_STATUS_OK, axiom_matmul_checked(&a, &b, &matrix, 2, 3, 2));
+    try testing.expectEqualSlices(f32, &[_]f32{ 58, 64, 139, 154 }, &matrix);
+
+    const huge = [_]f32{ std.math.floatMax(f32), std.math.floatMax(f32) };
+    const factors = [_]f32{ 2.0, 1.0, 2.0, 2.0 };
+    var untouched_matrix = [_]f32{ 71.0, 72.0 };
+    try testing.expectEqual(
+        AXIOM_STATUS_NON_FINITE_RESULT,
+        axiom_matmul_checked(&huge, &factors, &untouched_matrix, 1, 2, 2),
+    );
+    try testing.expectEqualSlices(f32, &[_]f32{ 71.0, 72.0 }, &untouched_matrix);
+
+    const left = [_]f32{ 1.5, -2.0, 4.0 };
+    const right = [_]f32{ 2.0, 3.0, -0.5 };
+    var output = [_]f32{91.0} ** 3;
+    try testing.expectEqual(AXIOM_STATUS_OK, axiom_add_checked(&left, &right, &output, 3));
+    try testing.expectEqualSlices(f32, &[_]f32{ 3.5, 1.0, 3.5 }, &output);
+    try testing.expectEqual(AXIOM_STATUS_OK, axiom_mul_checked(&left, &right, &output, 3));
+    try testing.expectEqualSlices(f32, &[_]f32{ 3.0, -6.0, -2.0 }, &output);
+
+    var overflow_output = [_]f32{81.0};
+    try testing.expectEqual(
+        AXIOM_STATUS_NON_FINITE_RESULT,
+        axiom_mul_checked(&[_]f32{std.math.floatMax(f32)}, &[_]f32{2.0}, &overflow_output, 1),
+    );
+    try testing.expectEqual(@as(f32, 81.0), overflow_output[0]);
 }

@@ -46,6 +46,7 @@ zig = ZigBackend(lib_path)
         cpu_relu = Axiom.backend_relu(JuliaBackend(), x)
         zg_relu = Axiom.backend_relu(zig, x)
         assert_parity(zg_relu, cpu_relu, :activations)
+        @test_throws ErrorException Axiom.backend_relu(zig, Float32[1, NaN32, 3])
 
         logits = randn(Float32, 8, 5)
         cpu_softmax = Axiom.backend_softmax(JuliaBackend(), logits, 2)

@@ -57,6 +57,20 @@ macro zig_call(func_name, ret_type, arg_types, args...)
     end
 end
 
+const _AXIOM_STATUS_MESSAGES = Dict{UInt32, String}(
+    1 => "null pointer",
+    2 => "non-finite input",
+    3 => "overlapping input/output buffers",
+    4 => "invalid dimensions",
+    5 => "non-finite result",
+)
+
+function _check_zig_status(operation::Symbol, status::UInt32)
+    status == 0 && return nothing
+    detail = get(_AXIOM_STATUS_MESSAGES, status, "unknown status")
+    error("Zig backend $(operation) failed: $(detail) (status $(status))")
+end
+
 # ============================================================================
 # Row-major conversion helpers (Julia is column-major, Zig expects row-major)
 # ============================================================================
@@ -97,10 +111,11 @@ function backend_matmul(::ZigBackend, A::Matrix{Float32}, B::Matrix{Float32})
     B_row = _to_row_major_vec(B)
     C_row = Vector{Float32}(undef, m * n)
 
-    @zig_call axiom_matmul Cvoid (
+    status = @zig_call axiom_matmul_checked UInt32 (
         Ptr{Float32}, Ptr{Float32}, Ptr{Float32},
         Csize_t, Csize_t, Csize_t
     ) A_row B_row C_row m k n
+    _check_zig_status(:matmul, status)
 
     _from_row_major_vec(C_row, (m, n))
 end
@@ -120,9 +135,10 @@ function backend_relu(::ZigBackend, x::Array{Float32})
     y = similar(x)
     n = length(x)
 
-    @zig_call axiom_relu Cvoid (
+    status = @zig_call axiom_relu_checked UInt32 (
         Ptr{Float32}, Ptr{Float32}, Csize_t
     ) x y n
+    _check_zig_status(:relu, status)
 
     y
 end

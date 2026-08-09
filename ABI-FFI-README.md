@@ -45,6 +45,20 @@ Current production-tested backend FFI path is Julia <-> Zig:
 
 This path is covered by CI/readiness checks (backend parity + runtime smoke).
 
+The pointwise ReLU path now uses `axiom_relu_checked`, which returns an explicit
+status and preflights null pointers, overlapping input/output ranges, and
+non-finite inputs before changing output. `axiom_relu6_checked` provides the
+same contract for ReLU6; the legacy void exports remain for compatibility.
+The production Zig build is pure Zig and does not link libc merely to expose a
+C-compatible calling convention.
+
+The current attention implementations have fixed stack capacities. Checked
+exports reject scaled-dot-product sequence lengths above 64, flash-attention
+sequence lengths above 4096, and flash block sizes above 64. The legacy void
+exports perform the same guards and return without writing when dimensions are
+outside those capacities. These guards make the existing implementations safe;
+they do not turn the simplified attention code into production evidence.
+
 ## KNOWN ISSUE: orphan second Zig FFI tree (`ffi/zig/` vs `zig/`)
 
 There are **two** Zig trees in this repository and they are not the same
