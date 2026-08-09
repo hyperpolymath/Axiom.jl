@@ -1,2 +1,23 @@
 # SPDX-License-Identifier: MPL-2.0
 * @hyperpolymath
+
+# Security-sensitive and machine-controlled surfaces
+SECURITY.md @hyperpolymath
+.github/ @hyperpolymath
+.machine_readable/ @hyperpolymath
+
+# Public governance and contribution policy
+CONTRIBUTING* @hyperpolymath
+CODE_OF_CONDUCT* @hyperpolymath
+GOVERNANCE* @hyperpolymath
+MAINTAINERS* @hyperpolymath
+LICENSE* @hyperpolymath
+
+# Coprocessor implementation and documentation seams
+src/ @hyperpolymath
+src/Abi/ @hyperpolymath
+zig/ @hyperpolymath
+docs/ @hyperpolymath
+docs/berrywiki/ @hyperpolymath
+Justfile @hyperpolymath
+*.sh @hyperpolymath

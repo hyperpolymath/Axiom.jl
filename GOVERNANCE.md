@@ -30,7 +30,7 @@ For major changes:
 
 ### BDFL (Benevolent Dictator for Life)
 
-**Current BDFL**: [Project Founder]
+**Current BDFL**: @hyperpolymath (Project Founder)
 
 Responsibilities:
 - Final arbiter on technical disputes
