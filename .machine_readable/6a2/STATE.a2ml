@@ -7,6 +7,9 @@ project = "Axiom.jl"
 version = "1.0.0"
 last-updated = "2026-06-15"
 status = "active"
+wiki = "docs/berrywiki/"
+wiki-pages = 16
+wiki-tool = "metadatastician/berrywiki"
 
 [project-context]
 name = "Axiom.jl"
@@ -72,3 +75,8 @@ machine-readable-layout = "06-12 estate standard (flat contractiles, bot_directi
 contractiles = "Adjust/Bust/Dust/Intent/Must/Trust .a2ml + Justfile — all flat under .machine_readable/contractiles/"
 bot-directives = "hypatia + gitbot-fleet + git-private-farm trio added 2026-06-13"
 instant-sync = "LIVE — .github/workflows/instant-sync.yml → hyperpolymath/.git-private-farm via FARM_DISPATCH_TOKEN"
+
+[coprocessor-documentation]
+human-index = "docs/berrywiki/Home.md"
+machine-index = "docs/berrywiki/Machine-Index.md"
+scope = "Axiom-derived kernels, Idris2 ABI, and shared Enaction accelerator linkage"

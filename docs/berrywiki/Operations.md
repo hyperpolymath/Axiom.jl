@@ -1,0 +1,18 @@
+<!-- berrywiki
+id: 10000000-0000-7000-8000-000000000203
+parent: 10000000-0000-7000-8000-000000000201
+position: 20
+kind: page
+tags:
+  - coprocessor
+  - axiom
+archived: false
+-->
+
+# Operations
+
+Canonical operation names and request semantics.
+
+Axiom keeps the mathematical API and proof-oriented contracts while delegating supported tensor primitives through the shared accelerator ABI.
+
+See [[Home]] for the project boundary and the repository machine-readable state for exact fields.
