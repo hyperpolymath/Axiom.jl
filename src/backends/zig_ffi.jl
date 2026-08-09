@@ -62,6 +62,7 @@ const _AXIOM_STATUS_MESSAGES = Dict{UInt32, String}(
     2 => "non-finite input",
     3 => "overlapping input/output buffers",
     4 => "invalid dimensions",
+    5 => "non-finite result",
 )
 
 function _check_zig_status(operation::Symbol, status::UInt32)
@@ -110,10 +111,11 @@ function backend_matmul(::ZigBackend, A::Matrix{Float32}, B::Matrix{Float32})
     B_row = _to_row_major_vec(B)
     C_row = Vector{Float32}(undef, m * n)
 
-    @zig_call axiom_matmul Cvoid (
+    status = @zig_call axiom_matmul_checked UInt32 (
         Ptr{Float32}, Ptr{Float32}, Ptr{Float32},
         Csize_t, Csize_t, Csize_t
     ) A_row B_row C_row m k n
+    _check_zig_status(:matmul, status)
 
     _from_row_major_vec(C_row, (m, n))
 end

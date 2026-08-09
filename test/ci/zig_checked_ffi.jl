@@ -21,4 +21,15 @@ init_zig_backend(lib_path)
     @test_throws ErrorException backend_relu(ZigBackend(), Float32[1, NaN32, 3])
 end
 
+@testset "checked Julia-Zig matmul boundary" begin
+    left = Float32[1 2 3; 4 5 6]
+    right = Float32[7 8; 9 10; 11 12]
+    @test backend_matmul(ZigBackend(), left, right) == Float32[58 64; 139 154]
+    @test_throws ErrorException backend_matmul(
+        ZigBackend(),
+        reshape(Float32[floatmax(Float32), floatmax(Float32)], 1, 2),
+        reshape(Float32[2, 2], 2, 1),
+    )
+end
+
 end # module CheckedZigFFISmoke
