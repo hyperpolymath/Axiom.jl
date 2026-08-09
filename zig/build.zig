@@ -19,9 +19,6 @@ pub fn build(b: *std.Build) void {
     // Enable SIMD optimizations
     lib.root_module.addCMacro("ENABLE_SIMD", "1");
 
-    // Link libc for FFI compatibility
-    lib.linkLibC();
-
     b.installArtifact(lib);
 
     // Tests

@@ -23,6 +23,10 @@ pub fn scaled_dot_product_attention(
     head_dim: usize,
     mask_ptr: ?[*]const f32,
 ) void {
+    // This implementation intentionally uses a fixed 64x64 score buffer.
+    // Refuse dimensions outside that proven capacity instead of indexing past
+    // the stack allocation. The checked FFI wrapper reports the distinction.
+    if (seq_len == 0 or seq_len > 64 or head_dim == 0) return;
     const scale = 1.0 / @sqrt(@as(f32, @floatFromInt(head_dim)));
 
     var b: usize = 0;
@@ -259,6 +263,9 @@ pub fn flash_attention(
     head_dim: usize,
     block_size: usize,
 ) void {
+    // max_vals/sum_vals hold 4096 sequence positions and each score block
+    // holds 64 values. Keep direct Zig callers safe as well as FFI callers.
+    if (seq_len == 0 or seq_len > 4096 or head_dim == 0 or block_size == 0 or block_size > 64) return;
     const scale = 1.0 / @sqrt(@as(f32, @floatFromInt(head_dim)));
     const num_blocks = (seq_len + block_size - 1) / block_size;
 

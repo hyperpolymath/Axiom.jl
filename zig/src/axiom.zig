@@ -31,6 +31,30 @@ pub const threading = @import("threading.zig");
 
 pub const VERSION = "0.1.0";
 
+pub const AXIOM_STATUS_OK: u32 = 0;
+pub const AXIOM_STATUS_NULL_POINTER: u32 = 1;
+pub const AXIOM_STATUS_NON_FINITE_INPUT: u32 = 2;
+pub const AXIOM_STATUS_ALIASING: u32 = 3;
+pub const AXIOM_STATUS_INVALID_DIMENSION: u32 = 4;
+
+const AddressRange = struct {
+    start: usize,
+    end: usize,
+
+    fn overlaps(self: AddressRange, other: AddressRange) bool {
+        return self.start < other.end and other.start < self.end;
+    }
+};
+
+fn f32Range(pointer: anytype, len: usize) ?AddressRange {
+    if (len == 0) return .{ .start = 0, .end = 0 };
+    const resolved = pointer orelse return null;
+    const start = @intFromPtr(resolved);
+    const bytes = std.math.mul(usize, len, @sizeOf(f32)) catch return null;
+    const end = std.math.add(usize, start, bytes) catch return null;
+    return .{ .start = start, .end = end };
+}
+
 export fn axiom_zig_version() [*:0]const u8 {
     return "Axiom.jl Zig Backend v" ++ VERSION;
 }
@@ -91,6 +115,35 @@ export fn axiom_bmm(
 
 export fn axiom_relu(x_ptr: [*]const f32, y_ptr: [*]f32, n: usize) void {
     threading.parallel_relu(x_ptr, y_ptr, n);
+}
+
+/// Checked, output-atomic ReLU for FFI consumers that cannot prove pointer and
+/// numeric preconditions in their type system. Legacy `axiom_relu` remains for
+/// compatibility with existing Julia callers.
+export fn axiom_relu_checked(x_ptr: ?[*]const f32, y_ptr: ?[*]f32, n: usize) u32 {
+    if (n == 0) return AXIOM_STATUS_OK;
+    const input_range = f32Range(x_ptr, n) orelse return AXIOM_STATUS_NULL_POINTER;
+    const output_range = f32Range(y_ptr, n) orelse return AXIOM_STATUS_NULL_POINTER;
+    if (input_range.overlaps(output_range)) return AXIOM_STATUS_ALIASING;
+    const input = x_ptr.?[0..n];
+    for (input) |value| if (!std.math.isFinite(value)) return AXIOM_STATUS_NON_FINITE_INPUT;
+    activations.relu(input, y_ptr.?[0..n]);
+    return AXIOM_STATUS_OK;
+}
+
+export fn axiom_relu6(x_ptr: [*]const f32, y_ptr: [*]f32, n: usize) void {
+    activations.relu6(x_ptr[0..n], y_ptr[0..n]);
+}
+
+export fn axiom_relu6_checked(x_ptr: ?[*]const f32, y_ptr: ?[*]f32, n: usize) u32 {
+    if (n == 0) return AXIOM_STATUS_OK;
+    const input_range = f32Range(x_ptr, n) orelse return AXIOM_STATUS_NULL_POINTER;
+    const output_range = f32Range(y_ptr, n) orelse return AXIOM_STATUS_NULL_POINTER;
+    if (input_range.overlaps(output_range)) return AXIOM_STATUS_ALIASING;
+    const input = x_ptr.?[0..n];
+    for (input) |value| if (!std.math.isFinite(value)) return AXIOM_STATUS_NON_FINITE_INPUT;
+    activations.relu6(input, y_ptr.?[0..n]);
+    return AXIOM_STATUS_OK;
 }
 
 export fn axiom_relu_inplace(x_ptr: [*]f32, n: usize) void {
@@ -349,6 +402,7 @@ export fn axiom_scaled_dot_product_attention(
     head_dim: usize,
     mask_ptr: ?[*]const f32,
 ) void {
+    if (seq_len == 0 or seq_len > 64 or head_dim == 0) return;
     attention.scaled_dot_product_attention(
         q_ptr,
         k_ptr,
@@ -361,6 +415,24 @@ export fn axiom_scaled_dot_product_attention(
     );
 }
 
+export fn axiom_scaled_dot_product_attention_checked(
+    q_ptr: ?[*]const f32,
+    k_ptr: ?[*]const f32,
+    v_ptr: ?[*]const f32,
+    output_ptr: ?[*]f32,
+    batch: usize,
+    seq_len: usize,
+    head_dim: usize,
+    mask_ptr: ?[*]const f32,
+) u32 {
+    if (seq_len == 0 or seq_len > 64 or head_dim == 0) return AXIOM_STATUS_INVALID_DIMENSION;
+    if (batch != 0 and (q_ptr == null or k_ptr == null or v_ptr == null or output_ptr == null))
+        return AXIOM_STATUS_NULL_POINTER;
+    if (batch == 0) return AXIOM_STATUS_OK;
+    attention.scaled_dot_product_attention(q_ptr.?, k_ptr.?, v_ptr.?, output_ptr.?, batch, seq_len, head_dim, mask_ptr);
+    return AXIOM_STATUS_OK;
+}
+
 export fn axiom_flash_attention(
     q_ptr: [*]const f32,
     k_ptr: [*]const f32,
@@ -371,6 +443,7 @@ export fn axiom_flash_attention(
     head_dim: usize,
     block_size: usize,
 ) void {
+    if (seq_len == 0 or seq_len > 4096 or head_dim == 0 or block_size == 0 or block_size > 64) return;
     attention.flash_attention(
         q_ptr,
         k_ptr,
@@ -381,6 +454,25 @@ export fn axiom_flash_attention(
         head_dim,
         block_size,
     );
+}
+
+export fn axiom_flash_attention_checked(
+    q_ptr: ?[*]const f32,
+    k_ptr: ?[*]const f32,
+    v_ptr: ?[*]const f32,
+    output_ptr: ?[*]f32,
+    batch: usize,
+    seq_len: usize,
+    head_dim: usize,
+    block_size: usize,
+) u32 {
+    if (seq_len == 0 or seq_len > 4096 or head_dim == 0 or block_size == 0 or block_size > 64)
+        return AXIOM_STATUS_INVALID_DIMENSION;
+    if (batch != 0 and (q_ptr == null or k_ptr == null or v_ptr == null or output_ptr == null))
+        return AXIOM_STATUS_NULL_POINTER;
+    if (batch == 0) return AXIOM_STATUS_OK;
+    attention.flash_attention(q_ptr.?, k_ptr.?, v_ptr.?, output_ptr.?, batch, seq_len, head_dim, block_size);
+    return AXIOM_STATUS_OK;
 }
 
 export fn axiom_rotary_embedding(
@@ -468,6 +560,41 @@ test "relu" {
     try testing.expectEqual(@as(f32, 0.0), output[2]);
     try testing.expectEqual(@as(f32, 1.0), output[3]);
     try testing.expectEqual(@as(f32, 2.0), output[4]);
+}
+
+test "checked relu family is finite, non-aliasing, and output atomic" {
+    const input = [_]f32{ -2.0, -0.0, 2.5, 9.0 };
+    var relu_output = [_]f32{ 91.0, 91.0, 91.0, 91.0 };
+    try testing.expectEqual(AXIOM_STATUS_OK, axiom_relu_checked(&input, &relu_output, input.len));
+    try testing.expectEqualSlices(f32, &[_]f32{ 0.0, 0.0, 2.5, 9.0 }, &relu_output);
+
+    var relu6_output = [_]f32{ 92.0, 92.0, 92.0, 92.0 };
+    try testing.expectEqual(AXIOM_STATUS_OK, axiom_relu6_checked(&input, &relu6_output, input.len));
+    try testing.expectEqualSlices(f32, &[_]f32{ 0.0, 0.0, 2.5, 6.0 }, &relu6_output);
+
+    const invalid = [_]f32{ 1.0, std.math.nan(f32), 3.0 };
+    var untouched = [_]f32{ 7.0, 8.0, 9.0 };
+    try testing.expectEqual(AXIOM_STATUS_NON_FINITE_INPUT, axiom_relu_checked(&invalid, &untouched, invalid.len));
+    try testing.expectEqualSlices(f32, &[_]f32{ 7.0, 8.0, 9.0 }, &untouched);
+
+    var aliased = [_]f32{ -1.0, 2.0 };
+    try testing.expectEqual(AXIOM_STATUS_ALIASING, axiom_relu_checked(&aliased, &aliased, aliased.len));
+    try testing.expectEqualSlices(f32, &[_]f32{ -1.0, 2.0 }, &aliased);
+}
+
+test "checked attention rejects dimensions beyond fixed scratch capacity" {
+    const input = [_]f32{1.0};
+    var output = [_]f32{77.0};
+    try testing.expectEqual(
+        AXIOM_STATUS_INVALID_DIMENSION,
+        axiom_scaled_dot_product_attention_checked(&input, &input, &input, &output, 1, 65, 1, null),
+    );
+    try testing.expectEqual(@as(f32, 77.0), output[0]);
+    try testing.expectEqual(
+        AXIOM_STATUS_INVALID_DIMENSION,
+        axiom_flash_attention_checked(&input, &input, &input, &output, 1, 1, 1, 65),
+    );
+    try testing.expectEqual(@as(f32, 77.0), output[0]);
 }
 
 test "softmax sums to 1" {
