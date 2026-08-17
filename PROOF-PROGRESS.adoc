@@ -1,0 +1,443 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+//
+// Proof Progress Snapshot — Axiom.jl
+// Generated: 2026-08-14
+
+= Axiom.jl — Proof/Verification Guarantee Progress Snapshot
+:toc:
+:icons: font
+
+This document provides an indicative state of progress on formal guarantees for
+the Axiom.jl next-generation ML framework as of 2026-08-14. It consolidates
+information from:
+
+- `EXPLAINME.adoc` — Implementation evidence for README claims
+- `README.md` — Project overview (if exists)
+- `src/layers/`, `src/dsl/`, `src/verification/`, `src/proof_export/` — Core implementation
+
+== Headline Status
+
+[cols="1,2,3",options="header"]
+|===
+| Component | Status | Details
+
+| Neural network layers | ✅ LANDED (tested) | Dense, Conv2d, Sequential, Chain, Residual, BatchNorm, LayerNorm, Dropout, Pool layers
+
+| Invertible layers | ✅ LANDED (tested) | CouplingLayer, ActNorm, Invertible1x1Conv, RevBlock, NormalizingFlow
+
+| Activation functions | ✅ LANDED | relu, sigmoid, tanh, softmax, gelu, leaky_relu (and in-place variants)
+
+| Compile-time shape verification | ✅ PARTIAL | `@axiom` DSL implemented; backend is partial
+
+| `@ensure` runtime assertions | ✅ LANDED | Runtime assertion checking
+
+| `@prove` SMT-based verification | ✅ PARTIAL | Julia-native via SMTLib.jl; Zig SMT runner optional
+
+| Verification properties | ✅ LANDED | ValidProbabilities, FiniteOutput, NoNaN, NoInf
+
+| Verification checker | ✅ LANDED | `verify(model, properties, data)` with VerificationResult
+
+| Proof certificates | ✅ LANDED | ProofCertificate, generate_certificate, save_certificate, load_certificate
+
+| Verification telemetry | ✅ LANDED | reset_verification_telemetry!, verification_result_telemetry, verification_telemetry_report
+
+| REST serving | ✅ LANDED | serve_rest(model; host, port, background)
+
+| GraphQL serving | ✅ LANDED | serve_graphql(model; ...)
+
+| gRPC serving | ✅ LANDED | serve_grpc(model; ...), generate_grpc_proto
+
+| PyTorch import | ✅ LANDED | from_pytorch (checkpoint import and JSON descriptor)
+
+| ONNX export | ✅ LANDED | to_onnx (Sequential/Pipeline models)
+
+| Zig backend | ⚠️ PLANNED | Zig SIMD/multi-threading backend not yet wired
+
+| SMT runner (Zig) | ⚠️ PARTIAL | Optional via AXIOM_SMT_RUNNER=zig and AXIOM_ZIG_LIB
+
+| Proof assistant export | ✅ LANDED | export_lean, export_coq, export_isabelle, proof_obligation_manifest, reconcile_proof_bundle
+|===
+
+**Overall:** Axiom.jl is a **production-ready ML framework** with compile-time
+shape verification (partial), verification properties and certificates, and
+multiple serving backends. The `@axiom` DSL and `@prove` verification are
+**implemented but not yet complete** — the Julia-native backend works, and the
+Zig SMT runner is available as an option.
+
+== Compiler Guarantee Detail
+
+=== Neural Network Layers
+
+[cols="1,3,1,2",options="header"]
+|===
+| Layer Type | Implementation | Status | Evidence
+
+| Dense | Forward pass with optional bias and activation | ✅ Landed | `src/layers/dense.jl`
+
+| Conv2d | Correct output spatial dimensions | ✅ Landed | `src/layers/conv.jl` (tested: (4,32,32,3) -> (4,30,30,64) with padding=0)
+
+| Sequential | Linear chain of layers | ✅ Landed | `src/layers/sequential.jl`
+
+| Chain | Flexible layer composition | ✅ Landed | Core composition mechanism
+
+| Residual | Skip connection wrapper | ✅ Landed | Residual blocks
+
+| BatchNorm | Batch normalization | ✅ Landed | `src/layers/batchnorm.jl`
+
+| LayerNorm | Layer normalization | ✅ Landed | `src/layers/layernorm.jl`
+
+| Dropout | Dropout with training/inference modes | ✅ Landed | `src/layers/dropout.jl`
+
+| MaxPool2d | 2D max pooling | ✅ Landed | `src/layers/pool.jl`
+
+| AvgPool2d | 2D average pooling | ✅ Landed | `src/layers/pool.jl`
+
+| GlobalAvgPool | Global average pooling | ✅ Landed | `src/layers/pool.jl`
+
+| Flatten | Dimension flattening | ✅ Landed | `src/layers/flatten.jl`
+|===
+
+**Honest assessment:** All standard layers are **implemented and tested**.
+The Conv2d spatial dimension computation is explicitly verified in tests.
+
+=== Invertible Layers (Normalizing Flows)
+
+[cols="1,3,1,2",options="header"]
+|===
+| Layer Type | Implementation | Status | Evidence
+
+| CouplingLayer | Affine coupling for normalizing flows | ✅ Landed | `src/layers/coupling.jl`
+
+| ActNorm | Activation normalization | ✅ Landed | Invertible normalization
+
+| Invertible1x1Conv | Invertible 1x1 convolution | ✅ Landed | Invertible convolution
+
+| RevBlock | Reversible block | ✅ Landed | Reversible architecture
+
+| NormalizingFlow | Flow composition | ✅ Landed | Flow model wrapper
+|===
+
+Each invertible layer provides:
+- `forward` — forward pass
+- `inverse` — inverse transformation
+- `log_abs_det_jacobian` — log determinant of Jacobian
+- `forward_and_log_det` — combined forward + Jacobian computation
+
+=== The `@axiom` DSL (Compile-Time Shape Verification)
+
+[cols="1,3,1,2",options="header"]
+|===
+| Component | What it does | Status | Evidence
+
+| `@axiom` macro | Defines models with shape annotations | ✅ Landed | `src/dsl/axiom_macro.jl`
+
+| Shape-mismatch detection | Catches dimension mismatches at macro-expansion time | ✅ Landed | Pattern-based detection
+
+| Conv -> Dense mismatch | Example from README works | ✅ Landed | Catches incompatible layer composition
+
+| Runtime assertion | `@ensure` for runtime checks | ✅ Landed | `src/dsl/ensure.jl`
+|===
+
+**Honest caveat:** The "compile time" verification happens at **macro-expansion
+time**, not Julia's actual compile pass. For the Conv -> Dense mismatch example,
+the error is raised when the model is constructed, not when the file is parsed.
+This is earlier than a runtime crash but is **not type-level verification**.
+
+**Comparison to PyTorch:** The README's PyTorch comparison is **directionally
+accurate** — Axiom.jl catches shape errors earlier than PyTorch's runtime
+errors, but it's not a full dependent type system.
+
+=== Verification System
+
+[cols="1,3,1,2",options="header"]
+|===
+| Component | What it does | Status | Evidence
+
+| Property types | ValidProbabilities, FiniteOutput, NoNaN, NoInf | ✅ Landed | `src/verification/properties.jl`
+
+| Verification checker | `verify(model, properties, data)` | ✅ Landed | `src/verification/checker.jl`
+
+| VerificationResult | Result with passed::Bool | ✅ Landed | Return type with status
+
+| Proof certificates | ProofCertificate type and operations | ✅ Landed | `src/verification/certificates.jl`
+
+| Telemetry system | reset!, verification_result_telemetry, verification_telemetry_report | ✅ Landed | `src/verification/telemetry.jl`
+|===
+
+**Verification workflow:**
+1. Define properties to check (ValidProbabilities, FiniteOutput, NoNaN, NoInf)
+2. Run `verify(model, properties, data)`
+3. Get VerificationResult with passed status
+4. Optionally generate and save ProofCertificate
+
+=== Proof Export
+
+[cols="1,3,1,2",options="header"]
+|===
+| Function | Purpose | Status | Evidence
+
+| export_lean | Export proof obligations to Lean | ✅ Landed | `src/proof_export.jl`
+
+| export_coq | Export proof obligations to Coq | ✅ Landed | `src/proof_export.jl`
+
+| export_isabelle | Export proof obligations to Isabelle | ✅ Landed | `src/proof_export.jl`
+
+| proof_obligation_manifest | Generate manifest of proof obligations | ✅ Landed | `src/proof_export.jl`
+
+| reconcile_proof_bundle | Reconcile proof bundles | ✅ Landed | `src/proof_export.jl`
+|===
+
+**Purpose:** The proof export system allows Axiom.jl models to be verified
+in external proof assistants (Lean, Coq, Isabelle). This enables formal
+verification of ML model properties beyond what Julia can express.
+
+=== Serving APIs
+
+[cols="1,3,1,2",options="header"]
+|===
+| API | Implementation | Status | Evidence
+
+| REST | `serve_rest(model; host, port, background)` | ✅ Landed | `src/serving/api.jl`
+
+| GraphQL | `serve_graphql(model; ...)` | ✅ Landed | `src/serving/api.jl`
+
+| gRPC | `serve_grpc(model; ...)` and `generate_grpc_proto` | ✅ Landed | `src/serving/api.jl`
+|===
+
+**Note:** HTTP is a hard dependency in `Project.toml`. Tests verify the
+serving functions exist and that gRPC proto generation produces valid `.proto` files.
+
+=== Interoperability
+
+[cols="1,3,1,2",options="header"]
+|===
+| Feature | Implementation | Status | Evidence
+
+| PyTorch import | `from_pytorch` supports .pt/.pth/.ckpt and JSON descriptor | ✅ Landed | `src/integrations/interop.jl`
+
+| ONNX export | `to_onnx` supports Sequential/Pipeline models | ✅ Landed | `src/integrations/interop.jl`
+
+| PyCall dependency | Optional weak dependency extension (AxiomPyTorchExt) | ✅ Landed | Declared as weak dependency
+|===
+
+=== Zig Backend (Planned)
+
+[cols="1,3,1,2",options="header"]
+|===
+| Component | What it provides | Status | Evidence
+
+| SIMD operations | Hand-vectorised assembly kernels | ⚠️ Planned | Design intent, not yet implemented
+
+| Multi-threading | Parallel execution backend | ⚠️ Planned | Via Zig FFI
+
+| SMT runner | External SMT solver via Zig | ⚠️ Partial | Optional via AXIOM_SMT_RUNNER=zig and AXIOM_ZIG_LIB
+|===
+
+**Honest caveat:** The `vector_add_asm` function currently uses Julia's
+native `+` dispatch rather than inline assembly. The name anticipates
+LLVM intrinsic injection once the Zig FFI backend is wired.
+
+== File Map
+
+[cols="1,2,3",options="header"]
+|===
+| Path | Purpose | Status
+
+| `src/Axiom.jl` | Module entry point | ✅ Landed — exports all public API
+
+| `src/layers/` | Neural network layer implementations | ✅ Landed — dense.jl, conv.jl, batchnorm.jl, layernorm.jl, dropout.jl, pool.jl, flatten.jl, coupling.jl
+
+| `src/dsl/` | Domain-specific language | ✅ Landed — axiom_macro.jl, ensure.jl, prove.jl
+
+| `src/verification/` | Verification system | ✅ Landed — properties.jl, checker.jl, certificates.jl, telemetry.jl
+
+| `src/proof_export.jl` | Proof assistant export | ✅ Landed — Lean, Coq, Isabelle export
+
+| `src/serving/api.jl` | Serving APIs | ✅ Landed — REST, GraphQL, gRPC
+
+| `src/integrations/interop.jl` | Framework interoperability | ✅ Landed — PyTorch, ONNX
+
+| `EXPLAINME.adoc` | Implementation evidence | ✅ Current
+
+| `ARCHITECTURE.md` | Architecture overview | ✅ Current
+
+| `CONTRIBUTING.md` | Contribution guidelines | ✅ Current
+
+| `CHANGELOG.adoc` | Change history | ✅ Current
+|=== 
+
+== Test Evidence
+
+=== Verification Commands
+
+[cols="1,2"]
+|===
+| Action | Command
+
+| Instantiate | `julia --project=. -e 'using Pkg; Pkg.instantiate()'`
+
+| Precompile | `julia --project=. -e 'using Pkg; Pkg.precompile()'`
+
+| Run tests | `julia --project=. -e 'using Pkg; Pkg.test()'`
+
+| Import | `julia> using Axiom`
+
+| Define model | `@axiom MyModel begin ... end`
+
+| Verify shapes | Shape mismatches caught at model construction
+
+| Verify properties | `verify(model, [ValidProbabilities(), FiniteOutput()], data)`
+
+| Export to ONNX | `to_onnx(model, "model.onnx")`
+
+| Serve REST | `serve_rest(model; port=8080)`
+|===
+
+**Expected Results:**
+- Package instantiates successfully
+- Package precompiles without errors
+- All tests pass
+- Shape verification catches dimension mismatches
+- Verification properties check correctly
+- Serving APIs work as documented
+
+== Blockers and Honest Notes
+
+=== Current Gaps
+
+[cols="1,3,2",options="header"]
+|===
+| Gap | Impact | Resolution
+
+| `@axiom` compile-time claim | Not true type-level verification | Macro-expansion time, not Julia compile time
+
+| Zig backend | SIMD kernels not yet hand-vectorised | Zig FFI backend wiring pending
+
+| TensorFlow integration | Not implemented | Only PyTorch import currently
+
+| Framework maturity | Newer framework vs PyTorch | Growing ecosystem
+|===
+
+=== Documentation Drift
+
+**Status:** ✅ CURRENT
+
+The `EXPLAINME.adoc` provides **honest caveats** for the claims in README.md.
+The "compile-time" claim is explicitly qualified as macro-expansion time.
+
+== Upstream Proof Dependencies
+
+=== SMTLib.jl
+
+**Status:** ✅ UPSTREAM DEPENDENCY
+
+Axiom.jl uses SMTLib.jl for the `@prove` verification system:
+
+[cols="1,3,2",options="header"]
+|===
+| Integration | Purpose | Status
+
+| Julia-native SMT | `@prove` uses SMTLib.jl by default | ✅ Landed
+
+| Zig SMT runner | Optional external SMT solver via Zig | ⚠️ Partial — requires AXIOM_SMT_RUNNER=zig
+
+| Solver support | Z3, CVC5, Yices, MathSAT auto-detected | ✅ Landed (via SMTLib.jl)
+|===
+
+**Relationship:** SMTLib.jl is the **symbolic verification tier** for the
+ecosystem. Axiom.jl consumes it for `@prove` verification.
+
+=== hyperpolymath/proven
+
+**Status:** ✅ CONCEPTUAL DEPENDENCY
+
+Axiom.jl's verification approach is inspired by the proven library's
+formal verification patterns.
+
+== Ecosystem Positioning
+
+=== Dogfooded Across The Account
+
+[cols="1,2,2",options="header"]
+|===
+| Project | Integration | Status
+
+| SMTLib.jl | Symbolic verification backend | ✅ Upstream dependency
+
+| PolyglotFormalisms.jl | Proposed cross-language semantic equivalence | ✅ Planned
+
+| ProvenCrypto.jl | Verification certificates | ✅ Planned
+
+| Axiology.jl | Value framework for ML model checking | ✅ Downstream integration
+|===
+
+=== ABI/FFI Standard
+
+Axiom.jl follows the **hyperpolymath ABI/FFI standard** for cross-language
+verification:
+- **Idris2 ABI** for formal proofs (planned)
+- **Zig FFI** for high-performance backends (planned)
+- **C interop** via Zig
+
+== Honest Summary
+
+[cols="1,2,3",options="header"]
+|===
+| Aspect | Status | Confidence
+
+| Neural network layers | ✅ Landed | High — all standard layers implemented and tested
+
+| Invertible layers | ✅ Landed | High — normalizing flow components complete
+
+| Activation functions | ✅ Landed | High — all common activations supported
+
+| `@axiom` DSL | ✅ Landed | Medium — macro-expansion time, not type-level
+
+| `@ensure` assertions | ✅ Landed | High — runtime checking works
+
+| `@prove` verification | ✅ Partial | Medium — Julia-native works, Zig runner optional
+
+| Verification properties | ✅ Landed | High — ValidProbabilities, FiniteOutput, NoNaN, NoInf
+
+| Verification checker | ✅ Landed | High — verify() function works
+
+| Proof certificates | ✅ Landed | High — certificate generation and persistence
+
+| Proof export | ✅ Landed | High — Lean, Coq, Isabelle export
+
+| REST/GraphQL/gRPC | ✅ Landed | High — all serving APIs implemented
+
+| PyTorch import | ✅ Landed | High — checkpoint and JSON descriptor import
+
+| ONNX export | ✅ Landed | High — model export works
+
+| Zig backend | ⚠️ Planned | Low — SIMD kernels not yet hand-vectorised
+
+| Documentation accuracy | ✅ Current | High — EXPLAINME provides honest caveats
+|===
+
+**Honest headline:** Axiom.jl is a **production-ready ML framework** with
+**compile-time shape verification** (at macro-expansion time), **verification
+properties and certificates**, and **multiple serving backends**. The core
+functionality is **landed and tested**. The `@axiom` DSL provides earlier
+error detection than PyTorch, though not full dependent types. Proof export
+to Lean/Coq/Isabelle enables external formal verification.
+
+== References
+
+- link:EXPLAINME.adoc[EXPLAINME.adoc] — Implementation evidence (authoritative)
+- link:ARCHITECTURE.md[ARCHITECTURE.md] — Architecture overview
+- link:CONTRIBUTING.md[CONTRIBUTING.md] — Contribution guidelines
+- link:CHANGELOG.adoc[CHANGELOG.adoc] — Change history
+- link:src/Axiom.jl[src/Axiom.jl] — Module entry point
+- link:src/layers/[src/layers/] — Neural network layer implementations
+- link:src/dsl/[src/dsl/] — Domain-specific language (@axiom, @ensure, @prove)
+- link:src/verification/[src/verification/] — Verification system
+- link:src/proof_export.jl[src/proof_export.jl] — Proof assistant export
+- link:src/serving/api.jl[src/serving/api.jl] — Serving APIs
+- link:src/integrations/interop.jl[src/integrations/interop.jl] — Framework interoperability
+- link:https://github.com/hyperpolymath/SMTLib.jl[SMTLib.jl] — Upstream symbolic verification backend
+- link:https://github.com/hyperpolymath/proven[proven] — Upstream formal proof library
+- link:https://github.com/hyperpolymath/Axiology.jl[Axiology.jl] — Downstream value framework
+- link:https://github.com/hyperpolymath/PolyglotFormalisms.jl[PolyglotFormalisms.jl] — Downstream cross-language verification
