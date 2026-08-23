@@ -68,7 +68,7 @@ Following RSR standards, contributions are organized by trust level:
 **Access**: Core Contributors only
 
 Areas:
-- Build system (flake.nix, Justfile)
+- Build system (flake.guix, Justfile)
 - CI/CD configuration
 - Security-critical code
 - FFI boundaries

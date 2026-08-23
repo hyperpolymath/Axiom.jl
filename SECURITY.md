@@ -61,7 +61,7 @@ Please include the following in your report:
 
 - **Dependency Auditing**: Regular `cargo audit` and `cargo deny` checks
 - **SBOM Generation**: Software Bill of Materials available
-- **Reproducible Builds**: Nix flake ensures reproducibility
+- **Reproducible Builds**: Guix flake ensures reproducibility
 - **Signed Releases**: All releases are signed with GPG
 
 ### Development Practices
