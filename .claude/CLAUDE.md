@@ -24,7 +24,7 @@
 
 | Banned | Replacement |
 |--------|-------------|
-| ReScript | AffineScript |
+| AffineScript | AffineScript |
 | TypeScript | AffineScript |
 | Node.js | Deno |
 | npm | Deno |
@@ -48,7 +48,7 @@ Both are FOSS with independent governance (no Big Tech).
 
 ### Enforcement Rules
 
-1. **No new ReScript files** - Port existing .res to AffineScript (.affine)
+1. **No new AffineScript files** - Port existing .res to AffineScript (.affine)
 2. **No new TypeScript files** - Convert existing TS to AffineScript
 3. **No package.json for runtime deps** - Use deno.json imports
 4. **No node_modules in production** - Deno caches deps automatically
@@ -59,7 +59,7 @@ Both are FOSS with independent governance (no Big Tech).
 ### Package Management
 
 - **Primary**: Guix (guix.scm)
-- **Fallback**: Nix (flake.nix)
+- **Fallback**: Guix (flake.guix)
 - **JS deps**: Deno (deno.json imports)
 
 ### Security Requirements

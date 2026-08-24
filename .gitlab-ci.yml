@@ -25,7 +25,7 @@ rsr-compliance:
   script:
     - |
       echo "Checking RSR compliance..."
-      files="README.md LICENSE SECURITY.md CODE_OF_CONDUCT.md CONTRIBUTING.md GOVERNANCE.md CHANGELOG.md MAINTAINERS.md FUNDING.yml flake.nix Justfile"
+      files="README.md LICENSE SECURITY.md CODE_OF_CONDUCT.md CONTRIBUTING.md GOVERNANCE.md CHANGELOG.md MAINTAINERS.md FUNDING.yml flake.guix Justfile"
       for file in $files; do
         if [ -f "$file" ]; then
           echo "✓ $file"

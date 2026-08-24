@@ -98,7 +98,7 @@ See `GAP-REGISTER.md` for the machine-readable form. Severity ∈
 . *[high/system]* No RegistryCI/AutoMerge/TagBot/CompatHelper; only test is Idris2 string-match (asserts a nonexistent README.adoc) → add RegistryCI.
 . *[high/compliance]* `NOTICE` falsely claims PMPL-1.0 → **FLAG-ONLY to owner** (no auto-edit).
 . *[medium/adaptive]* No semver/AutoMerge guideline; compat lower-bounds only → write policy + enforce.
-. *[medium/perfective]* Doc-map drift (claims README.adoc/deno.json/flake.nix; STATE 0% vs shipped v1.0.0) → reconcile.
+. *[medium/perfective]* Doc-map drift (claims README.adoc/deno.json/flake.guix; STATE 0% vs shipped v1.0.0) → reconcile.
 . *[medium/perfective]* No julianiser↔registry integration docs → document the pipeline.
 . *[low/corrective]* stapeln/guix copy-paste; copilot `npx` (self-banned); duplicate `secrets:inherit`; malformed curl → fix/exempt.
 . *[low/perfective]* GOVERNANCE references `docs/decisions/` that doesn't exist → create ADR dir.

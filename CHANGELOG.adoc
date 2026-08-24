@@ -42,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 === Removed
 - Rust backend removed; Zig backend is now the sole native backend. Migrate any `RustBackend(...)` calls to `ZigBackend(...)` and update `AXIOM_RUST_LIB` references to `AXIOM_ZIG_LIB`.
 - Comprehensive documentation (Architecture, Performance, Safety-Critical, etc.)
-- RSR compliance infrastructure (flake.nix, Justfile, security policies)
+- RSR compliance infrastructure (flake.guix, Justfile, security policies)
 - Attention mechanisms for transformer models
 - Flash attention implementation
 - Rotary position embeddings
