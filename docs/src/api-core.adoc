@@ -1,0 +1,22 @@
+== Tensors & Layers
+
+Core tensor types, shapes, and neural network layers.
+
+[source,@autodocs]
+----
+Modules = [Axiom]
+Public = true
+Private = false
+Pages = [
+    "types/tensor.jl",
+    "types/shapes.jl",
+    "types/math.jl",
+    "layers/abstract.jl",
+    "layers/dense.jl",
+    "layers/conv.jl",
+    "layers/activations.jl",
+    "layers/normalization.jl",
+    "layers/pooling.jl",
+    "layers/invertible.jl",
+]
+----

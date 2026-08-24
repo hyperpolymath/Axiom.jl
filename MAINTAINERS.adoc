@@ -1,48 +1,88 @@
-// SPDX-License-Identifier: CC-BY-SA-4.0
-// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-= Maintainers
-:toc: preamble
+== Maintainers
 
-This document lists the maintainers of this project and their responsibilities.
+This document lists the maintainers of Axiom.jl and their
+responsibilities.
 
-== Current Maintainers
+=== Core Maintainers
 
-[cols="2,3,2",options="header"]
+Core maintainers have full write access and are responsible for the
+project’s direction.
+
+[cols=",,,",options="header",]
 |===
-| Name | Role | Contact
-
-| Jonathan D.A. Jewell
-| Lead Maintainer
-| https://github.com/hyperpolymath[@hyperpolymath]
+|Name |GitHub |Role |Areas
+|Project Founder |@Hyperpolymath |BDFL |Architecture, Vision
 |===
 
-== Responsibilities
+=== Area Maintainers
 
-Maintainers are responsible for:
+Area maintainers have expertise and responsibility for specific areas.
 
-* Reviewing and merging pull requests
-* Triaging issues and feature requests
-* Ensuring code quality and security standards
-* Managing releases and versioning
-* Upholding the project's code of conduct
+[cols=",,",options="header",]
+|===
+|Area |Maintainer(s) |Description
+|Julia Core |Unassigned |Core Julia implementation
+|Rust Backend |Unassigned |Rust FFI and performance
+|Zig Backend |Unassigned |Zig FFI and SIMD
+|Verification |Unassigned |@ensure, @prove, certificates
+|Documentation |Unassigned |Wiki, tutorials, API docs
+|CI/CD |Unassigned |Build, test, release
+|===
 
-== Becoming a Maintainer
+=== Responsibilities
 
-Contributors who demonstrate:
+==== All Maintainers
 
-* Consistent, high-quality contributions
-* Understanding of the project's goals and standards
-* Constructive participation in discussions
-* Commitment to the project's long-term health
+* Respond to issues and PRs within 7 days
+* Follow the Code of Conduct
+* Review code according to contribution guidelines
+* Participate in governance decisions
 
-May be invited to become maintainers at the discretion of existing maintainers.
+==== Core Maintainers
 
-== Decision Making
+* Guide overall project direction
+* Make final decisions on disputed issues
+* Manage releases
+* Handle security issues
+* Mentor new contributors
 
-* Routine decisions (bug fixes, minor improvements) can be made by any maintainer
-* Significant changes require discussion and consensus among maintainers
-* Breaking changes or major features should be discussed in issues before implementation
+==== Area Maintainers
 
-== Contact
+* Expert review for their area
+* First response for area-specific issues
+* Documentation for their area
+* Onboarding contributors to their area
 
-For questions about project governance, open an issue or contact the maintainers listed above.
+=== Becoming a Maintainer
+
+==== Requirements
+
+[arabic]
+. *Sustained Contribution*: 6+ months of regular contributions
+. *Quality*: Consistently high-quality code and reviews
+. *Community*: Helpful and respectful interactions
+. *Understanding*: Deep knowledge of the codebase
+
+==== Process
+
+[arabic]
+. Nomination by existing maintainer
+. Discussion among maintainers (private)
+. Vote (simple majority of core maintainers)
+. Announcement and onboarding
+
+=== Emeritus Maintainers
+
+Maintainers who have stepped back but made significant contributions:
+
+_None yet - we’re a new project!_
+
+=== Contact
+
+* General questions: maintainers@axiom-jl.org
+* Security issues: security@axiom-jl.org
+* Governance: governance@axiom-jl.org
+
+'''''
+
+_This document is part of RSR compliance for transparent governance._

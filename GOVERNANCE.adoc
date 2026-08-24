@@ -1,162 +1,161 @@
-// SPDX-License-Identifier: CC-BY-SA-4.0
-// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-= Governance Model
-:toc: preamble
+== Governance
 
-This document describes the governance model for this repository.
+=== Overview
 
-== Overview
+Axiom.jl uses a *Benevolent Dictator for Life (BDFL) + Consensus* model,
+inspired by successful open source projects while incorporating RSR
+principles.
 
-This repository follows a **Sole Maintainer Governance Model**:
+=== Decision Making
 
-* Single maintainer (@hyperpolymath) has full authority over the project
-* All contributions are welcome and reviewed by the maintainer
-* Decisions are made transparently through GitHub issues and discussions
-* The project adheres to the hyperpolymath estate policies where applicable
+==== Levels of Decision
 
-== Core Principles
-
-[cols="1,2"]
+[width="100%",cols="31%,30%,39%",options="header",]
 |===
-| Principle | Description
-
-| **Benevolent Dictatorship** | Maintainer has final decision authority but seeks community input
-
-| **Meritocracy** | Contributions are judged on technical merit, not contributor identity
-
-| **Transparency** | All significant decisions are documented publicly
-
-| **Consensus-Seeking** | Maintainer prefers consensus but will decide when necessary
-
-| **Open Contribution** | Anyone can contribute via fork and pull request
-
+|Level |Scope |Process
+|*Minor* |Bug fixes, docs, typos |Single maintainer approval
+|*Standard* |Features, refactors |Two maintainer approval
+|*Major* |Architecture, breaking changes |BDFL + community RFC
+|*Governance* |This document, CoC changes |BDFL + supermajority vote
 |===
 
-== Roles and Permissions
+==== RFC Process
 
-[cols="1,2,2"]
-|===
-| Role | Permissions | Assignment
+For major changes:
 
-| **Maintainer** | Write access, merge rights, admin | @hyperpolymath
-| **Contributors** | Read access, fork, submit PRs | All GitHub users
-| **Users** | Use the software, report issues | All GitHub users
+[arabic]
+. *Draft RFC*: Open issue with `+[RFC]+` prefix
+. *Discussion Period*: Minimum 14 days
+. *Revision*: Address feedback
+. *Final Comment Period*: 7 days
+. *Decision*: BDFL decision with reasoning
 
-|===
+=== Roles
 
-== Decision Making Framework
+==== BDFL (Benevolent Dictator for Life)
 
-=== Routine Decisions
+*Current BDFL*: @hyperpolymath (Project Founder)
 
-* Bug fixes
-* Documentation improvements
-* Minor feature additions
-* Dependency updates
+Responsibilities: - Final arbiter on technical disputes - Guardian of
+project vision - Emergency decisions when needed
 
-**Process**: Maintainer reviews and merges PRs that meet quality standards.
+The BDFL can be changed by unanimous agreement of Core Contributors.
 
-=== Significant Changes
+==== Core Contributors
 
-* New major features
-* API changes
-* Architecture modifications
-* Breaking changes
+Contributors with merge rights. Requirements:
 
-**Process**:
-. Open issue describing the change
-. Discuss with community (minimum 72 hours)
-. Maintainer makes final decision
-. Document rationale in issue/PR
+* Sustained contributions over 6+ months
+* Deep understanding of codebase
+* Demonstrated alignment with project values
+* Nominated by existing Core Contributor
+* Approved by BDFL
 
-=== Structural Decisions
+*Current Core Contributors*: See `+MAINTAINERS.md+`
 
-* Repository purpose/renaming
-* License changes
-* Ownership transfer
-* Deprecation/archival
+==== Contributors
 
-**Process**: 
-. Extended discussion (minimum 1 week)
-. Maintainer makes final decision
-. Document in CHANGELOG and governance docs
+Anyone who has contributed code, docs, issues, or reviews.
 
-== Contribution Lifecycle
+==== Community Members
 
-[cols="1,2"]
-|===
-| Stage | Process
+Anyone participating in discussions, using the software, or providing
+feedback.
 
-| **Ideation** | Open issue, discuss feasibility
+=== Tri-Perimeter Contribution Framework (TPCF)
 
-| **Development** | Fork, implement, test thoroughly
+Following RSR standards, contributions are organized by trust level:
 
-| **Review** | Submit PR, maintainer reviews within 7 days
+==== 🔒 Perimeter 1 (Core)
 
-| **Merge** | Maintainer merges or requests changes
+*Access*: Core Contributors only
 
-| **Release** | Maintainer publishes according to project conventions
+Areas: - Build system (flake.guix, Justfile) - CI/CD configuration -
+Security-critical code - FFI boundaries - Release process
 
-|===
+==== 🧠 Perimeter 2 (Expert)
 
-== Conflict Resolution
+*Access*: Trusted Contributors (established track record)
 
-In case of disagreements:
+Areas: - Core algorithms - Verification system - Backend implementations
+- API design - Performance-critical code
 
-. Discuss in the relevant GitHub issue or PR
-. Provide technical justification for positions
-. Maintainer mediates and makes final decision
-. Decision is documented and can be revisited later
+==== 🌱 Perimeter 3 (Community)
 
-== Project Policies
+*Access*: Open to all
 
-This repository adheres to hyperpolymath estate-wide policies:
+Areas: - Documentation - Examples - Tests - Bug reports - Feature
+proposals - Community support
 
-* **License**: MPL-2.0 for code, CC-BY-SA-4.0 for prose (per standards/LICENCE-POLICY.adoc)
-* **Code of Conduct**: Follows hyperpolymath CODE_OF_CONDUCT.md
-* **Security**: Follows hyperpolymath SECURITY.md
-* **Contributing**: Follows hyperpolymath CONTRIBUTING.adoc conventions
+=== Meetings
 
-== Repository-Specific Conventions
+==== Technical Meetings
 
-[cols="1,2"]
-|===
-| Convention | Description
+* *Frequency*: Monthly
+* *Format*: Video call + text summary
+* *Agenda*: Posted 7 days in advance
+* *Notes*: Published in `+docs/meetings/+`
 
-| **Signing** | All commits must be signed (SSH or GPG)
+==== Community Calls
 
-| **SPDX Headers** | All source files must have SPDX license identifiers
+* *Frequency*: Quarterly
+* *Format*: Open video call
+* *Purpose*: Community Q&A, roadmap discussion
 
-| **Contractiles** | Mustfile, Trustfile, Intendfile, Adjustfile in root
+=== Conflict Resolution
 
-| **Machine Readable** | META.a2ml in .machine_readable/6a2/
+[arabic]
+. *Discussion*: Try to resolve through discussion
+. *Mediation*: Involve neutral third party
+. *Escalation*: Bring to Core Contributors
+. *Final Decision*: BDFL makes final call
 
-| **CI/CD** | GitHub Actions workflows in .github/workflows/
+=== Changes to Governance
 
-|===
+This document can be changed through:
 
-== Governance Evolution
+[arabic]
+. RFC process (standard)
+. 14-day discussion period
+. Supermajority (2/3) approval from Core Contributors
+. BDFL approval
 
-As the project grows, this governance model may evolve:
+=== Code of Conduct
 
-* **Adding Co-Maintainers**: When contribution volume warrants it
-* **Forming a Team**: For complex multi-maintainer projects
-* **Adopting TPCF**: For large, multi-repository projects (see rhodium-standard-repositories)
+All participants must follow our link:CODE_OF_CONDUCT.md[Code of
+Conduct].
 
-Changes to this document require the same process as Significant Changes above.
+Violations should be reported to: conduct@axiom-jl.org
 
-== See Also
+=== Licensing Decisions
 
-* link:MAINTAINERS.adoc[Maintainers]
-* link:CODE_OF_CONDUCT.md[Code of Conduct]
-* link:CONTRIBUTING.adoc[Contributing Guide]
-* link:https://github.com/hyperpolymath/standards/blob/main/LICENCE-POLICY.adoc[Estate License Policy]
-* link:https://github.com/hyperpolymath/standards[rhodium-standard-repositories (TPCF)]
+* Core framework: MIT License
+* All contributions must be MIT-compatible
+* Third-party dependencies reviewed for license compatibility
+* SPDX headers required on all source files
 
-== Changelog
+=== Financial Transparency
 
-[cols="1,1,1"]
-|===
-| Date | Change | By
+* Funding sources listed in `+FUNDING.yml+`
+* Financial reports published quarterly (when applicable)
+* No individual may receive >50% of project funds
+* All spending decisions made by Core Contributors
 
-| 2026-06-07 | Initial governance model established | @hyperpolymath
-|===
+=== Succession Planning
+
+If the BDFL becomes unavailable:
+
+[arabic]
+. Core Contributors elect interim leader (simple majority)
+. 90-day period to establish new governance
+. Options: New BDFL, Steering Committee, or Foundation
+
+=== Contact
+
+* General: hello@axiom-jl.org
+* Governance questions: governance@axiom-jl.org
+* Security issues: security@axiom-jl.org
+
+'''''
+
+_This governance model follows RSR community governance standards._

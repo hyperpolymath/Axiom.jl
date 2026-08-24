@@ -1,0 +1,10 @@
+== Architecture
+
+Boundaries, ownership, and data flow.
+
+Axiom keeps the mathematical API and proof-oriented contracts while
+delegating supported tensor primitives through the shared accelerator
+ABI.
+
+See [[Home]] for the project boundary and the repository
+machine-readable state for exact fields.

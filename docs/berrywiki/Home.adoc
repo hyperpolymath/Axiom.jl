@@ -1,0 +1,10 @@
+== Axiom.jl
+
+Julia proof-oriented tensor API with Zig FFI kernels.
+
+Axiom keeps the mathematical API and proof-oriented contracts while
+delegating supported tensor primitives through the shared accelerator
+ABI.
+
+This BerryWiki notebook is the human-facing index; the repository’s
+machine-readable state file is authoritative for automation.
