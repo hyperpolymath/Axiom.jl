@@ -94,8 +94,20 @@ check_markers() {
 check_doc_alignment() {
   local status=0
 
-  if ! rg -Fq 'model = from_pytorch("model.pt")' README.adoc; then
-    echo "README.adoc is missing the direct checkpoint `from_pytorch(\"model.pt\")` example."
+  # Assert the SUPPORTED import form. from_pytorch() throws on .pt/.pth/.ckpt by
+  # design (src/integrations/interop.jl) because those are Python pickles needing a
+  # PyTorch runtime, so requiring a "model.pt" example failed the gate for a README
+  # that was correct. Single-quoted: backticks in a double-quoted string are command
+  # substitution, which is what silently truncated this message.
+  if ! rg -Fq 'model = from_pytorch("model.pytorch.json")' README.adoc; then
+    echo 'README.adoc is missing the supported from_pytorch("model.pytorch.json") descriptor example.'
+    status=1
+  fi
+
+  # Guard the no-Python posture: the README must keep warning that raw checkpoints
+  # need a PyTorch/Python runtime, so a future edit cannot quietly reintroduce one.
+  if ! rg -Fq '.pt/.pth/.ckpt' README.adoc; then
+    echo 'README.adoc no longer warns that raw .pt/.pth/.ckpt need a PyTorch/Python runtime.'
     status=1
   fi
 
@@ -104,11 +116,10 @@ check_doc_alignment() {
     status=1
   fi
 
-  if ! rg -Fq "## Deferred Commitments (Tracked)" ROADMAP.md; then
-    echo "ROADMAP.md is missing the deferred commitments section."
-    status=1
-  fi
-
+  # The ROADMAP.md check that used to sit here was a leftover from the .md -> .adoc
+  # migration: the repo ships only ROADMAP.adoc, so `rg` failed on a missing file and
+  # `! rg` was permanently true, making check_doc_alignment unsatisfiable regardless of
+  # documentation quality. The .adoc check below is the migrated equivalent.
   if ! rg -Fq "== Deferred Commitments (Tracked)" ROADMAP.adoc; then
     echo "ROADMAP.adoc is missing the deferred commitments section."
     status=1
