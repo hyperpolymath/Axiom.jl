@@ -284,7 +284,7 @@ We're building the future of machine learning. A future where:
 
 **Want to help?**
 
-- [Contribute to Axiom.jl](CONTRIBUTING.md)
+- [Contribute to Axiom.jl](../../.github/CONTRIBUTING.md)
 - [Join our Discord](https://discord.gg/axiomjl)
 - [Star us on GitHub](https://github.com/Hyperpolymath/Axiom.jl)
 
