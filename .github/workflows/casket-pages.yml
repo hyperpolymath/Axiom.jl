@@ -96,12 +96,39 @@ jobs:
           cd .casket-ssg && cabal run casket-ssg -- build ../.site-src ../_site
           touch ../_site/.nojekyll
 
+      - name: Overlay the canonical www bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Publish the canonical bundle alongside whatever the SSG produced.
+          #
+          #   www/public/      -> the servable site root, used as a fallback
+          #   www/.well-known/ -> must be reachable at /.well-known/ on this
+          #                       origin (RFC 9116, and the RSR check on
+          #                       www/.well-known/security.txt)
+          #
+          # Everything else under www/ (dns/, policies/, profiles/, runbooks/,
+          # errors/) is source material and is deliberately NOT published, so
+          # only these two subtrees are copied rather than all of www/.
+          mkdir -p _site
+          # -n (no-clobber): a page the SSG did produce always wins, so the
+          # bundle can never regress a working site. It only fills the gaps.
+          if [ -d www/public ]; then
+            cp -an www/public/. _site/
+          fi
+          if [ -d www/.well-known ]; then
+            mkdir -p _site/.well-known
+            cp -a www/.well-known/. _site/.well-known/
+          fi
+          echo "published tree:"
+          find _site -maxdepth 2 | sort
       - name: Setup Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
+          include-hidden-files: true
           path: '_site'
 
   deploy:
