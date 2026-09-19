@@ -293,7 +293,7 @@ Performance comparison on common tasks:
 - [GitHub Discussions](https://github.com/Hyperpolymath/Axiom.jl/discussions) - Questions and ideas
 - [Discord](https://discord.gg/axiomjl) - Real-time chat
 - [Twitter](https://twitter.com/axiomjl) - Updates and news
-- [Contributing](CONTRIBUTING.md) - Help us build the future
+- [Contributing](../../.github/CONTRIBUTING.md) - Help us build the future
 
 ---
 

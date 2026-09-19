@@ -375,7 +375,7 @@ model = checkpoint(model, every=3)  # Checkpoint every 3 layers
 
 ### How can I contribute?
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). We welcome:
+See [CONTRIBUTING.md](../../.github/CONTRIBUTING.md). We welcome:
 - Bug reports
 - Documentation improvements
 - New layer implementations

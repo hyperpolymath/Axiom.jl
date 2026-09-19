@@ -428,7 +428,7 @@ to Lean/Coq/Isabelle enables external formal verification.
 
 - link:EXPLAINME.adoc[EXPLAINME.adoc] — Implementation evidence (authoritative)
 - link:ARCHITECTURE.md[ARCHITECTURE.md] — Architecture overview
-- link:CONTRIBUTING.md[CONTRIBUTING.md] — Contribution guidelines
+- link:.github/CONTRIBUTING.md[CONTRIBUTING.md] — Contribution guidelines
 - link:CHANGELOG.adoc[CHANGELOG.adoc] — Change history
 - link:src/Axiom.jl[src/Axiom.jl] — Module entry point
 - link:src/layers/[src/layers/] — Neural network layer implementations

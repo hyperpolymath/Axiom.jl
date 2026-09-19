@@ -325,7 +325,7 @@ Axiom.jl/
 
 == Contributing
 
-We welcome contributions! See link:CONTRIBUTING.md[CONTRIBUTING].
+We welcome contributions! See link:.github/CONTRIBUTING.md[CONTRIBUTING].
 
 * Bug reports and feature requests
 * Documentation improvements
