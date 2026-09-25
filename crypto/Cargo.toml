@@ -17,6 +17,18 @@ crate-type = ["cdylib"]
 openssl = "0.10"
 pqcrypto-dilithium = "0.5"
 pqcrypto-traits = "0.3"
+# Creusot verification — optional, enabled only for `cargo creusot` / `cargo verify`
+# via `--features creusot` or `cfg(creusot)`.  Normal `cargo build` does NOT pull
+# this crate, so offline/CI builds without Why3 remain hermetic.
+creusot-contracts = { version = "*", optional = true }
+
+[features]
+# Feature gate for Creusot contracts.  The `creusot` cfg flag is set by the
+# `cargo creusot` wrapper (not by this feature alone); enabling the feature
+# makes the crate available for `#[cfg(creusot)]` imports.  Kept optional so
+# `cargo build` and `cargo test` never require Why3.
+creusot = ["dep:creusot-contracts"]
+default = []
 
 [profile.release]
 # Keep panics as aborts out of the FFI boundary story simple: every exported
