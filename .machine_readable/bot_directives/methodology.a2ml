@@ -58,7 +58,7 @@ perfective = 10   # % for SPDX headers, doc updates, formatting, style
 # Customise this per project — the template default is generic.
 
 [methodology.unique-strength]
-description = "{{PROJECT_UNIQUE_STRENGTH}}"
+description = "Provably correct machine learning — Julia-native framework with compile-time shape verification, Zig SIMD kernels, Idris2 formal ABI, and hybrid post-quantum certificate signing (Ed448 + Dilithium5/ML-DSA-87)"
 deepen-not-broaden = true
 
 # ============================================================================

@@ -56,6 +56,16 @@ build-crypto:
 test-crypto:
     cd crypto && cargo test --release
 
+# Typecheck Creusot contracts (no Why3 required, blocks on ill-formed contracts)
+verify-crypto:
+    cd crypto && cargo check --features creusot
+    @echo "Creusot contracts typechecked (cfg_attr). For Why3 discharge: cargo creusot --features creusot"
+
+# Emit Creusot verification evidence (crypto + zig/idris2 preservation)
+creusot-evidence:
+    bash scripts/creusot-evidence.sh
+    @echo "Evidence at build/creusot_evidence.json"
+
 # Check code quality
 lint:
     @echo "Checking editorconfig..."
