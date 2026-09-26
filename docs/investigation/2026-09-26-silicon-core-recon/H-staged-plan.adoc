@@ -1,0 +1,130 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= H. Staged plan (with the verification plan embedded)
+:toc:
+
+Each phase is independently shippable, uses only existing dependencies and
+the existing CI Zig build, and has an exit test. Nothing in Phase 0–2 changes
+the repository layout beyond adding `src/runtime/` and test files.
+
+== Phase 0 — Stop the bleeding (correctness, in Axiom) — 1–2 weeks
+
+Fix the confirmed defects with a parity test for each *before* the fix (red
+→ green), so the test suite documents the contract:
+
+. Zig `norm.zig:143` fixed `[4096]f32` scratch → heap/arena or chunked
+  computation; add `num_features ∈ {4096, 4097, 8192, 65536}` to
+  `test/ci/backend_parity.jl` and to `zig build test`. (D.3)
+. Zig `activations.zig:103–119` `tanh` → overflow-safe form already used by
+  `gelu`; add `x ∈ {±1e-8, ±1e-5, ±10, ±44.3, ±44.5, ±50, ±Inf}` for *all*
+  activations, both in-place and out-of-place. (D.2)
+. Zig `threading.zig:392,469,523` chunking → `last_count = batch_size -
+  min(last_start, batch_size)` or compute chunk bounds with `@min`; add
+  `batch_size ∈ {1,2,3,4,5,6,7,9,13}` × `hidden ∈ {2048, 65536}` for
+  layernorm/rmsnorm/softmax in `zig build test` (runs in Debug → would have
+  panicked). (B.2)
+. Julia `zig_ffi.jl` pooling wrappers → `_to_row_major_vec` in/out (or Zig
+  kernels that accept a layout flag); pass padding or reject `padding ≠ 0`;
+  add pooling to parity with `N ∈ {1,2}`, `C ∈ {1,3}`, non-square, and the
+  `−Inf`/NaN window cases with an explicit decision on the contract. (D.1)
+. `axiom_matmul_checked` pre-pass → `O(m·k + k·n)` input scans; add a perf
+  *guard* (not a correctness test) asserting checked/unchecked ratio < 1.5 on
+  a 512² case. (E.1)
+. `backend_softmax/log_softmax(::ZigBackend)` → honour `dim` (permute or
+  reject with an error). (D.4)
+. `precision=:float16` → construct new layers (`Dense{Float16}`) instead of
+  `setfield!`; `MixedPrecisionWrapper` → `try/finally` or, better,
+  non-mutating; add a test that asserts the weight `eltype` actually changes.
+  (D.5)
+. `zig_forward(model::Dense)` → apply bias and activation, or delete the
+  special case. (B.2)
+. Delete or build `ffi/zig`; correct `ABI-FFI-README.adoc`, `TOPOLOGY.adoc`,
+  `zig/src/axiom.zig:13`, `PROOF-PROGRESS.adoc:55,224`, `README.adoc:353`
+  (`AXIOM_SMT_RUNNER`), `Justfile:128` (Zig version). (C.2)
+
+*Exit test:* parity job covers every wrapped op (29 symbols) at ≥ 2 shapes,
+both dtypes' reference copies, and the edge-value table in D.4; `zig build
+test` includes the shapes above; `nm -D` of the built `.so` is diffed against
+a checked-in `zig/ABI.txt`.
+
+== Phase 1 — Build the seam in-tree (`src/runtime/`) — 2–3 weeks
+
+. Add `Axiom.Runtime` with the types/functions in G (no kernels, no model
+  types; enforce with a test on the module's import set).
+. Implement `capabilities()` from real probes: `Libdl.dlopen` + symbol set +
+  `axiom_zig_version` for native; extension-provided `CUDA.functional()` etc.
+  for GPUs; env vars only as *requests*/*forbids*.
+. Route the existing call sites through `execute`: Dense, Conv2d, BatchNorm,
+  LayerNorm, RMSNorm, Dropout forwards; `GPUCompiledModel`;
+  `CoprocessorCompiledModel` (as `Experimental`, permissive only, report
+  `fallback_used=true` always).
+. Replace the six fallback mechanisms (B.4) with `Policy.strict`; remove the
+  bare `try … catch end` blocks.
+. `compile(model; backend, strict=true)` binds a `Policy` to the returned
+  model; `compile` on an unavailable strict backend throws.
+. `verify`/`check`/certificates/`model_metadata` embed `ExecutionSummary`
+  fingerprint + kernel/ABI versions.
+. Keep `set_backend!`/`current_backend()` as deprecated shims for one
+  release.
+
+*Exit tests (all CPU-only, run in ordinary CI):*
+
+* *Provenance:* `compile(m, backend=ZigBackend(path), strict=false)` without
+  the library → `summary.any_fallback == true`; with the library →
+  `false` and `kernel_version` non-`nothing`. Use the hook-counter pattern
+  from `test/ci/gpu_fallback.jl` to assert the native symbol was called.
+* *Strict:* same request with `strict=true` and no library → throws
+  `BackendUnavailable(NotLoaded)`; never returns a model.
+* *No false acceleration:* `AXIOM_CUDA_AVAILABLE=1` without CUDA →
+  `capability(CUDABackend(0)).available == false`; `compile(m,
+  backend=CUDABackend(0), strict=true)` throws.
+* *Precision:* Float64 input on native backend → `UnsupportedDType` unless
+  `allow_precision_change=true`, and then `report.precision == Float32`.
+* *Runtime smoke honesty:* `test/ci/runtime_smoke.jl` "accelerated" case
+  asserts `summary.backends_used == {NativeBackend}` — the test that today
+  cannot fail becomes one that can.
+
+== Phase 2 — Evidence gate — 1 week, then ongoing
+
+. Measure E.5 (shape-in-type recompilation) and decide the `Tensor` policy;
+  this is core-type work and is *not* blocked on the runtime.
+. Publish a corrected benchmark table (checked kernel, current wrapper,
+  OpenBLAS baseline) and mark the 2026-02-20 results superseded.
+. Hardware CI (unchanged infrastructure): make `gpu_hardware_smoke.jl`
+  assert `summary.backends_used == {CUDABackend}` and
+  `kernel_hooks_loaded == true`; populate
+  `benchmark/gpu_performance_baseline.json` from a real run or delete the
+  file. Hardware tests stay behind `AXIOM_ENABLE_GPU_HARDWARE_CI`, separate
+  from correctness CI.
+. Re-read every doc claim in C.2 against `capabilities()` output; where docs
+  describe a backend, link the parity job that proves it.
+
+*Exit:* two consecutive releases with the Phase 1 tests green and no new
+`backend_*` call outside `Runtime.execute` (grep test).
+
+== Phase 3 — Conditional extraction (only if F.4's exit criterion holds)
+
+. Move `src/runtime/` to a package that *supersedes* `AcceleratorGate.jl`
+  (same author, same purpose; bump to 0.2 or rename once — not a third
+  package). Axiom adds it as a dependency; delete
+  `src/vendored/AcceleratorGateVendored.jl`.
+. Kernels stay in Axiom until `zig/ABI.txt` has been unchanged for two
+  releases; then Option C can be evaluated with an artifact build plan.
+
+== Verification plan summary (what proves what)
+
+[cols="2,3,1"]
+|===
+| Property | Test | Runs where
+
+| Exact small-case parity | Hand-computed 2×2/3×3 expected values per op, per backend (not only reference-vs-backend `isapprox`) | CI
+| Tolerance parity | Existing `backend_parity.jl` budgets, extended to all 29 wrapped ops, ≥ 2 shapes, both dtypes | CI
+| Shape/order | `dim ∈ {1,2}` softmax; `N,C > 1` pooling; non-square; odd batch (5); `stride/padding/dilation/groups ≠ default` conv | CI
+| Zero/NaN/Inf/overflow | D.4 table as a data-driven test; each cell has a decided contract | CI
+| Aliasing/mutation | `x_before == x_after` for every out-of-place op; `compile` does not mutate its argument; `Array(t)` documented | CI
+| CPU fallback | Permissive policy without library → `fallback_used`; strict → throws | CI
+| No false acceleration | Env-forced availability never yields `available=true` | CI
+| ABI symbols | `nm -D` vs `zig/ABI.txt`; Julia load validates all required symbols and version | CI
+| Provenance | `ExecutionSummary` fingerprint present in certificate/metadata; changes when backend changes | CI
+| Hardware | `gpu_hardware_smoke.jl` with `backends_used` assertion | self-hosted, opt-in
+| Performance | Ratio guards (checked/unchecked < 1.5; wrapper overhead < X µs) marked `@test_broken`-tolerant to noise; never mixed with correctness assertions | nightly / opt-in
+|===

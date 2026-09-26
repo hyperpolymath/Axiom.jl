@@ -1,0 +1,130 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= F. Standalone package decision (SiliconCore.jl / CoprocessorRuntime.jl)
+:toc:
+
+== F.1 What would be extracted, and what must not be
+
+The candidate runtime package would own: capability detection, device
+description, backend selection, strict-vs-fallback policy, diagnostics,
+execution provenance, and a small execution protocol. It must *not* contain
+models, proof logic, domain science, speculative hardware types without an
+execution path, or application policy.
+
+Applying that filter to Axiom today:
+
+[cols="3,1,3"]
+|===
+| Axiom component | Extractable? | Why
+
+| Backend type hierarchy (`AbstractBackend`, `JuliaBackend`, `ZigBackend`, GPU types) | yes, *after* redesign | Currently 15 types incl. 9 stubs; the stubs fail the "no speculative hardware types" rule.
+| Availability detection (`*_available()`, env overrides) | yes | but env-forced availability must become "requested/forced" state, not "available".
+| `SmartBackend` heuristics | no (policy) | Cost model constants are Axiom-specific policy.
+| `compile()` + optimisation passes + `MixedPrecisionWrapper` | no | Model-level; belongs with layers.
+| GPU/coprocessor compiled-model wrappers, self-healing | partly | The *policy* (strict/fallback) is runtime; the *wrappers* know about `Pipeline` and layers.
+| `backend_*` kernel functions (Julia reference + Zig FFI) | not in a "runtime" package | Kernels are a separate concern (Option C).
+| Diagnostics counters, capability reports | yes | Already close to standalone.
+| Vendored AcceleratorGate | it *is* the previous extraction | See F.2.
+|===
+
+The honest size of the extractable core, once stubs and policy are removed, is
+a few hundred lines (G). That is the same size as `AcceleratorGate.jl`.
+
+== F.2 The extraction has already been attempted once — and it did not take
+
+`hyperpolymath/AcceleratorGate.jl` (v0.1.0, MPL-2.0, deps `Dates`+`Libdl`,
+unregistered) describes itself as "a small, dependency-light backend-selection
+layer … extracted from Axiom.jl's backend module". Axiom carries a copy at
+`src/vendored/AcceleratorGateVendored.jl` (494 lines), imports seven symbols
+(`abstract.jl:8–10`) and uses exactly one, at `abstract.jl:2277`, behind
+`applicable(device_capabilities, backend)` — which is `false` for every Axiom
+backend because the two packages define *disjoint* type hierarchies. The
+vendored copy is therefore dead code, and Axiom's own selection logic was
+never replaced by it.
+
+This is direct evidence for the failure mode of extracting before the seam
+exists: the package was created around *types*, not around an *execution
+protocol* that Axiom's layers actually call. Repeating this with a new name
+would produce a third hierarchy.
+
+== F.3 Options compared
+
+[cols="1,2,2,2"]
+|===
+| Option | What it means | For | Against
+
+| *A — keep everything in Axiom, as is*
+| Fix bugs in place; no new interface.
+| Zero coordination cost; no external consumers exist (0 open issues; both packages unregistered).
+| Leaves the four entanglements (A.5) in place; docs will keep drifting because nothing forces requested/executed backend to be recorded; every fallback stays silent.
+
+| *B — extract a small runtime package now*
+| New `SiliconCore.jl` (or `AcceleratorGate.jl` 0.2) owning types, detection, selection policy, provenance; Axiom depends on it.
+| Clean dependency story for a future second consumer; forces the protocol to be written down.
+| The protocol does not exist in Axiom yet, so the package would be designed in the abstract — exactly how F.2 happened. Adds registry/versioning/CI overhead for one consumer. Would ship with today's semantics (env-forced availability = "available", silent fallbacks) unless those are fixed first, and fixing them is in-tree work anyway.
+
+| *C — B plus a separate kernel/FFI package*
+| `AxiomKernels.jl` (Zig `.so` + Julia wrappers) and/or a JLL-style artifact.
+| Kernel release cadence decoupled from the framework; ABI becomes a versioned contract.
+| The ABI is unversioned and undocumented (C.3); 15 exports unused; 4 kernel defects open; a second FFI tree does not compile. Packaging this now would freeze the wrong contract. Artifact building for Zig across platforms is real work with no current user demand.
+
+| *D — defer; stabilise internal interfaces first*
+| Create the runtime seam *inside* Axiom as a submodule with the minimal API (G); route every existing path through it; add strict mode and provenance; fix the confirmed defects with parity tests; measure. Re-evaluate extraction against an explicit exit criterion.
+| Does the necessary work either way; produces the evidence the extraction decision needs; no new packages, deps or repos; every step is independently shippable and testable in existing CI.
+| Slower to a "clean package boundary" headline; requires discipline to keep the submodule free of model/proof imports (enforce with a test).
+|===
+
+== F.4 Recommendation
+
+*Option D now, with a pre-committed exit to Option B.*
+
+Reasons, in order of weight:
+
+. *The boundary must be discovered in-tree.* Today layers read a global,
+  fallbacks happen in six places, and provenance is not recorded anywhere.
+  Until a single `execute(op, backend; strict)` seam exists and everything
+  goes through it, there is nothing to extract except types — and F.2 shows
+  what extracting types alone yields.
+. *Correctness debt precedes packaging.* A runtime package's value is the
+  promise "what it reports is what ran". Shipping that promise on top of
+  D.1–D.5 (wrong pooling, tanh NaN, segfaulting BatchNorm, env-forced GPU
+  availability, broken precision paths) would make the promise false on day
+  one.
+. *No consumer pressure.* One consumer, unregistered packages, no issues.
+  Extraction cost is pure overhead until a second consumer or a release
+  cadence conflict exists.
+. *Evidence is cheap in-tree.* The parity, strict-mode, provenance and ABI
+  tests (H, Phase 0–1) run in the existing CI with the existing Zig build.
+  After they exist, the extraction is a mechanical move of one submodule.
+
+*Exit criterion to Option B* (all must hold):
+
+* The `Runtime` submodule has had no import from `layers/`, `dsl/`,
+  `verification/`, `integrations/`, `serving/` for two releases (enforced by
+  test).
+* Every `backend_*` call site in Axiom goes through it (grep-enforced).
+* Strict mode, provenance and ABI-version checks are tested in CI, including
+  a "fallback must be visible" test.
+* A second consumer exists *or* the Zig artifact needs a release cadence
+  different from Axiom's.
+
+When the exit is taken: publish the submodule as the successor of
+`AcceleratorGate.jl` (same author, same purpose) rather than a third name, and
+delete `src/vendored/AcceleratorGateVendored.jl`. Kernels (Option C) stay in
+Axiom until `zig/ABI.txt` has been stable for two releases.
+
+== F.5 Answer to "is Axiom.jl doing too much?"
+
+Yes in inventory (A), but the cost centres are:
+
+* One 3,069-line file mixing runtime policy, kernels, layer forwards and
+  compile passes.
+* Two Julia reference kernel sets plus Zig, with no single source of truth.
+* A verification layer and an execution layer that never mention each other.
+* Nine capability stubs presented as backends, which inflate the surface the
+  runtime must "support".
+
+Each is fixable by in-tree modularisation (`src/runtime/`, one reference
+kernel set, an execution report that certificates can embed, stubs moved
+behind an explicit `experimental` flag or removed). None requires a new
+repository, and doing them first is what makes an eventual extraction
+trivial instead of a rewrite.

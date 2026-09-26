@@ -1,0 +1,83 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= C. ABI / FFI discrepancy report
+:toc:
+
+Method: `nm -D --defined-only zig/zig-out/lib/libaxiom_zig.so | grep ' T axiom_'`
+against (a) `@zig_call`/`dlsym` names in `src/backends/zig_ffi.jl` and
+`src/backends/abstract.jl`, (b) `ffi/zig/include/axiom.h`, (c) `export fn` in
+`ffi/zig/src/main.zig`, (d) `%foreign` declarations in `src/Abi/Foreign.idr`,
+(e) numeric claims in the prose documents. `readelf -d` for link dependencies.
+
+== C.1 Symbol inventory `[empirical]`
+
+[cols="3,1,4"]
+|===
+| Set | Count | Members / notes
+
+| Exported by the built library | *44* | all `axiom_*` (42 kernels + `axiom_zig_init` + `axiom_zig_version`).
+| Called from Julia | 29 | all 29 resolve — *no missing symbol*.
+| Exported but never wrapped | 15 | `axiom_add`, `axiom_add_checked`, `axiom_avgpool2d`, `axiom_bmm`, `axiom_fill`, `axiom_flash_attention`, `axiom_flash_attention_checked`, `axiom_mul`, `axiom_mul_checked`, `axiom_relu`, `axiom_relu6`, `axiom_relu6_checked`, `axiom_rotary_embedding`, `axiom_scaled_dot_product_attention`, `axiom_scaled_dot_product_attention_checked`.
+| `_checked` variants used by Julia | 2 of 29 | `axiom_matmul_checked`, `axiom_relu_checked` (`zig_ffi.jl:114,138`). All other calls use unchecked kernels — the "checked FFI" guarantee (`test/ci/zig_checked_ffi.jl`) covers two operations.
+| Dynamic link dependencies (`NEEDED`) | 0 | The "libc-free" claim is *true*.
+| Artifact size | 1,101,096 B | vs "~400KB" (`zig/src/axiom.zig:13`), "320KB" (`TOPOLOGY.adoc:145,158`), "395KB" (`TOPOLOGY.adoc:273`).
+|===
+
+== C.2 Document vs. reality
+
+[cols="2,2,3"]
+|===
+| Document says | Reality | Location
+
+| "36 FFI exports, ~400KB compiled .so" | 44 exports, 1.1 MB (ReleaseFast, Zig 0.15.2) | `zig/src/axiom.zig:13`
+| "FFI exports (32 syms) … 320KB .so" | as above | `TOPOLOGY.adoc:145–159`
+| "36 exports, 395KB .so, SIMD + 4-thread dispatch" | as above (4-thread dispatch is accurate: `MAX_WORKERS = 3` + main) | `TOPOLOGY.adoc:273`
+| "`zig/src/axiom.zig` exports the ~36 real `axiom_*` kernels" | 44 | `ABI-FFI-README.adoc:73,100`
+| `ffi/zig` "is also concrete (non-template) and internally self-consistent"; "`cd ffi/zig && zig build test`" | `ffi/zig/src/main.zig:55` `export fn Axiom.jl_init()` is a syntax error (`.` in an identifier). The file does not parse under Zig 0.13, 0.14.1 or 0.15.2. Same placeholder at `:74,90,114,136,149,185,199,204,216,247`. `ffi/zig/include/axiom.h` declares 13 generic symbols (`axiom_init`, `axiom_version`, `axiom_create`, …) — none is exported by any buildable artifact. | `ABI-FFI-README.adoc:108–112`
+| `src/Abi/Foreign.idr` "specifies the ABI" | It declares the 13 generic lifecycle symbols of the non-compiling tree *plus* `axiom_matmul`, `axiom_relu`, `axiom_conv2d` — 3 of 44 real exports; signatures are not compared with anything in CI. `ABI-FFI-README.adoc` concedes `Verify.*` are `putStrLn` stubs. | `src/Abi/Foreign.idr`, `axiom-abi.ipkg`
+| README: "`AXIOM_SMT_RUNNER=zig`" enables a Zig SMT runner | Zero references to `AXIOM_SMT_RUNNER` in `src/`, `ext/`, `zig/`. | `README.adoc:353`, `PROOF-PROGRESS.adoc:57,234`
+| README tree: "backends/ — Backend abstraction (15 backends)" | 1 reference + 1 native + 3 extension + 9 stubs + `SmartBackend` | `README.adoc:309`
+| Justfile toolchain check: Zig "0.13" | Tree needs ≥ 0.14 (`b.addLibrary` API in `build.zig`; 0.13 fails to build); CI uses 0.15.2; `mise.toml` says `latest` | `Justfile:128`, `mise.toml:7`, `ci.yml:75,105`
+| Benchmarks: Zig matmul 512² = 25.6 ms | Wrapper now calls `axiom_matmul_checked`: 284.6 ms here (unchecked kernel: 21.7 ms) | `benchmark/results_2026-02-20_julia-rust-zig.adoc` vs `zig_ffi.jl:114`
+|===
+
+== C.3 Interface contract gaps (not documentation errors — missing mechanisms)
+
+. *No ABI version negotiation.* Julia calls `axiom_zig_init` and can read
+  `axiom_zig_version`, but nothing compares it with an expected value or with
+  the wrapper's assumptions about argument order/layout. A `.so` from a
+  different commit with a changed signature would be `ccall`ed with the wrong
+  arguments. `ZigBackend.lib_path` (`abstract.jl:32`) is never used to load
+  anything — the global `_zig_lib` from `AXIOM_ZIG_LIB` is (`abstract.jl:2502`
+  literally passes `ZigBackend("")` as a "dummy path").
+. *Layout contract is implicit.* Some wrappers convert column-major → row-major
+  (`_to_row_major_vec`, `zig_ffi.jl:79–95`) and some do not (pooling). The Zig
+  side documents NHWC row-major in comments only. Nothing on either side names
+  the layout in the symbol, signature, or a descriptor.
+. *Error contract is split.* `_checked` kernels return a status code; unchecked
+  kernels return `void` and cannot report an error — attention kernels
+  silently return without writing the output for unsupported `seq_len`
+  (`attention.zig:29,268`).
+. *Symbol resolution per call.* `@zig_call` performs `Libdl.dlsym` on every
+  invocation (`zig_ffi.jl:49–55`). Cheap relative to a kernel, but it means
+  there is no single place where the set of required symbols is validated at
+  load time (a missing symbol is discovered on first use).
+. *Two FFI trees, one name.* `zig/` (real) and `ffi/zig/` (non-compiling
+  template) are both described as the Axiom FFI. `ffi/zig/include/axiom.h`
+  is the only C header in the repository and it describes the wrong tree.
+. *No CI check that would have caught any of the above.* `ci.yml` builds and
+  unit-tests `zig/`, then runs parity for 7 symbols. There is no `nm`
+  diff against a checked-in symbol list, no header/Idris cross-check, and no
+  build of `ffi/zig`.
+
+== C.4 Recommended contract (input to G and H) — minimal
+
+* One checked-in `zig/ABI.txt` (or JSON) listing `symbol, argument layout,
+  row/column-major, error contract, since-version`; CI diffs it against
+  `nm -D`. The Julia side validates all 29 required symbols at load and
+  records the library's `axiom_zig_version` in the execution report (G).
+* Either build `ffi/zig` in CI or delete it and rewrite
+  `ABI-FFI-README.adoc` and `Foreign.idr` to describe `zig/`. Keeping a
+  non-compiling tree that documentation calls "self-consistent" is the
+  highest-leverage documentation fix available.
+* Make the layout explicit in wrapper names or a descriptor argument; add
+  parity tests for every wrapper that touches ≥ 3-D arrays with N>1 and C>1.

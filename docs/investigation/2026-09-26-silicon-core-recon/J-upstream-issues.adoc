@@ -1,0 +1,255 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= J. Upstream issues with evidence and minimal reproductions
+:toc:
+:toclevels: 2
+
+Buckets: *FIX-IN-AXIOM* (in-tree, now), *FUTURE-STANDALONE* (belongs to the
+runtime seam of G; implement in-tree in Phase 1, extract later),
+*NOT-YET-VERIFIED* (static reading of Julia source; check provided — open as
+an issue, not a PR, until run). Evidence: `[E]` empirical here, `[S]` static.
+
+Severity: *Critical* = crash or wrong results on an ordinary path; *High* =
+wrong results / false claim on a documented path or major perf regression;
+*Medium* = wrong results on a direct-API path, or a broken documented feature;
+*Low* = doc/hygiene.
+
+== J.1 Index
+
+[cols="1,4,1,1,2"]
+|===
+| ID | Title | Sev | Ev | Bucket
+
+| J-01 | Zig `batchnorm` wrong above 4096 features, SIGSEGV from 8192 — reachable from `BatchNorm.forward` | Critical | E | FIX-IN-AXIOM
+| J-02 | Zig pooling wrappers pass column-major memory to row-major kernels → wrong values | High | E | FIX-IN-AXIOM
+| J-03 | Zig `tanh`/`tanh_inplace` return NaN for x ≥ 44.5 and +Inf | High | E | FIX-IN-AXIOM
+| J-04 | Chunking underflow at `batch_size = 5` in `parallel_layernorm/rmsnorm/batch` (UB; panics in safe builds) | Medium | E | FIX-IN-AXIOM
+| J-05 | `axiom_matmul_checked` pre-pass is O(m·n·k): 9–16× slower than the benchmarked kernel | High | E | FIX-IN-AXIOM
+| J-06 | Zig `maxpool2d` wrapper sizes output with padding but the export has no padding args | Medium | S | FIX-IN-AXIOM
+| J-07 | Pooling edge contracts differ: all-`−Inf` → `−floatmax`, NaN window → `1.0` | Low | E | FIX-IN-AXIOM
+| J-08 | Documented production path `compile(model, backend=ZigBackend(path))` runs pure Julia; CI "accelerated" smoke cannot detect it | High | S | FIX-IN-AXIOM
+| J-09 | Every Zig wrapper silently returns the Julia result when the library is unavailable; no strict mode for Zig | High | S | FUTURE-STANDALONE
+| J-10 | `AXIOM_CUDA_AVAILABLE=1` asserts GPU availability without a device; no GPU strict mode; `AXIOM_GPU_REQUIRED` unread by the library | High | S | FUTURE-STANDALONE
+| J-11 | `gpu_hardware_smoke.jl` passes on CPU fallback (`acc ≈ cpu`), so it cannot evidence GPU execution | Medium | S | FIX-IN-AXIOM
+| J-12 | `backend_softmax/log_softmax(::ZigBackend)` ignore `dim` | Medium | S | FIX-IN-AXIOM
+| J-13 | `SmartBackend` layernorm drops `normalized_shape`; Zig layernorm wrapper assumes 2-D `(batch, hidden)` | Medium | S | FIX-IN-AXIOM
+| J-14 | `training` flag ignored by Zig and GPU `batchnorm` | Medium | S | FIX-IN-AXIOM
+| J-15 | Attention kernels silently no-op for `seq_len > 64` (SDPA) / `> 4096` (flash) | Medium | S | FIX-IN-AXIOM
+| J-16 | `std.Thread.spawn … catch null` — a failed spawn leaves that chunk uncomputed | Medium | S | NOT-YET-VERIFIED
+| J-17 | `zig_forward(model::Dense)` drops bias and activation | Medium | S | FIX-IN-AXIOM
+| J-18 | `precision=:float16` → `setfield!` `TypeError` on any parameterised layer | High | S | NOT-YET-VERIFIED
+| J-19 | `precision=:mixed` never computes in Float16 for a `Pipeline`; wrapper mutates the model without `try/finally` | Medium | S | NOT-YET-VERIFIED
+| J-20 | Two Julia reference kernel sets with different summation order, selected by dtype; Float32 `avgpool2d` lacks `count_include_pad` | Medium | S | FIX-IN-AXIOM
+| J-21 | Bare `try … catch end` fallbacks in layer forwards; diagnostics not incremented | Medium | S | FIX-IN-AXIOM
+| J-22 | `ZigBackend.lib_path` unused; global library from `AXIOM_ZIG_LIB`; `ZigBackend("")` "dummy path" | Low | S | FIX-IN-AXIOM
+| J-23 | `dlsym` per call; no load-time symbol/ABI-version validation | Medium | S | FUTURE-STANDALONE
+| J-24 | Redundant `Float32.(…)` copies of inputs and parameters on every backend-aware forward | Low | S | FIX-IN-AXIOM
+| J-25 | Vendored `AcceleratorGate` is dead code (disjoint type hierarchy; one guarded call site) | Low | S | FUTURE-STANDALONE
+| J-26 | `KernelAbstractions` is a weak dependency with no extension and no reference | Low | S | FIX-IN-AXIOM
+| J-27 | `AxiomPyTorchExt` defines `from_pytorch(::String)` which shadows core `from_pytorch(::AbstractString; strict)` when PyCall+torch load | Medium | S | NOT-YET-VERIFIED
+| J-28 | `Tensor(data)` embeds runtime size in the type → per-shape recompilation and type-unstable forwards | Medium | S | NOT-YET-VERIFIED
+| J-29 | `backend_flatten` is only correct for `start_dim == 2` (`reshape(x, size(x,1), prod(size(x)[start_dim:end]))`); `backend_dropout(training=false)` returns the input array itself | Low | S | FIX-IN-AXIOM
+| J-30 | In-place `backend_relu!` uses the unchecked `axiom_relu_inplace` while `backend_relu` uses `axiom_relu_checked` — one op, two NaN contracts on one backend | Low | S | FIX-IN-AXIOM
+| J-31 | Export count/size claims wrong everywhere (32/36 vs 44; 320/395/400 KB vs 1.1 MB) | Low | E | FIX-IN-AXIOM
+| J-32 | `ABI-FFI-README.adoc` says `ffi/zig` is "concrete … internally self-consistent" and `zig build test` works; it does not parse | Medium | E | FIX-IN-AXIOM
+| J-33 | `AXIOM_SMT_RUNNER=zig` documented; zero code references | Low | S | FIX-IN-AXIOM
+| J-34 | Docs contradict each other on backend status (PROOF-PROGRESS "planned" vs ROADMAP "production-hardened" vs REGISTRY-READINESS "type stubs") | Low | S | FIX-IN-AXIOM
+| J-35 | Published benchmarks measured the unchecked kernel and cite a Rust backend that is not in the tree | Medium | E | FIX-IN-AXIOM
+| J-36 | Toolchain pins disagree (Justfile Zig 0.13 / mise latest / CI 0.15.2 / build.zig needs ≥ 0.14, no minimum declared) | Low | S | FIX-IN-AXIOM
+| J-37 | README "15 backends" | Low | S | FIX-IN-AXIOM
+| J-38 | Proof/certificate layer records no backend, kernel or ABI provenance; SMT proves over `Real` and never encodes the model | Medium | S | FUTURE-STANDALONE
+| J-39 | `src/Abi/Foreign.idr` covers 3 of 44 real exports plus 13 symbols of the non-compiling tree; nothing checks it | Low | S | FIX-IN-AXIOM
+| J-40 | 62 `AXIOM_*` env vars with no schema; strict mode spelt three different ways | Low | S | FUTURE-STANDALONE
+|===
+
+== J.2 Detailed entries (evidence + reproduction)
+
+All commands assume the library was built as CI does:
+`cd zig && zig build -Doptimize=ReleaseFast` (Zig 0.15.2) and that `numpy`
+is importable. Zig test reproductions compile against the repository's
+`zig/src` tree directly. Paths are relative to `docs/investigation/2026-09-26-silicon-core-recon/repro/`.
+
+=== J-01 Zig `batchnorm` above 4096 features `[E]` — Critical
+
+* *Where:* `zig/src/norm.zig:143` `var inv_std: [4096]f32 = undefined;` indexed by `num_features`.
+* *Reach:* `abstract.jl:1072–1086` `forward(bn::BatchNorm, x)` → `backend_batchnorm(::ZigBackend, …)` (`zig_ffi.jl:536`) whenever the current backend is not `JuliaBackend`, `!bn.training`, `bn.affine`.
+* *Observed (shipped `.so`):* 4096 correct; 4097 → 2 wrong; 4100 → 8 wrong; 8192 / 65536 / 1e6 → SIGSEGV.
+* *Repro:* `python3 batchnorm_probe.py ../../../../zig/zig-out/lib/libaxiom_zig.so`; Zig-level: `zig test --dep axiom -Mroot=repro_batchnorm.zig -Maxiom=../../../../zig/src/axiom.zig -OReleaseSafe` → index out of bounds panic.
+* *Julia confirmation:* `set_backend!(ZigBackend(lib)); m = Sequential(Dense(4, 8192), BatchNorm(8192)); m(Tensor(randn(Float32, 2, 4)))` — expected: process terminates.
+* *Fix:* allocate `inv_std` per call (arena/heap) or compute per feature without the scratch; add `num_features ∈ {4096, 4097, 8192, 65536}` to `zig build test` and `backend_parity.jl`.
+
+=== J-02 Pooling wrappers: wrong layout `[E]` — High
+
+* *Where:* `src/backends/zig_ffi.jl:479–507` (`backend_maxpool2d`), `:513` (`backend_global_avgpool2d`) pass `input` directly; compare `_to_row_major_vec` use in conv/layernorm/softmax wrappers (`:79–95`). Kernels index row-major NHWC (`zig/src/pool.zig`).
+* *Observed:* maxpool wrong 5/8 (N=1,4×4,C=2), 5/8 (N=2,C=1), 49/54 (N=2,6×6,C=3), 7/8 (N=1,5×3,C=1,k=2,s=1); global-avgpool wrong for any N>1 or C>1; only N=1,C=1,square is correct.
+* *Repro:* `python3 layout_probe.py ../../../../zig/zig-out/lib/libaxiom_zig.so`.
+* *Julia confirmation:* see D.1.
+* *Reach:* direct API, `SmartBackend`, `benchmark/benchmarks.jl`; not `MaxPool2d.forward` (pure Julia). Not parity-tested.
+
+=== J-03 Zig `tanh` NaN overflow `[E]` — High
+
+* *Where:* `zig/src/activations.zig:103–119` `(e^{2x}−1)/(e^{2x}+1)`; `gelu` at `:135,144` already uses `1 − 2/(e^{2x}+1)`.
+* *Observed:* `axiom_tanh(44.5) = NaN`, `(45) = NaN`, `(50) = NaN`, `(100) = NaN`, `(+Inf) = NaN`; `(44.3) = 1.0`. Near zero: rel. err 1.3e-3 at 1e-5, 100 % at 1e-8. `gelu`, `sigmoid`, `silu` fine.
+* *Repro:* `python3 activation_probe.py ../../../../zig/zig-out/lib/libaxiom_zig.so`.
+* *Reach:* `backend_tanh(::ZigBackend)`, `backend_tanh!`, `SmartBackend`. `tanh` absent from `backend_parity.jl`.
+
+=== J-04 Chunking underflow at `batch_size = 5` `[E]` — Medium (UB)
+
+* *Where:* `zig/src/threading.zig:392` (`parallel_layernorm`), `:469` (`parallel_rmsnorm`), `:523` (`parallel_batch`, used by batched softmax): `last_start = (num_threads−1)·chunk`, `last_count = batch_size − last_start` with `chunk = ceil(batch/num_threads)`, `num_threads = min(4, batch)`. For `batch = 5`: `chunk = 2`, `last_start = 6 > 5` → usize wrap. Reached when `total ≥ 8192` and `batch ≥ 4` (`:294–324`).
+* *Observed:* Debug/ReleaseSafe: `panic: integer overflow` at `threading.zig:392`. `zig test -OReleaseFast` binary: *segfault*. Shipped `.so` (ReleaseFast): B=5 × {2048, 4096, 65536} correct with an intact canary after the output — LLVM's treatment of the UB happened to be benign in that compilation unit. It is undefined behaviour and build-dependent.
+* *Repro:* `zig test -OReleaseSafe --dep axiom -Mroot=repro_underflow_canary.zig -Maxiom=../../../../zig/src/threading.zig` (panic); `-OReleaseFast` (crash); `python3 canary_probe.py …libaxiom_zig.so` (benign through the `.so`); `python3 chunking_probe.py …` (B = 4…17 through the `.so`).
+* *Fix:* `last_count = batch_size -| last_start` (saturating) or derive per-thread ranges with `@min(start + chunk, batch_size)` as the element-wise `parallel_unary` already does (`:219`). Add B ∈ {1,…,9,13} to `zig build test` (Debug would have caught it).
+
+=== J-05 `axiom_matmul_checked` cost `[E]` — High (performance / claim)
+
+* *Where:* `zig_ffi.jl:114` always calls `axiom_matmul_checked`; `zig/src/axiom.zig:101` pre-pass over `m·n·k` products.
+* *Observed:* checked vs unchecked: 0.311/0.035 ms (64²), 2.82/0.18 (128²), 24.8/2.17 (256²), 284.6/21.7 (512²). Single-thread OpenBLAS 512² = 2.3 ms. `benchmark/results_2026-02-20…` reports 25.6 ms at 512² — the unchecked kernel.
+* *Repro:* `python3 matmul_cost.py ../../../../zig/zig-out/lib/libaxiom_zig.so`.
+* *Fix:* check inputs in O(m·k + k·n) (vectorised `isfinite` scans) or the output once; keep the error contract; re-run the benchmark table.
+
+=== J-06 `maxpool2d` padding not passed `[S]` — Medium
+
+`zig_ffi.jl:495–496` computes `H_out/W_out` with `pH/pW`, allocates that
+size, but `axiom_maxpool2d` receives only `N H_in W_in C kH kW sH sW`. With
+`padding ≠ (0,0)` part of the output is never written. Fix together with J-02
+(reject padding or implement it in the kernel).
+
+=== J-08 Documented production path runs Julia `[S]` — High
+
+* *Chain:* `compile(model, backend=ZigBackend(path))` → `compile_to_backend(::ZigBackend)` (`abstract.jl:1584`) → `ZigCompiledModel` (`:2460`) → `zig_forward(model::Pipeline, …)` → `forward(pipeline, x)` → layers call `current_backend()` (global, still `JuliaBackend()`).
+* *CI:* `test/ci/runtime_smoke.jl:67–79` does exactly this and never calls `set_backend!`; the assertions are shape/finiteness only.
+* *Check:* with the library loaded, wrap `Axiom.backend_matmul(::ZigBackend, …)` with a counter (pattern in `test/ci/gpu_fallback.jl`), run the README production snippet, observe count 0.
+* *Fix:* Phase 1 (policy bound at `compile`); interim: make `compile_to_backend(::ZigBackend)` call `set_backend!` or document that it does not.
+
+=== J-09 / J-10 Silent fallback and asserted availability `[S]` — High (runtime seam)
+
+* `zig_ffi.jl:51,102` and every wrapper: `if !zig_available() return <julia>(…)`. No counter, no warning, no strict option. `test/ci/backend_parity.jl:23` errors if unavailable — the *test* has a strict mode the library lacks.
+* `abstract.jl:1700–1704` and `ext/AxiomCUDAExt.jl:16–20`: `_backend_env_available("AXIOM_CUDA_AVAILABLE")` is returned *before* `CUDA.functional()` is consulted, even with the extension loaded (`gpu_hooks.jl:77–81` does the same for the device count). `AXIOM_GPU_REQUIRED` appears only in `test/ci/gpu_hardware_smoke.jl:42` and `scripts/gpu-performance-evidence.jl:119`.
+* *Design:* G.4. Interim: make `compile(…, backend=…)` error if `capability(backend).available == false` and add `AXIOM_ZIG_REQUIRED` with the same semantics as the coprocessor `_REQUIRED` flags.
+
+=== J-11 Hardware smoke cannot prove GPU execution `[S]` — Medium
+
+`gpu_hardware_smoke.jl:52–64`: `compiled = compile(model, backend=target, verify=false, optimize=:none)`; asserts `acc ≈ cpu`. `_gpu_forward_with_recovery` (`abstract.jl:407`) falls back to CPU on any error by default, so the assertion passes either way. Add `gpu_capability_report()["kernel_hooks_loaded"] == true` and a hook-call counter, and set `AXIOM_GPU_SELF_HEAL=0` in that job.
+
+=== J-12 `dim` ignored `[S]` — Medium
+
+`zig_ffi.jl:329` `backend_softmax(::ZigBackend, x, dim)` and `:351` `log_softmax` compute over the last dimension of the row-major copy regardless of `dim`. `SmartBackend.backend_softmax` (`abstract.jl:200`) forwards `dim`. Check: `backend_softmax(zig, randn(Float32, 3, 4), 1)` vs `JuliaBackend` — columns vs rows.
+
+=== J-13 / J-14 / J-15 / J-17 Contract gaps `[S]`
+
+* `abstract.jl:215` `backend_layernorm(sb::SmartBackend, …, nshape, eps)` calls the Zig 5-arg form without `nshape`; the Zig wrapper (`zig_ffi.jl:573`) treats `size(x, 2)` as hidden. `LayerNorm((B, H))` semantics differ.
+* `zig_ffi.jl:536–545` accepts `training::Bool` and ignores it; GPU hooks likewise.
+* `zig/src/attention.zig:29,268` early-return without writing output or signalling. No Julia wrapper today; the export exists.
+* `abstract.jl:2495–2502` `zig_forward(model::Dense, x, lib_handle)` →
+  `backend_matmul(ZigBackend(""), x, model.weight)` only: no bias, no
+  activation, `x` is passed as a `Tensor` although the Zig method takes
+  `Matrix{Float32}` (→ `MethodError` `[static]`), and the result is a raw
+  matrix. `ZigCompiledModel` (`:2460–2480`) `dlopen`s `backend.lib_path` into
+  `lib_handle` but only uses it for a `dlsym` presence check — execution goes
+  through the global `_zig_lib` loaded from `AXIOM_ZIG_LIB`, which may be a
+  different file or absent. For a `Pipeline` the generic
+  `zig_forward(model, x, _) = forward(model, x)` (`:2481–2483`) runs pure
+  Julia (J-08).
+
+=== J-16 Thread spawn failure `[S]` — NOT-YET-VERIFIED
+
+`threading.zig:225,268,387` `}) catch null;` then the join loop skips `null`
+handles. The chunk for that thread is never computed; the output buffer
+retains previous contents. Could not be forced in this sandbox (would need
+`RLIMIT_NPROC`/`ulimit -u` low enough during the call). Fix: on spawn failure
+run the chunk inline on the calling thread.
+
+=== J-18 / J-19 Precision paths `[S]` — NOT-YET-VERIFIED (High / Medium)
+
+* `abstract.jl:1398–1408` `convert_precision(::AbstractLayer, T)`:
+  `setfield!(model, name, converted)` where `Dense{Float32}` has
+  `weight::Matrix{Float32}`; `setfield!` does not `convert` → `TypeError`.
+  Not covered by `test/ci/optimization_passes.jl` (tests `:float32`, `:mixed`).
+* `abstract.jl:1476–1500` `forward(::MixedPrecisionWrapper)`: for a
+  `Pipeline`, `parameters()` is `NamedTuple()` (`layers/abstract.jl:136`, no
+  `Pipeline` method), so only the input is rounded; for a bare `Dense` the
+  first `setfield!` throws. No `try/finally`.
+* *Check:* D.5 snippet.
+
+=== J-20 Two reference kernel sets `[S]` — Medium
+
+`abstract.jl` Float32-specialised `backend_conv2d/avgpool2d/maxpool2d/…` vs
+`julia_backend.jl` generic `T`. Dispatch picks by dtype; summation orders
+differ; Float32 `avgpool2d` (`abstract.jl:598`) has no `count_include_pad`.
+Check: compare `backend_conv2d(JuliaBackend(), Float32 arrays…)` with the
+same call on `Float64.(…)` converted back — differences beyond Float32
+rounding indicate order differences; more directly, `@which` shows two
+methods in two files.
+
+=== J-21 Bare `try … catch end` `[S]` — Medium
+
+`abstract.jl:1078–1085`, `normalization.jl:128–138`, `:364–372`,
+`conv.jl:137`. Any exception (including a genuine bug in a kernel wrapper)
+becomes a silent CPU result. Diagnostics counters in `abstract.jl` are not
+incremented from these sites.
+
+=== J-27 `from_pytorch` shadowing `[S]` — NOT-YET-VERIFIED
+
+`integrations/interop.jl:348` `from_pytorch(path::AbstractString; strict)`
+(JSON descriptor); `ext/AxiomPyTorchExt.jl:39` `Axiom.from_pytorch(model_path::String)`
+(`torch.load`). For a `String` argument the extension method is more specific,
+so loading PyCall + torch changes what `from_pytorch("model.json")` does, and
+`from_pytorch(path; strict=false)` raises a keyword-argument `MethodError`.
+Check: `using PyCall, Axiom; methods(Axiom.from_pytorch)`; call with a JSON
+descriptor path.
+
+=== J-28 Shape-in-type recompilation `[S]` — NOT-YET-VERIFIED
+
+`types/tensor.jl:161`. Measurement in E.5.
+
+=== J-29 / J-30 Small API contract gaps `[S]` — Low
+
+* `julia_backend.jl:372–376` `backend_flatten(_, x, start_dim)` reshapes to
+  `(size(x,1), prod(size(x)[start_dim:end]))`; for `start_dim ≠ 2` on a
+  4-D input this is a `DimensionMismatch` (or silently wrong when a middle
+  dimension is 1). `julia_backend.jl:378–380` returns `x` itself when
+  `!training`.
+* `zig_ffi.jl:138` `backend_relu` → `axiom_relu_checked` (errors on NaN;
+  tested in `backend_parity.jl:49`); `backend_relu!` → `axiom_relu_inplace`
+  (unchecked, propagates NaN). Decide one contract per op.
+
+=== J-31 / J-32 / J-35 Documentation vs artifacts `[E]`
+
+* `nm -D --defined-only zig/zig-out/lib/libaxiom_zig.so | grep -c ' T axiom_'` → 44; `stat -c %s` → 1,101,096. Claims at `zig/src/axiom.zig:13`, `TOPOLOGY.adoc:145–159,273`, `ABI-FFI-README.adoc:16,73,100`.
+* `cd ffi/zig && zig build` → `src/main.zig:55:16: error` (`export fn Axiom.jl_init()`); same token at `:74,90,114,136,149,185,199,204,216,247`. Claim at `ABI-FFI-README.adoc:108–112`.
+* Benchmarks: J-05 numbers; `benchmark/results_2026-02-20_julia-rust-zig.adoc` and `ROADMAP.adoc:25` mention a Rust backend absent from the tree.
+
+=== J-33 / J-34 / J-36 / J-37 / J-39 Documentation hygiene `[S]`
+
+* `grep -rn AXIOM_SMT_RUNNER src ext zig` → none; `README.adoc:353`, `PROOF-PROGRESS.adoc:57,234`.
+* `PROOF-PROGRESS.adoc:55,224` "Zig backend PLANNED / not yet wired" vs `README.adoc:123` "Production path: optional Zig backend" vs `ROADMAP.adoc:93` "Production-hardened GPU paths" vs `REGISTRY-READINESS.adoc:47–54`.
+* `Justfile:128` Zig "0.13"; `mise.toml:7` `latest`; `ci.yml:75,105` `0.15.2`; `zig/build.zig` uses `b.addLibrary` (≥ 0.14) with no declared minimum — Zig 0.13 fails to build.
+* `README.adoc:309` "15 backends".
+* `src/Abi/Foreign.idr` vs `nm -D`.
+
+=== J-38 Provenance and the proof layer `[S]` — Medium (design)
+
+No struct in `verification/`, `proof_export.jl`, `model_metadata.jl` carries
+backend, kernel version, ABI version, dtype or summation order.
+`ext/AxiomSMTExt.jl` declares variables as `Real` (`SMTLib.jl:734–736`) and
+contains no reference to weights or layers; `checker.jl:295`
+`ValidProbabilities ⇔ last_layer isa Softmax`. The certificate therefore
+cannot distinguish "verified on reference" from "verified on Zig with the
+J-01 defect". Design: G.5 (embed `ExecutionSummary` fingerprint).
+
+=== J-40 Configuration surface `[S]` — Low
+
+`grep -rhoE 'AXIOM_[A-Z0-9_]+' src ext | sort -u | wc -l` → 62. Strict mode is
+`AXIOM_<X>_REQUIRED` (coprocessors), `AXIOM_GPU_SELF_HEAL=0` (GPUs, runtime
+errors only), and absent for Zig. One documented schema and one spelling
+(`Policy.strict`) — G.
+
+== J.3 Suggested issue order
+
+. J-01 (crash), J-02, J-03 (wrong values) — one issue each with the repro
+  script attached; fixes are local and small.
+. J-05 + J-35 together (performance claim vs. current wrapper).
+. J-08 + J-09 + J-10 + J-11 as one "requested vs executed backend" epic
+  pointing at G/H.
+. J-18/J-19 after running the D.5 check.
+. J-32 + J-31 + J-33 + J-34 + J-36 + J-37 + J-39 as one documentation sweep.
+. Remainder as individual low/medium tickets.

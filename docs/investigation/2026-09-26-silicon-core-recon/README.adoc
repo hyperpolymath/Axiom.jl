@@ -1,0 +1,91 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= Axiom.jl — Silicon-core reconnaissance (2026-09-26)
+:toc:
+:toclevels: 2
+
+Investigation of whether Axiom.jl combines too many responsibilities, whether
+its native/GPU/coprocessor execution paths are what the documentation says they
+are, and whether a standalone runtime package (working names `SiliconCore.jl` /
+`CoprocessorRuntime.jl`) should be extracted.
+
+*Scope discipline.* This is a reconnaissance and design deliverable. No source
+file under `src/`, `ext/`, `zig/`, `ffi/` or `test/` was modified. No
+dependency was added. No PR is opened by this work. Everything here lives under
+`docs/investigation/2026-09-26-silicon-core-recon/` on the session branch
+`arena/01a0de35-axiom-jl` (branched from `main` @ `79e6f48`).
+
+== Deliverables
+
+[cols="1,3,3"]
+|===
+| ID | File | One-line answer
+
+| A | link:A-component-map.adoc[Component map] | 19 sub-systems, 11 of them tested in CI; 9 "backends" are type stubs; 2 trees are dead (vendored AcceleratorGate, `ffi/zig`).
+| B | link:B-backend-status.adoc[Backend status table] | 1 reference backend; 1 native backend with 4 confirmed defects; 3 GPU extensions with no hardware evidence; 9 env-var stubs.
+| C | link:C-abi-ffi-discrepancies.adoc[ABI/FFI discrepancy report] | 44 real exports vs. "~36/32" documented; second FFI tree does not compile; Idris ABI spec covers 3 of 44 symbols; no ABI version check on the Julia side.
+| D | link:D-numerical-parity-risks.adoc[Numerical parity risk report] | Pooling layout bug (wrong values), `tanh` NaN for x ≥ 44.5, BatchNorm wrong/crash above 4096 features, `dim` ignored, two summation orders inside the *reference* backend.
+| E | link:E-memory-performance.adoc[Memory/performance report] | `axiom_matmul_checked` is 9–16× slower than the unchecked kernel the benchmarks were measured with; per-call `dlsym`, per-call thread spawn, permutedims copies on every FFI call, shape-in-type recompilation.
+| F | link:F-extraction-recommendation.adoc[Extraction recommendation] | *Option D now* (defer; stabilise internal interfaces), with an explicit exit criterion to *Option B* — realised by superseding the already-extracted `AcceleratorGate.jl`, not by a third package.
+| G | link:G-api-boundary.adoc[Proposed package/API boundary] | Minimal runtime protocol: `Backend`, `Capability`, `ExecutionReport` (requested/selected/executed, fallback_used, precision, device, kernel/ABI version), `strict` mode, diagnostics.
+| H | link:H-staged-plan.adoc[Staged plan] | Phase 0 fixes + parity tests → Phase 1 internal `Runtime` seam → Phase 2 evidence gate → Phase 3 (conditional) extraction.
+| I | link:I-not-recommended.adoc[Changes explicitly NOT recommended] | No repo split now, no `SiliconCore.jl` from stubs, no GPU deps, no replacing reference kernels, no global warning suppression, no third backend hierarchy.
+| J | link:J-upstream-issues.adoc[Upstream issues with evidence] | 40 issues, each with severity, evidence type (empirical vs static), reproduction, and bucket (fix-in-Axiom / future-standalone / not-yet-verified).
+| — | link:repro/[repro/] | Minimal reproductions (Zig test files + Python/ctypes probes against the built `.so`).
+|===
+
+== How the evidence was obtained
+
+[cols="1,3"]
+|===
+| Environment | Linux x86-64 sandbox, 2 CPUs, 3 GB RAM. Zig 0.15.2 (the version pinned in `.github/workflows/ci.yml:75`). Python 3 + numpy 1.26 for `ctypes` probes. `gcc`, `objdump`, `readelf`, `nm`.
+| Native library | Built exactly as CI does: `cd zig && zig build -Doptimize=ReleaseFast` → `zig/zig-out/lib/libaxiom_zig.so` (1,101,096 bytes, 44 `axiom_*` exports, zero `NEEDED` entries). `zig build test` passes. `zig fmt --check src/` is clean.
+| Julia | *Not available in the sandbox* (all Julia distribution hosts were unreachable; PyPI-hosted installers fetch from the same hosts). Every Julia-level statement in these reports is therefore *static analysis of the source* and is labelled `[static]`. Statements labelled `[empirical]` were executed against the real compiled Zig library or the Zig sources. Maintainer-runnable Julia scripts are specified in D and J so each `[static]` claim can be confirmed or refuted in minutes.
+| Git history | The checkout is a single-commit shallow clone (`79e6f48`, "fix: resolve estate gates and Rust/Creusot debt (#87) (#106)"). Provenance questions such as "when did `_checked` kernels replace the benchmarked ones" could not be answered from history; they are answered from artifacts (benchmark results vs. current wrapper code).
+|===
+
+== Executive summary
+
+. *Does Axiom.jl combine too many responsibilities?* Yes — 19 identifiable
+  sub-systems in one package (model core, autograd/training, shape DSL,
+  heuristic + SMT verification, proof export to four assistants, post-quantum
+  certificate signing via a Rust cdylib, backend selection, nine coprocessor
+  stubs, a Zig kernel library, a second orphaned FFI tree, an Idris ABI
+  specification, three GPU extensions, HuggingFace/PyTorch/ONNX interop, an
+  HTTP serving layer, model packaging). But the *damage* is not caused by
+  package count; it is caused by *missing seams inside the package*: layers
+  read a global `current_backend()`, kernels exist in two Julia copies plus
+  Zig, proofs never reference the backend that executes the model, and
+  fallbacks are silent. Splitting the repository would multiply surface area
+  without creating the missing seams.
+. *Is the native path what the docs say?* Partly. The Zig library is real,
+  libc-free, SIMD/threaded and passes its unit tests. But: the *documented*
+  production path (`compile(model, backend=ZigBackend(path))` on a
+  `Sequential`) runs pure Julia unless `set_backend!` is also called; the
+  Julia wrapper always uses `axiom_matmul_checked`, which is 9–16× slower
+  than the kernel the published benchmarks measured; the pooling wrappers pass
+  column-major memory to row-major kernels and return wrong values; `tanh`
+  overflows to NaN above 44.5; BatchNorm with more than 4096 features
+  returns wrong values and segfaults from 8192 features — reachable from the
+  ordinary layer path when the Zig backend is active.
+. *Are the GPU backends verified?* No. The extensions contain real
+  `CUDA.jl`/`AMDGPU.jl`/`Metal.jl` code, but hardware CI is opt-in and the
+  baseline file that hardware runs would populate is empty. The hardware smoke
+  test cannot distinguish GPU execution from CPU fallback. `AXIOM_CUDA_AVAILABLE=1`
+  makes `cuda_available()` return `true` without a device.
+. *Does the proof layer prove the runtime?* No. `@prove` strategies 1 and 3
+  are string heuristics (documented as such); the SMT path encodes free
+  variables over `Real` and never encodes the model, weights or a backend;
+  `verify()`'s `ValidProbabilities` is `last_layer isa Softmax`. No
+  certificate or proof artifact records which backend/kernel/ABI executed.
+. *Extraction decision:* Do not extract now. The runtime seam that a
+  `SiliconCore.jl` would own does not yet exist as an interface inside Axiom,
+  and the one previous extraction (`AcceleratorGate.jl`, "extracted from
+  Axiom.jl's backend module") is vendored back into Axiom as dead code with a
+  disjoint type hierarchy. Build the seam in-tree first (Phase 1 in H), keep
+  it small (G), gate on evidence (Phase 2), then decide.
+
+== Conventions used in the reports
+
+* `[empirical]` — executed in this investigation; script in `repro/`.
+* `[static]` — read from source; not executed here; maintainer check provided.
+* `file:line` references are against commit `79e6f48`.

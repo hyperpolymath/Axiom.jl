@@ -1,0 +1,166 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= G. Proposed package / API boundary (design only — not implemented)
+:toc:
+
+Goal: the smallest interface that (1) makes "requested vs. executed" a
+first-class, recorded fact, (2) is safe and reproducible by default, (3) can
+live as `Axiom.Runtime` today and be moved verbatim into a standalone package
+later. Names are proposals.
+
+== G.1 Design rules
+
+. *Default is the reference backend.* Nothing accelerates unless asked.
+. *Availability is measured, never asserted.* Environment variables may
+  *request* or *forbid* a backend; they cannot make it available.
+. *Strict mode fails; permissive mode records.* `strict=true` throws when the
+  requested backend cannot execute the op. `strict=false` may fall back — but
+  the report says so. There is no third mode that falls back silently.
+. *One report per execution.* Every call returns (or attaches) an
+  `ExecutionReport`; `Pipeline` execution aggregates them.
+. *No model, proof, or domain types in the module.* Enforced by a test that
+  the module's transitive `using`/`import` set is `{Base, Libdl, Dates}`.
+. *No speculative hardware.* A backend type may exist only if the module can
+  execute at least one op on it or *detect* it via a real probe (not an env
+  var). Today that admits `Reference`, `Zig`, `CUDA`, `ROCm`, `Metal`.
+
+== G.2 Types
+
+[source,julia]
+----
+module Runtime
+
+abstract type Backend end
+struct ReferenceBackend <: Backend end                       # pure Julia, deterministic order
+struct NativeBackend    <: Backend; lib::String; end          # Zig .so (path is *used*)
+struct CUDABackend      <: Backend; device::Int; end          # provided by extension
+struct ROCmBackend      <: Backend; device::Int; end
+struct MetalBackend     <: Backend; device::Int; end
+
+"Why an op could not run where it was asked to."
+@enum Unavailability NotBuilt NotLoaded NoDevice DriverError UnsupportedOp UnsupportedShape UnsupportedDType Forbidden
+
+struct Capability
+    backend::Backend
+    available::Bool
+    reason::Union{Nothing,Unavailability}
+    device::Union{Nothing,DeviceIdentity}
+    kernel_version::Union{Nothing,VersionNumber}   # e.g. axiom_zig_version
+    abi_version::Union{Nothing,VersionNumber}      # checked-in ABI contract the wrapper expects
+    ops::Set{Symbol}                               # ops this backend can execute here
+end
+
+struct DeviceIdentity
+    vendor::String; name::String; id::String       # e.g. ("NVIDIA","A10G","GPU-uuid"), ("cpu","x86_64","host")
+    memory_bytes::Union{Nothing,Int}
+end
+
+struct ExecutionReport
+    op::Symbol
+    requested::Backend
+    selected::Backend          # after policy
+    executed::Backend          # what actually ran
+    fallback_used::Bool        # executed !== requested
+    fallback_reason::Union{Nothing,Unavailability}
+    precision::DataType        # element type the kernel computed in
+    input_precision::DataType  # element type the caller supplied
+    device::DeviceIdentity
+    kernel_version::Union{Nothing,VersionNumber}
+    abi_version::Union{Nothing,VersionNumber}
+    strict::Bool
+    elapsed_ns::Int
+    diagnostics::Vector{Diagnostic}   # warnings that were *recorded*, never printed by default
+end
+
+struct Diagnostic; level::Symbol; code::Symbol; message::String; end
+
+end # module
+----
+
+== G.3 Functions (the whole public surface)
+
+[source,julia]
+----
+# --- discovery -------------------------------------------------------------
+capabilities()::Vector{Capability}          # probes; cached; never consults AXIOM_*_AVAILABLE
+capability(::Backend)::Capability
+reference()::ReferenceBackend
+
+# --- policy ----------------------------------------------------------------
+struct Policy
+    requested::Backend
+    strict::Bool                # default: false for ReferenceBackend, true otherwise? -> see G.4
+    allow_precision_change::Bool  # default false: Float64 in => Float64 out or Unavailable(UnsupportedDType)
+    forbidden::Set{Type{<:Backend}}
+end
+Policy(; backend=reference(), strict=..., kwargs...)
+
+# --- execution -------------------------------------------------------------
+# `f` is a kernel function `f(::Backend, args...)` provided by the host (Axiom's backend_*).
+execute(f, policy::Policy, args...)::Tuple{Any, ExecutionReport}
+
+# The host registers which ops each backend implements; Runtime never defines kernels.
+register_op!(::Type{<:Backend}, op::Symbol; dtypes, ndims_range, constraints=nothing)
+
+# --- provenance ------------------------------------------------------------
+aggregate(reports::Vector{ExecutionReport})::ExecutionSummary   # per-op counts, any_fallback, backends_used
+fingerprint(summary)::String                                    # stable hash for certificates/metadata
+----
+
+`ExecutionSummary` is what `compile`/`verify`/certificates embed. It answers
+"did anything fall back?", "which kernel versions ran?", "what precision?"
+without the caller reconstructing it from logs.
+
+== G.4 Semantics that resolve today's ambiguities
+
+[cols="2,3"]
+|===
+| Situation | Behaviour
+
+| `Policy(backend=NativeBackend(path))`, library missing | `strict` defaults to `true` for any non-reference request → `execute` throws `BackendUnavailable(NotLoaded, path)`. With `strict=false`: runs on reference, report has `fallback_used=true`, `fallback_reason=NotLoaded`.
+| Env var `AXIOM_CUDA_AVAILABLE=1`, no device | `capability(CUDABackend(0)).available == false` (probe result). The env var is read only by `Policy` defaults as a *request*, never by `capabilities()`.
+| Float64 input, backend kernel is Float32-only | Default: `UnsupportedDType` → strict throws / permissive falls back to reference in Float64. With `allow_precision_change=true`: runs in Float32, `report.precision=Float32`, `input_precision=Float64`.
+| Op not implemented on backend (e.g. pooling on Zig) | `UnsupportedOp` — reference executes; report says so. Never a bare `try … catch end`.
+| Shape outside kernel contract (`num_features > 4096`, `seq_len > 64`, `batch_size == 5` until fixed) | `UnsupportedShape` from `register_op!` constraints *before* the `ccall` — the runtime is where such limits live, not in Zig comments.
+| Kernel returns an error code (`_checked`) | Converted to a typed exception with the report attached; not swallowed.
+| Requested backend is `ReferenceBackend` | `strict` irrelevant; report still produced (precision, order id).
+| Diagnostics | Recorded in the report. Printing is a host decision (`Axiom` may `@warn` once per process for `fallback_used` in permissive mode). No global suppression switch.
+|===
+
+== G.5 How Axiom would consume it (Phase 1 in H)
+
+* `set_backend!(b)` becomes `set_policy!(Policy(backend=b, strict=…))`;
+  `current_backend()` becomes `current_policy()`. Layer forwards call
+  `execute(backend_matmul, policy, A, B)` instead of `backend_matmul(current_backend(), A, B)`
+  inside `try … catch`.
+* `compile(model; backend, strict=true)` returns a model *bound to a policy*
+  (no global consulted at forward time). A `compile` on an unavailable strict
+  backend throws at compile time — which is what the current CI smoke test
+  believes already happens.
+* `Pipeline` forward collects reports; `model(x; report=true)` returns
+  `(y, summary)`.
+* `verify()` / `check()` / `sign_certificate` embed `fingerprint(summary)`
+  and the summary's `kernel_version`/`abi_version`. A certificate then
+  states *which* execution it is about.
+* `gpu_capability_report()` and the coprocessor `*_capability_report()`
+  functions become thin views over `capabilities()`.
+* `SmartBackend` becomes a `Policy` with a selection function; its cost
+  heuristics stay in Axiom.
+
+== G.6 What stays out
+
+* Coprocessor stubs (TPU/NPU/PPU/MATH/FPGA/DSP/VPU/QPU/CRYPTO): no probe, no
+  op → not admissible as `Backend` subtypes. If the project wants to keep the
+  names for roadmap reasons, keep them in Axiom behind
+  `Axiom.Experimental` with the existing env-var behaviour, clearly outside
+  the runtime contract.
+* Kernel implementations (Julia reference, Zig wrappers, GPU extension
+  methods) remain in Axiom (Option C deferred).
+* `SmartBackend` cost model, `compile` optimisation passes, mixed precision.
+* Anything that imports `Tensor`, `AbstractLayer`, `Pipeline`, proof types.
+
+== G.7 Size estimate
+
+Types + policy + execute + aggregate + tests: roughly 400–600 lines of Julia,
+zero new dependencies (`Libdl` for the native probe, `Dates` for timestamps).
+Comparable to `AcceleratorGate.jl`'s current size — which is the point: this
+is what that package should have been, defined from the call sites outward.

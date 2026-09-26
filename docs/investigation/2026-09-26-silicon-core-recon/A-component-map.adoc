@@ -1,0 +1,169 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= A. Component map
+:toc:
+
+Classification key:
+
+* *production-tested* — exercised by `Pkg.test()` or a CI script that would fail if the component broke.
+* *experimental* — real code, self-described or evidently heuristic/simplified.
+* *stub / capability-only* — types, env-var detection and dispatch plumbing with no execution path of its own.
+* *disconnected* — present in the tree but not reachable from any public entry point, or does not build.
+* *documentation-only* — described in docs with no corresponding code.
+
+Line counts are `wc -l` at `79e6f48` (27,093 lines of `.jl`/`.zig`/`.h` total).
+
+== A.1 Julia package (`src/`, `ext/`)
+
+[cols="2,1,1,4"]
+|===
+| Component | LOC | Class | Evidence / notes
+
+| `types/` — `Tensor{T,N,Shape}`, `DynamicTensor`, arithmetic
+| 1,179 | production-tested
+| `test/runtests.jl` "Tensor Types", "Tensor Arithmetic", "Compile-Time Shape Verification". Design note: `Tensor(data) = Tensor{T,N,Tuple(size(data))}(data)` (`tensor.jl:161`) puts the *runtime* size into the type → see E.5.
+
+| `layers/` — Dense, Conv{1,2,3}d, ConvTranspose2d, activations, normalisation, pooling, invertible
+| 3,505 | production-tested (Julia path only)
+| Tested on `JuliaBackend` only. Backend-aware `forward` for Dense/Conv2d/BatchNorm/LayerNorm/RMSNorm/Dropout lives in `backends/abstract.jl`, not in `layers/` (`normalization.jl:51` comment). Activations, pooling and LogSoftmax never dispatch to a backend (see B.3). `conv.jl:245` "Simplified 1D conv", `normalization.jl:296,320` "Simplified implementation".
+
+| `dsl/` — `@axiom`, `@prove`, `Pipeline`/`Sequential`/`Chain`, `@ensure`
+| 1,738 | production-tested (structure) / experimental (`@prove`)
+| `prove.jl:10,18,244,258,274,316` label strategies 1 and 3 "experimental heuristic — not symbolic execution, not a theorem prover". Strategy 2 = SMT extension (below).
+
+| `autograd/`, `training/` (Zygote-based)
+| 1,407 | production-tested
+| "Optimizers", "Loss Functions", "Data Utilities" test sets. Zygote is a hard dependency used only here and in `layers/invertible.jl`.
+
+| `verification/` — `verify()`, properties, certificates, Ed448+Dilithium signing
+| 2,024 | production-tested (structural checks) / experimental (proof semantics)
+| `checker.jl:295`: `ValidProbabilities` is `:proven` iff `last_layer isa Softmax`. Empirical `check()` runs on `current_backend()` and records no backend provenance. Signing calls a Rust cdylib in `crypto/` (837 LOC, separate build) — `test/verification/hybrid_signing_tests.jl`.
+
+| `proof_export.jl` — Lean/Coq/Isabelle/Agda export
+| 1,115 | experimental
+| Emits theorem *skeletons*; `proof_export.jl:185–246` counts unresolved placeholders in the emitted file ("vacuous placeholder", "`theorem foo : True := trivial`-style").
+
+| `backends/abstract.jl`
+| 3,069 | mixed — see B
+| One file holds: 15 backend types, `SmartBackend`, `current_backend()` global, Float32 reference kernels, backend-aware layer forwards, `compile()` + optimisation passes, `MixedPrecisionWrapper`, GPU/coprocessor compiled-model wrappers, self-healing wrappers, diagnostics, capability reports. This is the seam a runtime package would need, and it is not separable today.
+
+| `backends/julia_backend.jl`
+| — (part of 4,573) | production-tested
+| Generic-`T` reference kernels that *duplicate* the Float32 kernels in `abstract.jl` with different summation order (D.6).
+
+| `backends/zig_ffi.jl`
+| 651 | production-tested (7 ops via `test/ci/backend_parity.jl`, only when `AXIOM_ZIG_LIB` is set)
+| 29 `ccall`s; `dlsym` per call (`zig_ffi.jl:49–55`); every wrapper silently returns the Julia result when `!zig_available()` (`zig_ffi.jl:51,102`).
+
+| `backends/gpu_hooks.jl`
+| — | stub / capability-only (in-tree) — real hooks arrive via extensions
+| `backend_gpu_*` default methods are CPU implementations. `cuda_available()` honours `AXIOM_CUDA_AVAILABLE` before any device probe — in the base definition (`abstract.jl:1700–1704`, returns `false` otherwise) *and* in the extension override (`ext/AxiomCUDAExt.jl:16–20`, `forced !== nothing && return forced` precedes `CUDA.functional()`); `gpu_hooks.jl:454` is a docstring example of the override. `gpu_capability_report()["kernel_hooks_loaded"]` (`:125–143`) is the only genuine "is an accelerator really wired" signal in the package.
+
+| Coprocessor backends (TPU, NPU, PPU, MATH, FPGA, DSP, VPU, QPU, CRYPTO) in `abstract.jl`
+| ≈900 | stub / capability-only
+| Availability = env var (`AXIOM_<X>_AVAILABLE`); execution = Julia path with a one-time warning unless `AXIOM_<X>_REQUIRED` makes it error. `REGISTRY-READINESS.adoc:51` says so itself: "type stubs, not working hardware backends". "MATH" = AVX-512 and "CRYPTO" = AES-NI are CPU ISA features presented as coprocessors. Tested only as env-var plumbing (`test/runtests.jl:211–255`, `test/ci/*_required_mode.jl`).
+
+| `vendored/AcceleratorGateVendored.jl`
+| 494 | disconnected
+| Imported at `abstract.jl:8–10`; the only call site is `abstract.jl:2277`, guarded by `applicable(device_capabilities, backend)` which is false for every Axiom backend (disjoint type hierarchy). Upstream `hyperpolymath/AcceleratorGate.jl` exists (v0.1.0, unregistered, deps Dates+Libdl) and its README states it was "extracted from Axiom.jl's backend module". See F.
+
+| `ext/AxiomCUDAExt.jl`, `AxiomAMDGPUExt.jl`, `AxiomMetalExt.jl`
+| ≈700 | experimental — no hardware evidence
+| Real vendor-array code. Hardware CI gated on `vars.AXIOM_ENABLE_GPU_HARDWARE_CI` + self-hosted runners (`ci.yml`); `benchmark/gpu_performance_baseline.json` is an empty template ("Populate … from dedicated CUDA/ROCm/Metal hardware runners"). AMDGPU/Metal are copy-edits of the CUDA file.
+
+| `ext/AxiomSMTExt.jl` + `packages/SMTLib.jl` (2,329 LOC, unregistered path dep)
+| ≈2,700 | experimental
+| Sound sat/unsat mapping (`AxiomSMTExt.jl:125–150`), but variables are declared `Real` (`SMTLib.jl:734–736`), `≈` becomes `==`, and the model is never encoded (no reference to weights/layers in the extension). Tests skip when no solver is installed (`runtests.jl:785–812`).
+
+| `ext/AxiomPyTorchExt.jl`
+| 291 | experimental
+| Defines `Axiom.from_pytorch(::String)`; core `integrations/interop.jl:348` defines `from_pytorch(::AbstractString; strict)` for a JSON descriptor format. Loading PyCall+torch therefore changes which method a `String` path hits `[static]` (J-27).
+
+| `integrations/` — HuggingFace, interop (PyTorch descriptor, ONNX export)
+| 1,887 | experimental
+| `huggingface.jl:26–29` "NOT implemented (honest gaps)"; architectures are "simplified" (`:362,453,548`); tokenizer is a documented stub (`:809–812`).
+
+| `serving/`
+| 549 | production-tested (HTTP handlers unit-tested)
+| Only consumer of the `HTTP` hard dependency besides HuggingFace download.
+
+| `model_metadata.jl`, `model_packaging.jl`
+| 823 | production-tested
+| `backend_compatibility::Vector{String}` is the only backend-related metadata anywhere; it is declarative, not measured.
+|===
+
+== A.2 Native and specification trees
+
+[cols="2,1,1,4"]
+|===
+| Component | LOC | Class | Evidence / notes
+
+| `zig/` — `libaxiom_zig` (matmul, activations, conv, pool, norm, attention, threading)
+| 3,410 | production-tested (Zig unit tests; 7 ops parity-tested from Julia)
+| Builds with Zig 0.15.2 (the CI version); `build.zig` uses the `b.addLibrary` API (Zig ≥ 0.14) and declares no minimum; Zig 0.13 fails. 44 exports; 29 wrapped from Julia; 15 exported-but-unwrapped (`add`, `mul`, `bmm`, `fill`, `avgpool2d`, `relu`, `relu6`, `rotary_embedding`, `scaled_dot_product_attention`, `flash_attention`, and their `_checked` twins). Four confirmed defects (B.2, D, J).
+
+| `ffi/zig/` — second Zig tree + `include/axiom.h` + `test/integration_test.zig`
+| 392 | disconnected (does not compile)
+| `src/main.zig:55` `export fn Axiom.jl_init()` — a project-name template placeholder was expanded to `Axiom.jl`, which is not a valid identifier; same at `:74,90,114,136,149,185,199,204,216,247`. Fails to parse under Zig 0.13/0.14/0.15. `ABI-FFI-README.adoc:108` claims it is "concrete (non-template) and internally self-consistent" and that `cd ffi/zig && zig build test` works.
+
+| `src/Abi/*.idr`, `axiom-abi.ipkg` — Idris2 ABI/layout specification
+| 568 | documentation-only (as a check)
+| `Foreign.idr` declares the generic lifecycle symbols of `ffi/zig` plus `axiom_matmul/relu/conv2d` — 3 of the 44 real exports. `ABI-FFI-README.adoc` itself notes the `Verify.*` functions are `putStrLn` stubs. Nothing in CI compares the Idris declarations to `nm -D` output.
+
+| `crypto/` — Rust cdylib (Ed448 + ML-DSA-87)
+| 837 | production-tested when built
+| Loaded via `AXIOM_CRYPTO_LIB`; tests fall back when absent.
+
+| `benchmark/`
+| — | documentation-only (stale)
+| `results_2026-02-20_julia-rust-zig.adoc` reports Zig matmul 512² = 25.6 ms; the current wrapper's `axiom_matmul_checked` measures 284.6 ms on this machine (unchecked: 21.7 ms) — the published numbers were produced by a kernel the Julia wrapper no longer calls (E.1). Also references a Rust backend that no longer exists in the tree.
+|===
+
+== A.3 Documentation surfaces (claims audited in C, D, J)
+
+`README.adoc`, `ROADMAP.adoc`, `PROOF-PROGRESS.adoc`, `TOPOLOGY.adoc`,
+`ABI-FFI-README.adoc`, `REGISTRY-READINESS.adoc`, `TEST-NEEDS.adoc`,
+`docs/wiki/Verification.md`, `docs/design-diary/ULTRAPLAN.adoc`, `CHANGELOG.adoc`.
+They disagree with each other on the same facts: `PROOF-PROGRESS.adoc:55,224`
+still says the Zig backend is "PLANNED / not yet wired", `ROADMAP.adoc:19,31,93`
+ticks backend parity and "production-hardened GPU paths" as done, and
+`REGISTRY-READINESS.adoc:47–54` says there is "no native GPU acceleration of
+Axiom's own" and that accelerator backends are "type stubs". The last one is
+the accurate description.
+
+== A.4 Dependency boundary facts (Project.toml)
+
+* Hard deps: `Dates, HTTP, JSON, Libdl, LinearAlgebra, Random, SHA, Serialization, Statistics, Zygote`.
+  `HTTP` is used only by `serving/` and HuggingFace download; `Zygote` only by
+  autograd/training/invertible; `Random` only by `DataLoader`. None is unused,
+  but `HTTP`/`Zygote` are heavy for an inference-only consumer.
+* Weak deps: `AMDGPU, CUDA, KernelAbstractions, Metal, PyCall, SMTLib`.
+  *`KernelAbstractions` is an orphan*: no extension and no source reference.
+* Extensions: 5 (no `AxiomKernelAbstractionsExt`).
+* Toolchain pins disagree: `Justfile:128` checks Zig "0.13"; `mise.toml:7`
+  `zig = "latest"`; `ci.yml:75,105` `0.15.2`; `zig/build.zig` needs ≥ 0.14 (`b.addLibrary` API) and declares no minimum.
+  Zig 0.13 cannot build the tree (`b.addLibrary` API).
+* De-facto configuration surface: *62 distinct `AXIOM_*` environment
+  variables* read by `src/` + `ext/` (`grep -rhoE 'AXIOM_[A-Z0-9_]+' src ext | sort -u`).
+  There is no single documented list and no schema; the same concept (strict
+  mode) is spelt `AXIOM_<X>_REQUIRED` for coprocessors, `AXIOM_GPU_SELF_HEAL=0`
+  for GPUs, and does not exist for Zig.
+
+== A.5 Where responsibilities are entangled (the actual problem)
+
+. `current_backend()` is a process-global read inside layer `forward`
+  (`dense.jl`, `abstract.jl:1073`, `normalization.jl:123`). A model has no
+  backend identity; `compile(model, backend=…)` for Julia/Zig returns a
+  wrapper that still consults the global.
+. Reference kernels exist twice in Julia (`abstract.jl` Float32 specialisations
+  vs `julia_backend.jl` generic) and once in Zig; which Julia copy runs depends
+  on the element type (D.6).
+. Proofs (`verify`, `@prove`, certificates) are backend-blind; execution
+  (`compile`, `SmartBackend`, GPU/coprocessor wrappers) is proof-blind.
+  Nothing links a certificate hash to a kernel/ABI version.
+. Fallback policy is implemented six different ways (bare `try … catch end`
+  in layer forwards; `zig_available()` early-returns; GPU self-heal;
+  coprocessor self-heal + required; `compile_to_backend` returning the
+  original model; SmartBackend heuristics) with no shared record of what ran.
+
+These four entanglements — not the number of directories — are what
+G/H address.

@@ -1,0 +1,138 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= E. Memory / performance report
+:toc:
+
+Time is separated into: *compile/JIT*, *dispatch/wrapper overhead*,
+*allocation/copies*, *transfers/sync*, *kernel*. Measurements are
+`[empirical]` on a 2-vCPU sandbox (numbers are for ratios, not absolute
+performance claims); Julia-side items are `[static]` with the measurement
+that would settle them.
+
+== E.1 Kernel time: the Julia wrapper calls a kernel 9–16× slower than the one that was benchmarked `[empirical]`
+
+`backend_matmul(::ZigBackend)` always calls `axiom_matmul_checked`
+(`zig_ffi.jl:114`), which runs a scalar `O(m·n·k)` finiteness pre-pass before
+the tiled SIMD kernel. `repro/matmul_cost.py`, same `.so`, same inputs
+(median of repeats):
+
+[cols="1,1,1,1,1"]
+|===
+| size | `axiom_matmul_checked` | `axiom_matmul` | ratio | single-thread numpy/OpenBLAS
+
+| 64² | 0.311 ms | 0.035 ms | 8.9× | —
+| 128² | 2.82 ms | 0.18 ms | 15.7× | —
+| 256² | 24.8 ms | 2.17 ms | 11.4× | —
+| 512² | 284.6 ms | 21.7 ms | 13.1× | 2.3 ms
+|===
+
+`benchmark/results_2026-02-20_julia-rust-zig.adoc` reports Zig 512² =
+25.6 ms — consistent with the *unchecked* kernel. The published "Zig backend
+performance" therefore describes a code path the Julia wrapper no longer
+uses. Even unchecked, the kernel is ~10× slower than OpenBLAS at 512², so the
+honest positioning of the Zig matmul is "dependency-free", not "fast".
+
+Algorithmic fix (preferred over any offload): make the finiteness check
+`O(m·k + k·n)` on the *inputs* (one vectorised pass each) instead of
+`O(m·n·k)` over products, or check the output once. Then the checked and
+unchecked kernels cost the same to within noise.
+
+== E.2 Dispatch overhead per FFI call `[static, cheap to measure]`
+
+* `@zig_call` does `Libdl.dlsym(_zig_lib[], :sym)` on *every* invocation
+  (`zig_ffi.jl:49–55`). Cost is ~100 ns–1 µs; it matters for small tensors
+  (activation of a 128-vector) and it hides missing symbols until first use.
+  Fix: resolve all 29 symbols once at load into a `NamedTuple` of `Ptr{Cvoid}`.
+* Every threaded kernel spawns and joins fresh OS threads per call
+  (`std.Thread.spawn`, `threading.zig`). Thread creation is ~10–50 µs per
+  thread; for an op that takes 100 µs this is the dominant cost. The
+  thresholds (`THREAD_THRESHOLD = 65536` elements, `BATCH_THREAD_THRESHOLD =
+  8192`) partly mask it. A persistent pool or single-threaded default with
+  opt-in threading would be the algorithmic fix; not a priority until
+  correctness items land.
+* Julia layer forward: `current_backend()` global read + `isa` checks per
+  layer per call — negligible, but see E.5.
+
+== E.3 Allocations and copies `[static]`
+
+[cols="3,2"]
+|===
+| Site | Copies per call
+
+| Layer forward on non-Julia backend: `Float32.(x.data)`, `Float32.(bn.γ)`, `Float32.(bn.running_mean)`, … (`abstract.jl:1079–1082`, `normalization.jl:129–132`) | 1 full input copy + 4 parameter copies *even when already Float32* (`Float32.(::Array{Float32})` allocates a new array).
+| `_to_row_major_vec` / `_from_row_major_vec` (`zig_ffi.jl:79–95`) | 2 full `permutedims` copies per conv2d/layernorm/softmax call.
+| `zig_forward(model::Dense)` etc. `Tensor(y)` re-wraps | 0 extra (wraps), but see E.5 for the type cost.
+| `MixedPrecisionWrapper.forward` | converts every parameter to Float16 and back on *every* forward (`abstract.jl:1476–1500`) — allocation proportional to model size per inference (when it does not throw, D.5).
+| GPU `GPUCompiledModel` | host→device→host per op: Dense + activation = 4 transfers/layer; `CuArray(x)` + `Array(y)` allocate on both sides.
+| Reference `conv2d` Float32 path (`abstract.jl`) | allocates a `patch .* kernel` temporary per output element — `O(N·H_out·W_out·C_out)` small allocations; the generic loop version does not. The *faster* reference path is selected only for non-Float32 inputs (D.6).
+| `Dense` forward | `y .+ d.bias'` materialises; fine.
+|===
+
+Fixes are local and cheap: `convert(Array{Float32}, x)` (no-op if already
+Float32) instead of broadcasting; cache row-major weight copies for conv
+layers; pre-allocate output buffers for in-place FFI variants.
+
+== E.4 Transfers and synchronisation
+
+* Zig path: none (in-process), but all threaded kernels join before return —
+  no asynchrony, no overlap. Fine.
+* GPU path: synchronous `Array(y)` after every op; no streams, no batching of
+  layers on-device. The design is "call one kernel, come back" rather than
+  "keep the activation on device". An `on_device` compiled pipeline would
+  remove 2·(L−1) transfers for an L-layer model. Not recommended before
+  correctness/provenance work (I).
+
+== E.5 Compile/JIT time: shape-in-type `[static; measurable in one session]`
+
+`Tensor(data::Array{T,N}) = Tensor{T,N,Tuple(size(data))}(data)`
+(`types/tensor.jl:161`) embeds the *runtime* size in the type parameter.
+Every layer `forward` returns `Tensor(y)`, whose type depends on a runtime
+value → return types are not inferable → dynamic dispatch at every layer
+boundary, and every distinct input shape (batch size, sequence length,
+image size) triggers fresh specialisation of every `forward` method it
+flows through. Symptoms a user will see: the "first call" penalty recurs for
+each new batch size (e.g. the last partial batch of a `DataLoader`), and
+`@code_warntype forward(model, x)` is red at each layer.
+
+Measurement plan (Julia, ~2 minutes):
+[source,julia]
+----
+using Axiom
+m = Sequential(Dense(784,128,relu), Dense(128,10), Softmax())
+for b in (32, 32, 33, 64, 65)            # repeated 32 shows warm cost; new sizes show recompile
+    x = Tensor(randn(Float32, b, 784))
+    @time m(x)
+end
+# and: using SnoopCompileCore; tinf = @snoopi_deep m(Tensor(randn(Float32, 17, 784)))
+----
+Expected: each *new* `b` costs tens to hundreds of ms of compilation; repeats
+cost microseconds. If confirmed, the design choice needs a documented
+"static shape only where declared" policy (`:dynamic` batch dimension by
+default in layer outputs) — a core-type decision, *not* a runtime-package
+concern.
+
+== E.6 Where the time actually goes (qualitative budget for a small MLP on Zig backend)
+
+For `Dense(784,128) → ReLU → Dense(128,10) → Softmax`, batch 32, with
+`set_backend!(ZigBackend(path))`:
+
+. JIT for a new shape (E.5): dominates the first call.
+. Two `axiom_matmul_checked` calls: kernel time inflated ~10× by the
+  pre-pass (E.1).
+. `Float32.(x.data)` copy + `dlsym` ×2 + thread spawn (784·32·128 ≈ 3.2 M
+  products, above the threshold → spawns).
+. ReLU and Softmax run in Julia (never dispatched, B.3).
+
+Without `set_backend!` (the documented `compile(...)` path) the whole model
+runs in Julia and the Zig library is loaded but idle.
+
+== E.7 Recommendations (algorithmic first, in this order)
+
+. Replace the `O(m·n·k)` finiteness pre-pass with `O(m·k + k·n)` input scans
+  (or a single output scan) → restores the benchmarked performance without
+  removing the safety contract.
+. Resolve symbols once at load; validate the required set; expose the
+  library version in the execution report (G).
+. Remove redundant `Float32.(…)` copies; cache row-major parameter layouts.
+. Decide the `Tensor` shape-in-type policy after measuring E.5.
+. Only then consider persistent threads, on-device pipelines, or any
+  accelerator work.
