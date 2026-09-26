@@ -23,7 +23,9 @@ for n in (64, 128, 256, 512):
     def bench(fn):
         best = 1e9
         for _ in range(reps):
-            t = time.perf_counter(); fn(); best = min(best, time.perf_counter() - t)
+            t = time.perf_counter()
+            fn()
+            best = min(best, time.perf_counter() - t)
         return best * 1e3
     tu = bench(lambda: lib.axiom_matmul(a.ctypes.data_as(f32p), b.ctypes.data_as(f32p), c.ctypes.data_as(f32p), n, n, n))
     tc = bench(lambda: lib.axiom_matmul_checked(a.ctypes.data_as(f32p), b.ctypes.data_as(f32p), c.ctypes.data_as(f32p), n, n, n))
