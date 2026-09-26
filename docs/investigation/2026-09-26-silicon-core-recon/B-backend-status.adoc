@@ -1,0 +1,107 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= B. Backend status table
+:toc:
+
+"Verified" below means: a test exists that compares numerical output against
+the reference on that backend *and* would fail if the backend silently fell
+back. Compiling, loading, or returning the right shape does not count.
+
+== B.1 Status by backend type
+
+[cols="1,1,1,1,2,3"]
+|===
+| Backend type | Kernels exist | Reachable from a layer `forward` | Strict mode | Tested how | Status
+
+| `JuliaBackend` | yes (two copies) | yes (default) | n/a | `Pkg.test()`; parity *baseline* | *Reference.* Float32 and generic-`T` copies use different summation orders (D.6).
+| `ZigBackend` | yes, 44 exports (29 wrapped) | yes, for Dense/Conv2d/BatchNorm/LayerNorm/RMSNorm/Dropout — only after `set_backend!` | *none* — every wrapper returns the Julia result when `!zig_available()` (`zig_ffi.jl:51,102`) | `test/ci/backend_parity.jl` (7 ops, tiny random shapes, one NaN case); `test/ci/zig_checked_ffi.jl` | *Partially verified; 4 confirmed defects* (B.2). The documented `compile(model, backend=ZigBackend(path))` on a `Sequential` runs pure Julia (B.3).
+| `SmartBackend` | delegates | yes | none | none directly | `SmartBackend(; zig_path=nothing)` (`abstract.jl:166`) silently means "no Zig"; layernorm delegation drops `normalized_shape` (`abstract.jl:215`). Activation routing is inert for `Pipeline` inference (B.3).
+| `CUDABackend` | in `ext/AxiomCUDAExt.jl` | via `GPUCompiledModel` only (`compile(..., backend=CUDABackend())`), not via `set_backend!` layer path | none; `AXIOM_GPU_SELF_HEAL=0` only stops *runtime* self-healing | `test/ci/gpu_fallback.jl` (no GPU: asserts CPU fallback works); `gpu_hardware_smoke.jl` behind `vars.AXIOM_ENABLE_GPU_HARDWARE_CI` | *Unverified on hardware.* Empty baseline file; smoke test compares `acc ≈ cpu`, which passes trivially on fallback; `AXIOM_GPU_REQUIRED` is read by the test only, not by the library.
+| `ROCmBackend` | `ext/AxiomAMDGPUExt.jl` (copy-edit of CUDA) | as above | none | as above | *Unverified on hardware.*
+| `MetalBackend` | `ext/AxiomMetalExt.jl` | as above | none | as above | *Unverified on hardware.* Accepts `Float64` arrays that Metal cannot execute natively `[static]`.
+| `TPUBackend`, `NPUBackend`, `PPUBackend`, `MATHBackend`, `FPGABackend`, `DSPBackend`, `VPUBackend`, `QPUBackend`, `CRYPTOBackend` | *no* | via `CoprocessorCompiledModel` → Julia path | `AXIOM_<X>_REQUIRED=1` → error when env says unavailable | `runtests.jl:211–255`, `test/ci/{coprocessor_strategy,coprocessor_resilience,*_required_mode}.jl` | *Capability-only stubs.* Tests assert the plumbing (env var → `tpu_available()` → wrapper type), never a computation on a device. "MATH" (AVX-512) and "CRYPTO" (AES-NI) are CPU features.
+|===
+
+== B.2 Native (Zig) backend — per-kernel status
+
+Built with Zig 0.15.2, `-Doptimize=ReleaseFast` (as CI). `[empirical]` unless noted.
+
+[cols="2,1,1,3"]
+|===
+| Kernel (Julia wrapper → export) | Parity-tested | Result | Notes
+
+| `backend_matmul` → `axiom_matmul_checked` | yes (16×12·12×7) | correct | 9–16× slower than `axiom_matmul` (E.1). Rejects NaN/Inf with an error — different contract from the Julia reference (D.4).
+| `backend_relu` → `axiom_relu_checked` | yes (128; NaN → error) | correct | In-place `backend_relu!` uses the *unchecked* `axiom_relu_inplace` — same op, different NaN contract.
+| `backend_gelu`, `backend_sigmoid` → `axiom_gelu/sigmoid` | yes | correct | GELU uses the overflow-safe `1 − 2/(e+1)` form.
+| `backend_tanh` / `backend_tanh!` → `axiom_tanh(_inplace)` | *no* | *NaN for x ≥ 44.5 and +Inf* (Julia: 1.0); rel. error 1.3e-3 at x=1e-5, 100 % at 1e-8 | `activations.zig:103–119` uses `(e^{2x}−1)/(e^{2x}+1)`; `repro/activation_probe.py`.
+| `backend_softmax`, `backend_log_softmax` → `axiom_softmax/log_softmax` | softmax yes (8×5) | correct for `dim == ndims` | `dim` argument ignored (`zig_ffi.jl:329,351`) `[static]`. `[empirical]` B=4…17 × 2048 correct through the `.so`.
+| `backend_conv2d` → `axiom_conv2d` | yes (2×10×10×3, 3×3×3×4) | correct at that shape | Wrapper does full `permutedims` copies both ways (E.3). Stride/padding/dilation/groups other than the tested defaults: untested.
+| `backend_batchnorm` → `axiom_batchnorm` | yes (6×8) | *wrong for `num_features` 4097–8191; SIGSEGV from 8192* | Fixed `[4096]f32` stack scratch (`norm.zig:143`); `repro/batchnorm_probe.py`. Reachable from `forward(bn::BatchNorm)` (`abstract.jl:1072–1086`) with the Zig backend set. `training` flag ignored `[static]`.
+| `backend_layernorm`, `backend_rmsnorm` → `axiom_layernorm/rmsnorm` | *no* | correct through the shipped `.so` for B=4…17 × 2048/4096/65536, canary intact | `threading.zig:392,469,523` `batch_size − last_start` underflows at `batch_size = 5` (with `MAX_WORKERS = 3`, `total ≥ 8192`): panics in Debug/ReleaseSafe; the same function compiled ReleaseFast in a `zig test` binary segfaults; in the shipped `.so` LLVM happened to make it benign. Undefined behaviour either way. `repro/repro_underflow*.zig`, `repro/canary_probe.py`. 3-D inputs: wrapper treats `size(x,2)` as hidden `[static]`.
+| `backend_maxpool2d`, `backend_global_avgpool2d` → `axiom_maxpool2d`, `axiom_global_avgpool2d` (no Zig wrapper exists for `avgpool2d`) | *no* | *wrong values whenever N>1 or C>1 (and for non-square N=1,C=1)* | Wrapper passes column-major bytes to row-major NHWC kernels without `_to_row_major_vec` (`zig_ffi.jl:479–507`, `:513`). `repro/layout_probe.py`: maxpool wrong 5/8, 5/8, 49/54, 7/8 elements in four cases; global-avgpool wrong for every N>1 or C>1. Edge contracts: all-`−Inf` window → `−3.4028235e38` (Julia `−Inf`); NaN in window → `1.0` (Julia `NaN`). Not reachable from `MaxPool2d.forward` (pure Julia) — reachable from direct calls, `SmartBackend`, and benchmarks.
+| `backend_dense` (fused) → `axiom_dense`? | no | not probed | `zig_forward(model::Dense)` (`abstract.jl:2495–2502`) drops bias and activation `[static]`.
+| attention (`axiom_scaled_dot_product_attention`, `axiom_flash_attention`) | no Julia wrapper | silent no-op for `seq_len > 64` (`attention.zig:29`), `> 4096` for flash | Output buffer left untouched, no error code.
+| 15 unwrapped exports | — | unreachable from Julia | `add(_checked)`, `mul(_checked)`, `bmm`, `fill`, `avgpool2d`, `relu`, `relu6(_checked)`, `rotary_embedding`, `scaled_dot_product_attention(_checked)`, `flash_attention(_checked)`.
+|===
+
+Threading: every `axiom_*` call above the element threshold spawns OS threads
+(`std.Thread.spawn`, `threading.zig:220,262,387`) and *ignores spawn failure*
+(`catch null`) — the chunk assigned to a thread that failed to start is never
+computed and the output buffer keeps its previous contents `[static; not
+forced in this environment]`.
+
+== B.3 Reachability: what the "production path" actually executes `[static]`
+
+. `compile(model, backend=ZigBackend(path), …)` → `compile_to_backend(model, ::ZigBackend)`
+  (`abstract.jl:1584`) → `ZigCompiledModel` (`:2460`).
+. `forward(::ZigCompiledModel, x)` → `zig_forward(model::Pipeline, …)` →
+  `forward(pipeline, x)` → each layer calls `current_backend()` — the global,
+  which is still `JuliaBackend()` unless the user also called
+  `set_backend!(ZigBackend(path))`.
+. Therefore README's "Production path" and CI's "Runtime smoke (accelerated)"
+  (`test/ci/runtime_smoke.jl:67–79`, which calls `compile(model,
+  backend=accelerator, verify=false, optimize=:none)` and never
+  `set_backend!`) execute pure Julia. The smoke test cannot detect this.
+. Even with `set_backend!(ZigBackend(path))`: only Dense (matmul), Conv2d,
+  BatchNorm (inference, affine), LayerNorm/RMSNorm (2-D, affine, cast to
+  Float32) and Dropout dispatch. `ReLU`, `GELU`, `Tanh`, `Softmax`,
+  `MaxPool2d`, `AvgPool2d`, `LogSoftmax` layers run pure Julia on every
+  backend (`activations.jl:275–312`, `pooling.jl:30–60`). The `SmartBackend`
+  rule "activations → Zig" therefore never fires during `Pipeline` inference.
+. GPU: `compile(model, backend=CUDABackend())` produces a `GPUCompiledModel`
+  whose forward moves data host→device→host *per layer op* (Dense + activation
+  = 4 transfers). `set_backend!(CUDABackend())` on the layer path: *with* the
+  extension loaded, Dense/Conv2d/BatchNorm hit the extension's
+  `backend_matmul/conv2d/batchnorm(::CUDABackend, …)` (`ext/AxiomCUDAExt.jl:168`
+  ff.) and LayerNorm/RMSNorm raise `MethodError` inside their bare `try/catch`
+  → silent CPU; *without* the extension, Dense raises `MethodError` (no
+  fallback method, no `try/catch`) while Conv2d/BatchNorm silently run on
+  CPU. Only the five `backend_gpu_*` hooks have in-tree CPU fallbacks
+  (`gpu_hooks.jl:299–313`, `@warn maxlog=1`).
+
+== B.4 Fallback inventory (where "requested ≠ executed" can happen silently)
+
+[cols="3,2,2"]
+|===
+| Site | Trigger | Observable?
+
+| `zig_ffi.jl` every wrapper (`:51`, `:102`, …) | `!zig_available()` (env `AXIOM_ZIG_LIB` unset, load failure, `ZigBackend("")`) | No. Returns Julia result, no counter, no warning.
+| `abstract.jl:1584–1595` `compile_to_backend(::ZigBackend)` | `!isfile(lib_path)` | `@warn` and returns the *unwrapped* model (no strict option).
+| Layer forwards: `abstract.jl:1078–1085` (BatchNorm), `normalization.jl:128–138` (LayerNorm), `:364–372` (RMSNorm), `conv.jl:137` (Conv2d) | *any* exception from the backend | No. Bare `catch end`, diagnostics not incremented. (A segfault is not an exception — the process dies.)
+| `abstract.jl:407` `_gpu_forward_with_recovery` | any exception | `@warn` unless suppressed; falls back to CPU unless `AXIOM_GPU_SELF_HEAL=0`.
+| `abstract.jl:2754` `_coprocessor_forward_with_recovery` | any exception | as above with `AXIOM_COPROCESSOR_SELF_HEAL`.
+| `cuda_available()` (`abstract.jl:1700–1704`; `ext/AxiomCUDAExt.jl:16–20`) | `AXIOM_CUDA_AVAILABLE=1` | Claims availability without a device; `kernel_hooks_loaded` in `gpu_capability_report()` stays `false` — the only tell.
+| `SmartBackend` constructor `abstract.jl:166` | `zig_path === nothing` | No. `sb.zig === nothing` silently.
+| `MixedPrecisionWrapper` / `precision=:float16` (`abstract.jl:1398–1408`, `1476–1500`) | `setfield!` of a `Matrix{Float16}` into a `Matrix{Float32}` field | `[static]` `setfield!` does not convert → `TypeError` for any parameterised layer; for a `Pipeline`, `parameters()` is empty, so `:mixed` only rounds the *input* to Float16 and computes in Float32 (J-19).
+|===
+
+== B.5 Verification-status summary
+
+[cols="2,1,1,1,1"]
+|===
+| Backend | Compiles / loads | Correct on tested cases | Correct in general | Claimed status in docs
+
+| Julia | ✓ | ✓ | ✓ (with two summation orders) | reference
+| Zig | ✓ | ✓ for 7 ops at 1 shape each | ✗ (pooling, tanh, batchnorm > 4096, dim, seq_len > 64) | "high-performance … production" (README), "PLANNED" (PROOF-PROGRESS)
+| CUDA/ROCm/Metal | ✓ (no hardware here) | unknown | unknown | "production-hardened" (ROADMAP:93) vs "no native GPU acceleration" (REGISTRY-READINESS:47)
+| 9 coprocessors | n/a | n/a | n/a | "15 backends" (README:309) vs "type stubs" (REGISTRY-READINESS:51)
+|===

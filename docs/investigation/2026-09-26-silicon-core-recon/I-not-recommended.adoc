@@ -1,0 +1,49 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= I. Changes explicitly NOT recommended (and why)
+
+[cols="2,4"]
+|===
+| Not recommended | Reason grounded in this investigation
+
+| *Splitting the repository or creating `SiliconCore.jl` / `CoprocessorRuntime.jl` now*
+| The runtime seam does not exist inside Axiom yet (A.5, F.4). The one previous extraction (`AcceleratorGate.jl`) is vendored back as dead code with a disjoint type hierarchy (F.2). Extract after Phase 1–2, as a successor of that package.
+
+| *A separate kernel/FFI package (Option C)*
+| ABI is unversioned, 15 of 44 exports unused, four kernel defects open, second FFI tree does not compile (C). Packaging freezes the wrong contract.
+
+| *Adding GPU, KernelAbstractions, TPU/NPU or any accelerator dependency*
+| No hardware evidence exists for the GPU paths that are already present; adding more surface increases the claim/reality gap. `KernelAbstractions` is already an unused weak dependency — remove it or use it, do not add more.
+
+| *Promoting the nine coprocessor types into a runtime package or its documentation as "supported"*
+| They have no execution path and no real probe (B.1). Keep in `Axiom.Experimental` or delete. Naming AVX-512 and AES-NI "coprocessors" should be dropped.
+
+| *Replacing the Julia reference kernels with Zig/GPU implementations, or making a non-reference backend the default*
+| Parity coverage is 7 ops at one shape; three of the untested ops are wrong (D). The reference must stay the default until the Phase 0 exit test passes — and even then, "default = reference" is a design rule (G.1).
+
+| *Merging the two Julia reference copies by deleting one without tests*
+| Which copy runs depends on dtype (D.6). First pin the summation order with tests, then unify.
+
+| *Removing the `_checked` matmul to recover performance*
+| The finiteness contract is a documented feature (`test/ci/zig_checked_ffi.jl`). Fix the algorithmic cost of the check (E.1) instead.
+
+| *Suppressing warnings globally (e.g. a `AXIOM_QUIET` switch) to make fallback noise go away*
+| Fallbacks must become *recorded* (G.4), not silent. A global suppressor would make the current silent-downgrade problem permanent.
+
+| *Adding a "soft strict" mode that downgrades with a warning*
+| That is today's behaviour. Two modes only: strict throws; permissive records.
+
+| *Rewriting `backends/abstract.jl` wholesale in the first phase*
+| 3,069 lines with the only tests being the ones that exist; a rewrite would invalidate them. Phase 1 routes call sites through the seam incrementally.
+
+| *On-device pipelines, persistent thread pools, async transfers*
+| Real improvements (E.4, E.2), but they optimise paths whose correctness and provenance are not yet established. Sequence after Phase 1.
+
+| *Opening PRs from documentation review alone*
+| Every issue in J that is `[static]` carries a maintainer-runnable check; open issues (not PRs) for those until the check has been run in Julia.
+
+| *Trusting `test/ci/runtime_smoke.jl` "accelerated" or `gpu_hardware_smoke.jl` as evidence of acceleration*
+| Both pass on CPU fallback by construction (B.3, D.8). Fix the tests in Phase 1/2 before citing them.
+
+| *Changing the `Tensor{T,N,Shape}` design in the runtime work*
+| Shape-in-type (E.5) is a core-type decision with wide blast radius; measure first, decide separately.
+|===

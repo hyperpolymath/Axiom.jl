@@ -1,0 +1,225 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= D. Numerical parity risk report
+:toc:
+
+Ordered by (reachability from ordinary use) × (severity). Every item states
+whether it was executed (`[empirical]`, script in `repro/`) or read from source
+(`[static]`, with a maintainer-runnable Julia check).
+
+== D.1 Pooling wrappers pass the wrong memory layout `[empirical]`
+
+*What.* `backend_maxpool2d(::ZigBackend, …)` (`zig_ffi.jl:479–507`) and
+`backend_global_avgpool2d(::ZigBackend, …)` (`:513`) hand Julia's
+column-major `(N,H,W,C)` buffer straight to `axiom_maxpool2d` /
+`axiom_global_avgpool2d`, which index row-major NHWC (`zig/src/pool.zig`).
+Every other array wrapper in the file converts with `_to_row_major_vec`
+(`:79`); these two do not.
+
+*Measured* (`repro/layout_probe.py`, simulates exactly what the Julia wrapper
+does, compares with correct pooling):
+
+[cols="2,1,1"]
+|===
+| Case | maxpool wrong elements | global-avgpool wrong
+
+| N=1, 4×4, C=2, k=2 s=2 | 5 / 8 | 2 / 2
+| N=2, 4×4, C=1 | 5 / 8 | 2 / 2
+| N=2, 6×6, C=3 | 49 / 54 | 8 / 8 (any N>1 or C>1)
+| N=1, 5×3, C=1, k=2 s=1 | 7 / 8 | —
+| N=1, C=1, square | 0 | 0 (the only correct case)
+|===
+
+Also `[static]`: the maxpool wrapper sizes the output with `padding` but the
+export has no padding parameters (`N H_in W_in C kH kW sH sW`), so any
+`padding ≠ (0,0)` leaves part of the output buffer uninitialised.
+
+*Reachability.* `MaxPool2d`/`AvgPool2d` layer `forward` never dispatches to a
+backend (`pooling.jl:30–60`), so `Pipeline` inference is unaffected. Direct
+`backend_*` calls, `SmartBackend`, `benchmark/benchmarks.jl` and any future
+"route pooling to Zig" change are affected. Not covered by
+`test/ci/backend_parity.jl`.
+
+*Maintainer check (Julia):*
+[source,julia]
+----
+using Axiom; zig = ZigBackend(ENV["AXIOM_ZIG_LIB"])
+x = randn(Float32, 2, 6, 6, 3)
+a = Axiom.backend_maxpool2d(zig, x, (2,2), (2,2), (0,0))
+b = Axiom.backend_maxpool2d(JuliaBackend(), x, (2,2), (2,2), (0,0))
+count(a .!= b), maximum(abs.(a .- b))          # expect (≈49, large), not (0, 0)
+----
+
+== D.2 `tanh` overflows to NaN `[empirical]`
+
+`activations.zig:103–119` computes `tanh(x) = (e^{2x}−1)/(e^{2x}+1)` in f32.
+For `x ≥ 44.5` (and `+Inf`) `e^{2x} = Inf` and the result is `Inf/Inf = NaN`;
+Julia's `tanh` returns `1.0`. `gelu` in the same file already uses the
+overflow-safe `1 − 2/(e^{2x}+1)` (`:135,144`) — the fix is to use the same
+form in `tanh_inplace`/`tanh`. Near zero the formula cancels: relative error
+1.3e-3 at `x = 1e-5`, 100 % at `x = 1e-8` (absolute error negligible).
+Measured with `repro/activation_probe.py`; `axiom_tanh_inplace` behaves the
+same. `gelu`, `sigmoid`, `silu` are fine over the probed range (sigmoid(−100)
+flushes a denormal to 0 — harmless).
+
+*Reachability.* `backend_tanh(::ZigBackend)`, `backend_tanh!`, `SmartBackend`
+routing. `Tanh()` layer forward is pure Julia. Not parity-tested (`tanh` is
+absent from `backend_parity.jl`).
+
+== D.3 BatchNorm above 4096 features: wrong values, then SIGSEGV `[empirical]`
+
+`norm.zig:143` `var inv_std: [4096]f32 = undefined;` indexed by
+`num_features` with no bound check. Through the shipped ReleaseFast `.so`
+(`repro/batchnorm_probe.py`, B=2):
+
+[cols="1,2"]
+|===
+| `num_features` | result
+| 4096 | correct
+| 4097 | 2 wrong values (silent)
+| 4100 | 8 wrong values (silent)
+| 8192, 65536, 1,000,000 | *process killed by SIGSEGV*
+|===
+
+In Debug/ReleaseSafe it is an index-out-of-bounds panic
+(`repro/repro_batchnorm.zig`).
+
+*Reachability: high.* `forward(bn::BatchNorm, x)` (`abstract.jl:1072–1086`)
+calls `backend_batchnorm(backend, …)` for any non-Julia backend in inference
+mode with affine parameters — i.e. `set_backend!(ZigBackend(path))` followed
+by a `BatchNorm(8192)` in a model *terminates the Julia process*; the
+surrounding `try … catch` cannot intercept a segfault. `BatchNorm(4097…8191)`
+returns silently wrong numbers for the trailing features.
+
+== D.4 Different NaN/Inf/edge contracts per backend and per variant `[empirical + static]`
+
+[cols="2,2,2"]
+|===
+| Operation | Julia reference | Zig
+
+| `matmul` with NaN/Inf input | propagates (BLAS) | `axiom_matmul_checked` → Julia `error(...)` (`zig_ffi.jl:114–130`)
+| `relu` with NaN | NaN | `backend_relu` errors (`_checked`); `backend_relu!` (`axiom_relu_inplace`, unchecked) returns NaN — *same op, two contracts on one backend*
+| `maxpool2d`, all-`−Inf` window | `−Inf` | `−3.4028235e38` (`floatmax` sentinel) `[empirical]`
+| `maxpool2d`, NaN in window | `NaN` (`maximum`/`max` propagate) | `1.0` `[empirical]` (comparison-based max ignores NaN)
+| `tanh(x ≥ 44.5)`, `tanh(+Inf)` | `1.0` | `NaN`
+| `softmax(dim=1)` on a matrix | normalises along dim 1 | normalises along the last dim regardless (`dim` unused, `zig_ffi.jl:329,351`) `[static]`
+| `layernorm` on 3-D input | any `normalized_shape` | wrapper assumes `(batch, hidden)`; `SmartBackend` drops `normalized_shape` (`abstract.jl:215`) `[static]`
+| `batchnorm(training=true)` | batch statistics | `training` ignored, running stats used `[static]`
+| attention `seq_len > 64` (SDPA) / `> 4096` (flash) | n/a (no Julia wrapper) | silent no-op, output untouched (`attention.zig:29,268`)
+| thread spawn failure | n/a | chunk skipped, output stale (`threading.zig:225,268,387` `catch null`) `[static]`
+|===
+
+A parity test that only feeds `randn` never sees any of these. The
+"documented tolerance budgets" (`backend_parity.jl:11–15`) are fine as
+tolerances; they are not a contract for edge values.
+
+== D.5 Precision changes silently on non-reference backends `[static]`
+
+* Every backend-aware layer forward casts to Float32 before dispatch
+  (`Float32.(x.data)`, `Float32.(bn.γ)`, … at `abstract.jl:1079`,
+  `normalization.jl:129–132`, `dense.jl` forward). A `Float64` model on
+  `ZigBackend`/GPU is computed in Float32 and the result is returned as Float32
+  — no warning, no record.
+* `precision=:float16` → `convert_precision(::AbstractLayer, Float16)`
+  (`abstract.jl:1398–1408`) does `setfield!(model, name, Float16.(param))`
+  into a field typed `Matrix{Float32}` (`Dense{T}` is `mutable struct` with
+  `weight::Matrix{T}`). `setfield!` does not convert, so this throws
+  `TypeError` for every parameterised layer. Not covered by
+  `test/ci/optimization_passes.jl` (which tests `:float32` and `:mixed` only).
+* `precision=:mixed` → `MixedPrecisionWrapper` (`:1476–1500`). For a
+  `Pipeline`, `parameters(::Pipeline)` is the generic `NamedTuple()`
+  (`layers/abstract.jl:136`) so no weights are converted; the input is
+  rounded to Float16, then multiplied with Float32 weights → Float32
+  arithmetic. The CI drift bound `≤ 5e-2` passes because only the *input*
+  was rounded. For a single `Dense`, the first `setfield!` throws. There is
+  also no `try/finally`, so an exception mid-forward would leave a model
+  permanently converted.
+
+*Maintainer check:*
+[source,julia]
+----
+using Axiom
+m = Dense(4, 3)
+compile(m; backend=JuliaBackend(), precision=:float16, verify=false)   # expect TypeError [static prediction]
+p = Sequential(Dense(4, 3), ReLU())
+mp = compile(p; backend=JuliaBackend(), precision=:mixed, verify=false)
+eltype(mp.model.layers[1].weight)                                       # expect Float32 (never Float16)
+----
+
+== D.6 The reference backend is not one implementation `[static]`
+
+`abstract.jl` defines Float32-specialised reference kernels
+(`backend_conv2d(::JuliaBackend, ::Array{Float32,4}, …)`,
+`backend_avgpool2d` at `:598`, …) and `julia_backend.jl` defines generic-`T`
+versions of the same functions. Julia's dispatch picks the Float32 copy for
+`Array{Float32}` inputs and the generic copy for everything else. The two
+copies accumulate in different orders (e.g. `sum(patch .* kernel)` pairwise vs
+an explicit sequential loop; `mean(window)` vs manual accumulation), and the
+Float32 `avgpool2d` lacks `count_include_pad`. Consequences:
+
+* "Parity with the reference" means parity with *whichever* copy dispatch
+  selected; a Float64 parity test and a Float32 parity test compare against
+  different code.
+* Bit-for-bit reproducibility across dtypes is impossible to promise.
+
+Recommendation (H, Phase 0): keep *one* generic reference kernel per op with
+a documented summation order, and make the Float32 fast paths call it or be
+tested against it explicitly.
+
+== D.7 Aliasing and mutation `[static]`
+
+* `Base.Array(t::Tensor) = t.data` (`tensor.jl:310`) returns the buffer, not a
+  copy; `forward(::Dropout)` in inference returns the input tensor itself;
+  `backend_dropout(…, training=false)` returns `x`. Callers that mutate the
+  output mutate the input. Document or copy.
+* In-place `backend_*!` Zig wrappers mutate Julia arrays through raw pointers;
+  they are correctly restricted to `Array{Float32}` (contiguous), but the
+  matching out-of-place wrappers may return the *same* array when Zig is
+  unavailable (e.g. `backend_dropout`), so "in-place vs out-of-place" is not a
+  stable distinction across availability states.
+* `convert_precision` and `MixedPrecisionWrapper.forward` mutate the user's
+  model object (see D.5). `compile()` is documented as returning a compiled
+  model, not as mutating its argument.
+
+== D.8 GPU extensions `[static]`
+
+* Availability can be asserted by environment (`AXIOM_CUDA_AVAILABLE=1`,
+  `abstract.jl:1700–1704` and `ext/AxiomCUDAExt.jl:16–20`) with no device present; nothing later re-checks
+  `CUDA.functional()` before claiming acceleration. No strict mode exists;
+  `AXIOM_GPU_REQUIRED` is read only by the test script.
+* Host↔device transfer per op (`GPUCompiledModel`): Dense + activation = 4
+  transfers per layer; conv2d builds im2col per patch with kernel launches in
+  a loop.
+* `backend_gpu_maxpool2d/avgpool2d` use scalar indexing on device arrays and
+  are never called from a layer path.
+* `batchnorm` ignores `training` (same as Zig). Metal extension accepts
+  `Float64` (unsupported natively on Metal).
+* `test/ci/gpu_hardware_smoke.jl` asserts `acc ≈ cpu`; with self-healing on
+  (default), a failed GPU op silently falls back and the assertion still
+  passes. The test cannot prove GPU execution. `gpu_capability_report()
+  ["kernel_hooks_loaded"]` and the hook-counter override pattern used in
+  `test/ci/gpu_fallback.jl` are the right building blocks for a real check
+  (see the verification plan in H).
+
+== D.9 Edge-shape coverage that does not exist today
+
+* `batch_size = 5` (chunking underflow, D.4/threading) — never tested.
+* `num_features > 4096` — never tested.
+* `N > 1` and `C > 1` for pooling — never tested.
+* `dim ≠ ndims` for softmax — never tested.
+* Zero-size dimensions (`0×n` matmul, empty batch): `axiom_matmul_checked`
+  pre-pass and the threading thresholds have not been exercised with `n = 0`
+  `[not verified]`.
+* Non-finite inputs for anything but `relu` — never tested.
+* Non-default `stride/padding/dilation/groups` for conv2d on Zig — never tested.
+
+== D.10 Proof layer vs. numerical execution
+
+Nothing in `verification/`, `dsl/prove.jl`, `proof_export.jl` or the SMT
+extension refers to a backend, a kernel, a dtype, or a summation order. The
+SMT encoding uses `Real` (`SMTLib.jl:734–736`), so even a genuinely proven
+property is a statement about real arithmetic, not about the Float32 kernel
+that runs. `verify()`'s structural checks are backend-agnostic by design
+(`checker.jl:295`). Empirical `check()` runs on the global backend and stores
+no provenance. Conclusion: the proof layer *does not* prove the runtime
+implementation, and any certificate produced today is valid for every backend
+only because it says nothing about any of them.
