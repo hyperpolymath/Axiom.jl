@@ -76,6 +76,8 @@ Every commit that reaches the default branch must be signed; a ruleset refuses
 unsigned pushes. Estate policy:
 [SIGNING-POLICY](https://github.com/hyperpolymath/standards/blob/main/docs/SIGNING-POLICY.adoc).
 
+SSH commit signing requires Git 2.34 or later.
+
 - **People and interactive agents** sign with an SSH key registered on GitHub
   as a *signing* key (`gpg.format=ssh`, `user.signingkey=<key>.pub`,
   `commit.gpgsign=true`). The committer email must be verified on that account.
