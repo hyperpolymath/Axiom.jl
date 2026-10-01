@@ -3,7 +3,7 @@
 // indexed by `num_features` with no bound check.  num_features > 4096 writes
 // past the stack array.  In ReleaseSafe/Debug this is an index-out-of-bounds
 // panic; through the shipped ReleaseFast .so it is silently wrong (4097..8191)
-// and SIGSEGV from 8192 features (see batchnorm_probe.py).
+// and SIGSEGV from 8192 features (see batchnorm_probe.jl).
 // Run: zig test -OReleaseSafe --dep axiom -Mroot=repro_batchnorm.zig -Maxiom=../../../../zig/src/axiom.zig
 const std = @import("std");
 const axiom = @import("axiom");

@@ -6,22 +6,34 @@ library first exactly as CI does (Zig 0.15.2):
 
     cd zig && zig build -Doptimize=ReleaseFast     # -> zig/zig-out/lib/libaxiom_zig.so
 
-Python probes need `numpy` (`ctypes` is standard library). Run them from this
-directory; the `.so` path argument is `../../../../zig/zig-out/lib/libaxiom_zig.so`.
+Julia probes use only standard libraries (no package installation required).
+Run them from this directory, for example:
+
+    julia --startup-file=no activation_probe.jl ../../../../zig/zig-out/lib/libaxiom_zig.so
+
+The probes retain the investigated shapes, C ABI calls, comparison tolerances,
+and subprocess isolation for batchnorm/chunking crashes. Normalisation buffers
+store each C row in a Julia column; pooling deliberately passes Julia's native
+column-major NHWC layout to reproduce the wrapper defect. Random samples use
+Julia's seeded generator, so exact mismatch counts and timings can differ from
+the original Python/NumPy measurements recorded in this investigation. Those
+historical measurements are unchanged; the Julia ports reproduce the same cases.
+A successful probe exit means the probe ran, not that the backend is correct;
+inspect its mismatch, NaN, canary, and child-process crash reports.
 
 [cols="2,3,2"]
 |===
 | File | What it shows | Issue
 
-| `batchnorm_probe.py` | `axiom_batchnorm` silently wrong for 4097–8191 features, SIGSEGV from 8192 (each case in a subprocess) | J-01
+| `batchnorm_probe.jl` | `axiom_batchnorm` silently wrong for 4097–8191 features, SIGSEGV from 8192 (each case in a subprocess) | J-01
 | `repro_batchnorm.zig` | Same defect as an index-out-of-bounds panic in ReleaseSafe | J-01
-| `layout_probe.py` | Pooling wrappers' column-major buffers vs row-major kernels → wrong values; `−Inf`/NaN window contracts | J-02, J-07
-| `activation_probe.py` | `axiom_tanh` NaN for x ≥ 44.5 / +Inf; near-zero cancellation; gelu/sigmoid fine | J-03
+| `layout_probe.jl` | Pooling wrappers' column-major buffers vs row-major kernels → wrong values; `−Inf`/NaN window contracts | J-02, J-07
+| `activation_probe.jl` | `axiom_tanh` NaN for x ≥ 44.5 / +Inf; near-zero cancellation; gelu/sigmoid fine | J-03
 | `repro_underflow.zig` | `parallel_layernorm` batch=5 integer-overflow panic (ReleaseSafe) | J-04
 | `repro_underflow_canary.zig` | Same function: `-OReleaseSafe` panics, `-OReleaseFast` test binary crashes | J-04
-| `canary_probe.py` | Through the shipped `.so`, batch=5 is (accidentally) benign: rows correct, canary intact | J-04
-| `chunking_probe.py` | softmax/layernorm for batch 4…17 × 2048 through the `.so` | J-04
-| `matmul_cost.py` | `axiom_matmul_checked` vs `axiom_matmul` timing (9–16×) | J-05
+| `canary_probe.jl` | Through the shipped `.so`, batch=5 is (accidentally) benign: rows correct, canary intact | J-04
+| `chunking_probe.jl` | softmax/layernorm for batch 4…17 × 2048 through the `.so` | J-04
+| `matmul_cost.jl` | `axiom_matmul_checked` vs `axiom_matmul` timing (9–16×) | J-05
 |===
 
 Zig-level reproductions:

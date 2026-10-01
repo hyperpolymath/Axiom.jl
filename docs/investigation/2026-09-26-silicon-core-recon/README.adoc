@@ -30,7 +30,7 @@ dependency was added. No PR is opened by this work. Everything here lives under
 | H | link:H-staged-plan.adoc[Staged plan] | Phase 0 fixes + parity tests → Phase 1 internal `Runtime` seam → Phase 2 evidence gate → Phase 3 (conditional) extraction.
 | I | link:I-not-recommended.adoc[Changes explicitly NOT recommended] | No repo split now, no `SiliconCore.jl` from stubs, no GPU deps, no replacing reference kernels, no global warning suppression, no third backend hierarchy.
 | J | link:J-upstream-issues.adoc[Upstream issues with evidence] | 40 issues, each with severity, evidence type (empirical vs static), reproduction, and bucket (fix-in-Axiom / future-standalone / not-yet-verified).
-| — | link:repro/[repro/] | Minimal reproductions (Zig test files + Python/ctypes probes against the built `.so`).
+| — | link:repro/[repro/] | Minimal reproductions (Zig test files + Julia/ccall probes against the built `.so`).
 |===
 
 == How the evidence was obtained

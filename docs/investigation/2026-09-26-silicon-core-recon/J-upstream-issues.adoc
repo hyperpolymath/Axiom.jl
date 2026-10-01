@@ -64,8 +64,9 @@ wrong results / false claim on a documented path or major perf regression;
 == J.2 Detailed entries (evidence + reproduction)
 
 All commands assume the library was built as CI does:
-`cd zig && zig build -Doptimize=ReleaseFast` (Zig 0.15.2) and that `numpy`
-is importable. Zig test reproductions compile against the repository's
+`cd zig && zig build -Doptimize=ReleaseFast` (Zig 0.15.2) and that Julia
+is available. The probes use only Julia standard libraries; see link:repro/README.adoc[reproduction notes]
+for the port and historical measurement details. Zig test reproductions compile against the repository's
 `zig/src` tree directly. Paths are relative to `docs/investigation/2026-09-26-silicon-core-recon/repro/`.
 
 === J-01 Zig `batchnorm` above 4096 features `[E]` — Critical
@@ -73,7 +74,7 @@ is importable. Zig test reproductions compile against the repository's
 * *Where:* `zig/src/norm.zig:143` `var inv_std: [4096]f32 = undefined;` indexed by `num_features`.
 * *Reach:* `abstract.jl:1072–1086` `forward(bn::BatchNorm, x)` → `backend_batchnorm(::ZigBackend, …)` (`zig_ffi.jl:536`) whenever the current backend is not `JuliaBackend`, `!bn.training`, `bn.affine`.
 * *Observed (shipped `.so`):* 4096 correct; 4097 → 2 wrong; 4100 → 8 wrong; 8192 / 65536 / 1e6 → SIGSEGV.
-* *Repro:* `python3 batchnorm_probe.py ../../../../zig/zig-out/lib/libaxiom_zig.so`; Zig-level: `zig test --dep axiom -Mroot=repro_batchnorm.zig -Maxiom=../../../../zig/src/axiom.zig -OReleaseSafe` → index out of bounds panic.
+* *Repro:* `julia --startup-file=no batchnorm_probe.jl ../../../../zig/zig-out/lib/libaxiom_zig.so`; Zig-level: `zig test --dep axiom -Mroot=repro_batchnorm.zig -Maxiom=../../../../zig/src/axiom.zig -OReleaseSafe` → index out of bounds panic.
 * *Julia confirmation:* `set_backend!(ZigBackend(lib)); m = Sequential(Dense(4, 8192), BatchNorm(8192)); m(Tensor(randn(Float32, 2, 4)))` — expected: process terminates.
 * *Fix:* allocate `inv_std` per call (arena/heap) or compute per feature without the scratch; add `num_features ∈ {4096, 4097, 8192, 65536}` to `zig build test` and `backend_parity.jl`.
 
@@ -81,7 +82,7 @@ is importable. Zig test reproductions compile against the repository's
 
 * *Where:* `src/backends/zig_ffi.jl:479–507` (`backend_maxpool2d`), `:513` (`backend_global_avgpool2d`) pass `input` directly; compare `_to_row_major_vec` use in conv/layernorm/softmax wrappers (`:79–95`). Kernels index row-major NHWC (`zig/src/pool.zig`).
 * *Observed:* maxpool wrong 5/8 (N=1,4×4,C=2), 5/8 (N=2,C=1), 49/54 (N=2,6×6,C=3), 7/8 (N=1,5×3,C=1,k=2,s=1); global-avgpool wrong for any N>1 or C>1; only N=1,C=1,square is correct.
-* *Repro:* `python3 layout_probe.py ../../../../zig/zig-out/lib/libaxiom_zig.so`.
+* *Repro:* `julia --startup-file=no layout_probe.jl ../../../../zig/zig-out/lib/libaxiom_zig.so`.
 * *Julia confirmation:* see D.1.
 * *Reach:* direct API, `SmartBackend`, `benchmark/benchmarks.jl`; not `MaxPool2d.forward` (pure Julia). Not parity-tested.
 
@@ -89,21 +90,21 @@ is importable. Zig test reproductions compile against the repository's
 
 * *Where:* `zig/src/activations.zig:103–119` `(e^{2x}−1)/(e^{2x}+1)`; `gelu` at `:135,144` already uses `1 − 2/(e^{2x}+1)`.
 * *Observed:* `axiom_tanh(44.5) = NaN`, `(45) = NaN`, `(50) = NaN`, `(100) = NaN`, `(+Inf) = NaN`; `(44.3) = 1.0`. Near zero: rel. err 1.3e-3 at 1e-5, 100 % at 1e-8. `gelu`, `sigmoid`, `silu` fine.
-* *Repro:* `python3 activation_probe.py ../../../../zig/zig-out/lib/libaxiom_zig.so`.
+* *Repro:* `julia --startup-file=no activation_probe.jl ../../../../zig/zig-out/lib/libaxiom_zig.so`.
 * *Reach:* `backend_tanh(::ZigBackend)`, `backend_tanh!`, `SmartBackend`. `tanh` absent from `backend_parity.jl`.
 
 === J-04 Chunking underflow at `batch_size = 5` `[E]` — Medium (UB)
 
 * *Where:* `zig/src/threading.zig:392` (`parallel_layernorm`), `:469` (`parallel_rmsnorm`), `:523` (`parallel_batch`, used by batched softmax): `last_start = (num_threads−1)·chunk`, `last_count = batch_size − last_start` with `chunk = ceil(batch/num_threads)`, `num_threads = min(4, batch)`. For `batch = 5`: `chunk = 2`, `last_start = 6 > 5` → usize wrap. Reached when `total ≥ 8192` and `batch ≥ 4` (`:294–324`).
 * *Observed:* Debug/ReleaseSafe: `panic: integer overflow` at `threading.zig:392`. `zig test -OReleaseFast` binary: *segfault*. Shipped `.so` (ReleaseFast): B=5 × {2048, 4096, 65536} correct with an intact canary after the output — LLVM's treatment of the UB happened to be benign in that compilation unit. It is undefined behaviour and build-dependent.
-* *Repro:* `zig test -OReleaseSafe --dep axiom -Mroot=repro_underflow_canary.zig -Maxiom=../../../../zig/src/threading.zig` (panic); `-OReleaseFast` (crash); `python3 canary_probe.py …libaxiom_zig.so` (benign through the `.so`); `python3 chunking_probe.py …` (B = 4…17 through the `.so`).
+* *Repro:* `zig test -OReleaseSafe --dep axiom -Mroot=repro_underflow_canary.zig -Maxiom=../../../../zig/src/threading.zig` (panic); `-OReleaseFast` (crash); `julia --startup-file=no canary_probe.jl …libaxiom_zig.so` (benign through the `.so`); `julia --startup-file=no chunking_probe.jl …` (B = 4…17 through the `.so`).
 * *Fix:* `last_count = batch_size -| last_start` (saturating) or derive per-thread ranges with `@min(start + chunk, batch_size)` as the element-wise `parallel_unary` already does (`:219`). Add B ∈ {1,…,9,13} to `zig build test` (Debug would have caught it).
 
 === J-05 `axiom_matmul_checked` cost `[E]` — High (performance / claim)
 
 * *Where:* `zig_ffi.jl:114` always calls `axiom_matmul_checked`; `zig/src/axiom.zig:101` pre-pass over `m·n·k` products.
 * *Observed:* checked vs unchecked: 0.311/0.035 ms (64²), 2.82/0.18 (128²), 24.8/2.17 (256²), 284.6/21.7 (512²). Single-thread OpenBLAS 512² = 2.3 ms. `benchmark/results_2026-02-20…` reports 25.6 ms at 512² — the unchecked kernel.
-* *Repro:* `python3 matmul_cost.py ../../../../zig/zig-out/lib/libaxiom_zig.so`.
+* *Repro:* `julia --startup-file=no matmul_cost.jl ../../../../zig/zig-out/lib/libaxiom_zig.so`.
 * *Fix:* check inputs in O(m·k + k·n) (vectorised `isfinite` scans) or the output once; keep the error contract; re-run the benchmark table.
 
 === J-06 `maxpool2d` padding not passed `[S]` — Medium
