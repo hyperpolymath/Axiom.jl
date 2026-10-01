@@ -12,7 +12,7 @@ that would settle them.
 
 `backend_matmul(::ZigBackend)` always calls `axiom_matmul_checked`
 (`zig_ffi.jl:114`), which runs a scalar `O(m·n·k)` finiteness pre-pass before
-the tiled SIMD kernel. `repro/matmul_cost.py`, same `.so`, same inputs
+the tiled SIMD kernel. `repro/matmul_cost.jl`, same `.so`, same inputs
 (median of repeats):
 
 [cols="1,1,1,1,1"]

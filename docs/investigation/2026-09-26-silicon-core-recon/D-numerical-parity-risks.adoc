@@ -15,7 +15,7 @@ column-major `(N,H,W,C)` buffer straight to `axiom_maxpool2d` /
 Every other array wrapper in the file converts with `_to_row_major_vec`
 (`:79`); these two do not.
 
-*Measured* (`repro/layout_probe.py`, simulates exactly what the Julia wrapper
+*Measured* (`repro/layout_probe.jl`, simulates exactly what the Julia wrapper
 does, compares with correct pooling):
 
 [cols="2,1,1"]
@@ -57,7 +57,7 @@ Julia's `tanh` returns `1.0`. `gelu` in the same file already uses the
 overflow-safe `1 − 2/(e^{2x}+1)` (`:135,144`) — the fix is to use the same
 form in `tanh_inplace`/`tanh`. Near zero the formula cancels: relative error
 1.3e-3 at `x = 1e-5`, 100 % at `x = 1e-8` (absolute error negligible).
-Measured with `repro/activation_probe.py`; `axiom_tanh_inplace` behaves the
+Measured with `repro/activation_probe.jl`; `axiom_tanh_inplace` behaves the
 same. `gelu`, `sigmoid`, `silu` are fine over the probed range (sigmoid(−100)
 flushes a denormal to 0 — harmless).
 
@@ -69,7 +69,7 @@ absent from `backend_parity.jl`).
 
 `norm.zig:143` `var inv_std: [4096]f32 = undefined;` indexed by
 `num_features` with no bound check. Through the shipped ReleaseFast `.so`
-(`repro/batchnorm_probe.py`, B=2):
+(`repro/batchnorm_probe.jl`, B=2):
 
 [cols="1,2"]
 |===
