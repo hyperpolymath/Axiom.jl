@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "Axiom.jl"
+abstract: "Julia package: Axiom"
+authors:
+  - family-names: "Jewell"
+    given-names: "Jonathan D.A."
+    orcid: "https://orcid.org/0000-0002-3078-6652"
+repository-code: "https://github.com/hyperpolymath/Axiom.jl"
+keywords:
+  - "hyperpolymath"
+  - "julia"
+  - "open-source"
+  - "computational-science"
+  - "epistemic-computing"
+  - "epistemic-infrastructure"
+  - "julia-package"
+  - "reproducible-research"
+  - "research-software"
+  - "scientific-software"
+  - "veridical-computing"
+  - "equivalence-aware-computing"
+  - "typed-provenance"
