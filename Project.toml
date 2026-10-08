@@ -22,7 +22,7 @@ CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
 Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
 PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
-SMTLib = "7d3f9a2c-8b4e-5c1f-a6d0-9e8f7b2c3d4e"
+SMTLib = "01a11d29-d89a-86da-8e3a-553d114a3537"
 
 [extensions]
 AxiomAMDGPUExt = "AMDGPU"
@@ -48,7 +48,7 @@ Random = "1"
 SHA = "0.7, 1"
 Serialization = "1"
 # SMTLib is the estate-internal package (packages/SMTLib.jl, uuid
-# 7d3f9a2c-...) resolvable only inside this monorepo via the workspace/dev
+# 01a11d29-d89a-...) resolvable only inside this monorepo via the workspace/dev
 # path -- it is not (yet) registered in General. The bound below tracks its
 # own Project.toml version (currently 0.1.0) rather than a registry range.
 SMTLib = "0.1"
