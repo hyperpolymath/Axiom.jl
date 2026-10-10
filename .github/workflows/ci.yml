@@ -53,8 +53,8 @@ jobs:
     # `continue-on-error: true` is the correct configuration per the Julia
     # ecosystem convention and the estate Julia-matrix decision fork
     # (ULTRAPLAN docs/design-diary/ULTRAPLAN.adoc, §Decision forks, item 6).
-    # Nightly breakage is expected during Julia's development cycle and is not
-    # an Axiom.jl defect. The real compatibility gates are Julia 1.10 (LTS)
+    # The cause of this nightly failure is undetermined.
+    # The real compatibility gates are Julia 1.10 (LTS)
     # and Julia 1.11 (stable) in the `julia-compat` job above.
     continue-on-error: true
     steps:

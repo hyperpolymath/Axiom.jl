@@ -45,8 +45,7 @@ for both checks.
 |Workflow |`julia-test.yml` → `test-nightly` job
 |Matrix |Julia nightly, ubuntu-latest, with Rust-built crypto cdylib
 |`continue-on-error` |`true`
-|Failure mode |`Pkg.test()` exits 1 on Julia nightly (same root cause —
-               the test suite itself is the failing surface)
+|Failure mode |`Pkg.test()` exits 1 on Julia nightly; cause undetermined
 |Also red on `main`? |*Yes* — red on every `main` run since at least `abe0cda`
                        (2026-09-28), confirmed still red on `b2d3eac` (2026-10-09)
 |Blocks merges? |*No* — same `continue-on-error: true` mitigation
