@@ -82,6 +82,13 @@ jobs:
   test-nightly:
     name: Julia nightly (crypto-enabled) - ubuntu-latest
     runs-on: ubuntu-latest
+    # Exemption (Axiom.jl#111): Julia nightly is informational-only.
+    # `continue-on-error: true` is the correct configuration per the Julia
+    # ecosystem convention and the estate Julia-matrix decision fork
+    # (ULTRAPLAN docs/design-diary/ULTRAPLAN.adoc, §Decision forks, item 6).
+    # The cause of this nightly failure is undetermined.
+    # The real compatibility gates are Julia 1.10 (LTS)
+    # and Julia 1 (stable) in the `test` job above.
     continue-on-error: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
