@@ -185,7 +185,7 @@ jobs:
 
       - name: Upload model package evidence artifact
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: model-package-evidence
           path: |
@@ -195,7 +195,7 @@ jobs:
 
       - name: Upload optimization evidence artifact
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: optimization-evidence
           path: build/optimization_evidence.json
@@ -203,7 +203,7 @@ jobs:
 
       - name: Upload verification telemetry evidence artifact
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: verification-telemetry-evidence
           path: build/verification_telemetry_evidence.json
@@ -244,7 +244,7 @@ jobs:
 
       - name: Upload GPU performance evidence artifact
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: gpu-performance-evidence-${{ matrix.os }}
           path: build/gpu_performance_evidence_${{ matrix.os }}.json
@@ -304,7 +304,7 @@ jobs:
 
       - name: Upload coprocessor evidence artifact
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coprocessor-evidence
           path: build/coprocessor_evidence.json
@@ -312,7 +312,7 @@ jobs:
 
       - name: Upload coprocessor resilience evidence artifact
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coprocessor-resilience-evidence
           path: build/coprocessor_resilience_evidence.json
@@ -320,7 +320,7 @@ jobs:
 
       - name: Upload TPU strict mode evidence artifact
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: tpu-strict-evidence
           path: build/tpu_strict_evidence.json
@@ -328,7 +328,7 @@ jobs:
 
       - name: Upload NPU strict mode evidence artifact
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: npu-strict-evidence
           path: build/npu_strict_evidence.json
@@ -336,7 +336,7 @@ jobs:
 
       - name: Upload DSP strict mode evidence artifact
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dsp-strict-evidence
           path: build/dsp_strict_evidence.json
@@ -344,7 +344,7 @@ jobs:
 
       - name: Upload MATH strict mode evidence artifact
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: math-strict-evidence
           path: build/math_strict_evidence.json
@@ -382,7 +382,7 @@ jobs:
 
       - name: Upload CUDA performance evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: gpu-performance-evidence-cuda
           path: build/gpu_performance_cuda.json
@@ -420,7 +420,7 @@ jobs:
 
       - name: Upload ROCm performance evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: gpu-performance-evidence-rocm
           path: build/gpu_performance_rocm.json
@@ -458,7 +458,7 @@ jobs:
 
       - name: Upload Metal performance evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: gpu-performance-evidence-metal
           path: build/gpu_performance_metal.json
@@ -526,7 +526,7 @@ jobs:
 
       - name: Upload proof bundle evidence artifact
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: proof-bundle-evidence
           path: build/proof_bundle_evidence.json
@@ -596,7 +596,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
 
       - name: Check for secrets
-        uses: trufflesecurity/trufflehog@b2b0a92070f206ab7b5a1105d82a7f2f48d92341 # v3.99.0
+        uses: trufflesecurity/trufflehog@e76dff8a7e57d6df0c60ad8cbf5d5cba505a8fc9 # v3.99.2
         with:
           path: ./
           base: ${{ github.event.repository.default_branch }}
