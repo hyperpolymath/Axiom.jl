@@ -48,10 +48,10 @@ jobs:
         julia-version: ['1.10', '1']
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - uses: actions/checkout@v7.0.1
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # stable
+        uses: dtolnay/rust-toolchain@v1
         with:
           # Required when the action is SHA-pinned: it can only infer the
           # toolchain from a tag ref (e.g. @stable), so a SHA pin needs it
@@ -59,7 +59,7 @@ jobs:
           toolchain: stable
 
       - name: Cache Cargo (crypto shim)
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache@v6.1.0
         with:
           path: |
             ~/.cargo/registry
@@ -70,11 +70,11 @@ jobs:
       - name: Build hybrid-signing crypto cdylib
         run: cd crypto && cargo build --release
 
-      - uses: julia-actions/setup-julia@da908477b5db94c10ffce8cfea9f2b3b9d5db687 # v3.0.3
+      - uses: julia-actions/setup-julia@v3.0.3
         with:
           version: ${{ matrix.julia-version }}
 
-      - uses: julia-actions/cache@9353db09a0f2bbbdec6f41791918c75d37391b36 # v3.5.0
+      - uses: julia-actions/cache@v3.5.0
 
       - name: Instantiate / Build / Precompile / Test
         run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile(); Pkg.test()'
@@ -91,10 +91,10 @@ jobs:
     # and Julia 1 (stable) in the `test` job above.
     continue-on-error: true
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - uses: actions/checkout@v7.0.1
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # stable
+        uses: dtolnay/rust-toolchain@v1
         with:
           # Required when the action is SHA-pinned: it can only infer the
           # toolchain from a tag ref (e.g. @stable), so a SHA pin needs it
@@ -102,7 +102,7 @@ jobs:
           toolchain: stable
 
       - name: Cache Cargo (crypto shim)
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache@v6.1.0
         with:
           path: |
             ~/.cargo/registry
@@ -113,11 +113,11 @@ jobs:
       - name: Build hybrid-signing crypto cdylib
         run: cd crypto && cargo build --release
 
-      - uses: julia-actions/setup-julia@da908477b5db94c10ffce8cfea9f2b3b9d5db687 # v3.0.3
+      - uses: julia-actions/setup-julia@v3.0.3
         with:
           version: nightly
 
-      - uses: julia-actions/cache@9353db09a0f2bbbdec6f41791918c75d37391b36 # v3.5.0
+      - uses: julia-actions/cache@v3.5.0
 
       - name: Instantiate / Build / Precompile / Test
         run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile(); Pkg.test()'
