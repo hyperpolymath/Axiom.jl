@@ -31,20 +31,20 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - uses: actions/checkout@v7.0.1
 
-      - uses: julia-actions/setup-julia@da908477b5db94c10ffce8cfea9f2b3b9d5db687 # v3.0.3
+      - uses: julia-actions/setup-julia@v3.0.3
         with:
           version: ${{ matrix.julia-version }}
 
-      - uses: julia-actions/cache@9353db09a0f2bbbdec6f41791918c75d37391b36 # v3.5.0
+      - uses: julia-actions/cache@v3.5.0
 
       - name: Instantiate / Build / Precompile / Test
         run: julia --project=. -e 'using Pkg; Pkg.Registry.add("General"); Pkg.Registry.add(Pkg.RegistrySpec(url="https://github.com/hyperpolymath/julia-professional-registry.git")); Pkg.instantiate(); Pkg.build(); Pkg.test()'
 
       - name: Process coverage
         if: matrix.julia-version == '1.10' && matrix.os == 'ubuntu-latest'
-        uses: julia-actions/julia-processcoverage@03114f09f119417c3242a9fb6e0b722676aedf38 # v1
+        uses: julia-actions/julia-processcoverage@v1.2.2
 
   julia-nightly:
     name: Julia nightly - ubuntu
@@ -58,13 +58,13 @@ jobs:
     # and Julia 1.11 (stable) in the `julia-compat` job above.
     continue-on-error: true
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - uses: actions/checkout@v7.0.1
 
-      - uses: julia-actions/setup-julia@da908477b5db94c10ffce8cfea9f2b3b9d5db687 # v3.0.3
+      - uses: julia-actions/setup-julia@v3.0.3
         with:
           version: nightly
 
-      - uses: julia-actions/cache@9353db09a0f2bbbdec6f41791918c75d37391b36 # v3.5.0
+      - uses: julia-actions/cache@v3.5.0
 
       - name: Instantiate / Build / Precompile / Test
         run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile(); Pkg.test()'
@@ -74,10 +74,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - uses: actions/checkout@v7.0.1
 
       - name: Install Zig
-        uses: goto-bus-stop/setup-zig@abea47f85e598557f500fa1fd2ab7464fcb39406 # v2.2.1
+        uses: goto-bus-stop/setup-zig@v2.2.1
         with:
           version: '0.15.2'
 
@@ -98,16 +98,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - uses: actions/checkout@v7.0.1
 
-      - uses: julia-actions/setup-julia@da908477b5db94c10ffce8cfea9f2b3b9d5db687 # v3.0.3
+      - uses: julia-actions/setup-julia@v3.0.3
         with:
           version: '1.10'
 
-      - uses: julia-actions/cache@9353db09a0f2bbbdec6f41791918c75d37391b36 # v3.5.0
+      - uses: julia-actions/cache@v3.5.0
 
       - name: Install Zig
-        uses: goto-bus-stop/setup-zig@abea47f85e598557f500fa1fd2ab7464fcb39406 # v2.2.1
+        uses: goto-bus-stop/setup-zig@v2.2.1
         with:
           version: '0.15.2'
 
@@ -135,13 +135,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - uses: actions/checkout@v7.0.1
 
-      - uses: julia-actions/setup-julia@da908477b5db94c10ffce8cfea9f2b3b9d5db687 # v3.0.3
+      - uses: julia-actions/setup-julia@v3.0.3
         with:
           version: '1.10'
 
-      - uses: julia-actions/cache@9353db09a0f2bbbdec6f41791918c75d37391b36 # v3.5.0
+      - uses: julia-actions/cache@v3.5.0
 
       - name: Instantiate / Build / Precompile
         run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile()'
@@ -154,13 +154,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - uses: actions/checkout@v7.0.1
 
-      - uses: julia-actions/setup-julia@da908477b5db94c10ffce8cfea9f2b3b9d5db687 # v3.0.3
+      - uses: julia-actions/setup-julia@v3.0.3
         with:
           version: '1.10'
 
-      - uses: julia-actions/cache@9353db09a0f2bbbdec6f41791918c75d37391b36 # v3.5.0
+      - uses: julia-actions/cache@v3.5.0
 
       - name: Instantiate / Build / Precompile
         run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile()'
@@ -185,7 +185,7 @@ jobs:
 
       - name: Upload model package evidence artifact
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: model-package-evidence
           path: |
@@ -195,7 +195,7 @@ jobs:
 
       - name: Upload optimization evidence artifact
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: optimization-evidence
           path: build/optimization_evidence.json
@@ -203,7 +203,7 @@ jobs:
 
       - name: Upload verification telemetry evidence artifact
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: verification-telemetry-evidence
           path: build/verification_telemetry_evidence.json
@@ -218,13 +218,13 @@ jobs:
         os: [ubuntu-latest, macos-latest]
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - uses: actions/checkout@v7.0.1
 
-      - uses: julia-actions/setup-julia@da908477b5db94c10ffce8cfea9f2b3b9d5db687 # v3.0.3
+      - uses: julia-actions/setup-julia@v3.0.3
         with:
           version: '1.10'
 
-      - uses: julia-actions/cache@9353db09a0f2bbbdec6f41791918c75d37391b36 # v3.5.0
+      - uses: julia-actions/cache@v3.5.0
 
       - name: Instantiate / Build / Precompile
         run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile()'
@@ -244,7 +244,7 @@ jobs:
 
       - name: Upload GPU performance evidence artifact
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: gpu-performance-evidence-${{ matrix.os }}
           path: build/gpu_performance_evidence_${{ matrix.os }}.json
@@ -255,13 +255,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - uses: actions/checkout@v7.0.1
 
-      - uses: julia-actions/setup-julia@da908477b5db94c10ffce8cfea9f2b3b9d5db687 # v3.0.3
+      - uses: julia-actions/setup-julia@v3.0.3
         with:
           version: '1.10'
 
-      - uses: julia-actions/cache@9353db09a0f2bbbdec6f41791918c75d37391b36 # v3.5.0
+      - uses: julia-actions/cache@v3.5.0
 
       - name: Instantiate / Build / Precompile
         run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile()'
@@ -304,7 +304,7 @@ jobs:
 
       - name: Upload coprocessor evidence artifact
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: coprocessor-evidence
           path: build/coprocessor_evidence.json
@@ -312,7 +312,7 @@ jobs:
 
       - name: Upload coprocessor resilience evidence artifact
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: coprocessor-resilience-evidence
           path: build/coprocessor_resilience_evidence.json
@@ -320,7 +320,7 @@ jobs:
 
       - name: Upload TPU strict mode evidence artifact
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: tpu-strict-evidence
           path: build/tpu_strict_evidence.json
@@ -328,7 +328,7 @@ jobs:
 
       - name: Upload NPU strict mode evidence artifact
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: npu-strict-evidence
           path: build/npu_strict_evidence.json
@@ -336,7 +336,7 @@ jobs:
 
       - name: Upload DSP strict mode evidence artifact
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: dsp-strict-evidence
           path: build/dsp_strict_evidence.json
@@ -344,7 +344,7 @@ jobs:
 
       - name: Upload MATH strict mode evidence artifact
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: math-strict-evidence
           path: build/math_strict_evidence.json
@@ -356,9 +356,9 @@ jobs:
     runs-on: [self-hosted, linux, x64, gpu, cuda]
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - uses: actions/checkout@v7.0.1
 
-      - uses: julia-actions/setup-julia@da908477b5db94c10ffce8cfea9f2b3b9d5db687 # v3.0.3
+      - uses: julia-actions/setup-julia@v3.0.3
         with:
           version: '1.10'
 
@@ -382,7 +382,7 @@ jobs:
 
       - name: Upload CUDA performance evidence
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: gpu-performance-evidence-cuda
           path: build/gpu_performance_cuda.json
@@ -394,9 +394,9 @@ jobs:
     runs-on: [self-hosted, linux, x64, gpu, rocm]
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - uses: actions/checkout@v7.0.1
 
-      - uses: julia-actions/setup-julia@da908477b5db94c10ffce8cfea9f2b3b9d5db687 # v3.0.3
+      - uses: julia-actions/setup-julia@v3.0.3
         with:
           version: '1.10'
 
@@ -420,7 +420,7 @@ jobs:
 
       - name: Upload ROCm performance evidence
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: gpu-performance-evidence-rocm
           path: build/gpu_performance_rocm.json
@@ -432,9 +432,9 @@ jobs:
     runs-on: [self-hosted, macOS, ARM64, gpu, metal]
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - uses: actions/checkout@v7.0.1
 
-      - uses: julia-actions/setup-julia@da908477b5db94c10ffce8cfea9f2b3b9d5db687 # v3.0.3
+      - uses: julia-actions/setup-julia@v3.0.3
         with:
           version: '1.10'
 
@@ -458,7 +458,7 @@ jobs:
 
       - name: Upload Metal performance evidence
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: gpu-performance-evidence-metal
           path: build/gpu_performance_metal.json
@@ -469,13 +469,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - uses: actions/checkout@v7.0.1
 
-      - uses: julia-actions/setup-julia@da908477b5db94c10ffce8cfea9f2b3b9d5db687 # v3.0.3
+      - uses: julia-actions/setup-julia@v3.0.3
         with:
           version: '1.10'
 
-      - uses: julia-actions/cache@9353db09a0f2bbbdec6f41791918c75d37391b36 # v3.5.0
+      - uses: julia-actions/cache@v3.5.0
 
       - name: Instantiate / Build / Precompile
         run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile()'
@@ -488,13 +488,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - uses: actions/checkout@v7.0.1
 
-      - uses: julia-actions/setup-julia@da908477b5db94c10ffce8cfea9f2b3b9d5db687 # v3.0.3
+      - uses: julia-actions/setup-julia@v3.0.3
         with:
           version: '1.10'
 
-      - uses: julia-actions/cache@9353db09a0f2bbbdec6f41791918c75d37391b36 # v3.5.0
+      - uses: julia-actions/cache@v3.5.0
 
       - name: Instantiate / Build / Precompile
         run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile()'
@@ -507,13 +507,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - uses: actions/checkout@v7.0.1
 
-      - uses: julia-actions/setup-julia@da908477b5db94c10ffce8cfea9f2b3b9d5db687 # v3.0.3
+      - uses: julia-actions/setup-julia@v3.0.3
         with:
           version: '1.10'
 
-      - uses: julia-actions/cache@9353db09a0f2bbbdec6f41791918c75d37391b36 # v3.5.0
+      - uses: julia-actions/cache@v3.5.0
 
       - name: Instantiate / Build / Precompile
         run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.build(); Pkg.precompile()'
@@ -526,7 +526,7 @@ jobs:
 
       - name: Upload proof bundle evidence artifact
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: proof-bundle-evidence
           path: build/proof_bundle_evidence.json
@@ -539,7 +539,7 @@ jobs:
       image: ghcr.io/stefan-hoeck/idris2-pack@sha256:de9781906050dc44704ec6de0108c86f899ef17b2642932b79e00245d613b8ad
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - uses: actions/checkout@v7.0.1
 
       - name: Typecheck ABI package (Abi.Types, Abi.Layout, Abi.Foreign)
         run: idris2 --typecheck axiom-abi.ipkg
@@ -549,7 +549,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - uses: actions/checkout@v7.0.1
 
       - name: Install Z3 solver
         run: |
@@ -557,11 +557,11 @@ jobs:
           sudo apt-get install -y z3
           z3 --version
 
-      - uses: julia-actions/setup-julia@da908477b5db94c10ffce8cfea9f2b3b9d5db687 # v3.0.3
+      - uses: julia-actions/setup-julia@v3.0.3
         with:
           version: '1.10'
 
-      - uses: julia-actions/cache@9353db09a0f2bbbdec6f41791918c75d37391b36 # v3.5.0
+      - uses: julia-actions/cache@v3.5.0
 
       - name: SMTLib.jl subpackage tests (solver-backed)
         run: julia --project=packages/SMTLib.jl -e 'using Pkg; Pkg.instantiate(); Pkg.test()'
@@ -576,7 +576,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - uses: actions/checkout@v7.0.1
 
       - name: Check core docs exist
         run: |
@@ -593,10 +593,10 @@ jobs:
     if: github.event_name == 'schedule'
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - uses: actions/checkout@v7.0.1
 
       - name: Check for secrets
-        uses: trufflesecurity/trufflehog@ea68ca03c865c5f324e86e849ced20ed3cf9dbbb # v3.99.8
+        uses: trufflesecurity/trufflehog@v3.99.8
         with:
           path: ./
           base: ${{ github.event.repository.default_branch }}
